@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Open Data Vibes</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin: 24px; }
+    header { max-width: 1000px; margin: 0 auto 16px; }
+    .grid { display: grid; gap: 16px; grid-template-columns: 1fr; max-width: 1000px; margin: 0 auto; }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    input, select { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom: 1px solid #eee; text-align: left; }
+    .muted { color: #6b7280; font-size: 14px; }
+  </style>
+  <!-- CSVパース用（軽量） -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js" defer></script>
+  <!-- チャート用（お手軽） -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="./script.js" type="module" defer></script>
+</head>
+<body>
+  <header>
+    <h1>Open Data Vibes 🚀</h1>
+    <p class="muted">/data/data.csv を置くだけで可視化。CSVの列名は自由です（後で Cursor に喋って変えればOK）。</p>
+  </header>
+
+  <section class="grid">
+    <div class="card">
+      <div class="row">
+        <label>数値列（Y軸）</label>
+        <select id="ySelect"></select>
+        <label>カテゴリ列（X軸）</label>
+        <select id="xSelect"></select>
+        <input id="filterInput" placeholder="フィルタ（部分一致）" />
+        <button id="downloadBtn">今の表をCSVでDL</button>
+      </div>
+      <canvas id="chart" height="120"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="row"><strong>プレビュー</strong><span class="muted" id="meta"></span></div>
+      <table id="table"><thead></thead><tbody></tbody></table>
+    </div>
+  </section>
+</body>
+</html>
