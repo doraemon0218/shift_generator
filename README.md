@@ -42,14 +42,6 @@ python3 -m http.server 8000
 - **ログインページ**: [http://localhost:8000/login.html](http://localhost:8000/login.html)
 - **トップページ**: [http://localhost:8000/top.html](http://localhost:8000/top.html) (ログイン後)
 
-### GitHub Pagesでデプロイ（推奨）
-
-1. このリポジトリをフォーク
-2. Settings → Pages で GitHub Pages を有効化
-3. ブランチを `main`、フォルダを `/` に設定
-4. デプロイ後、以下のURLでアクセス可能：
-   - `https://[ユーザー名].github.io/shift_generator/login.html`
-
 ## 📋 主な機能
 
 ### 1. ログイン機能
@@ -84,21 +76,8 @@ python3 -m http.server 8000
 - 休日に関する希望設定
 - いつでも修正可能
 
-## 🎯 使い方
 
-### 初回セットアップ
-
-1. **サーバーを起動**
-   ```bash
-   python3 -m http.server 8000
-   ```
-
-2. **ブラウザでアクセス**
-   ```
-   http://localhost:8000/login.html
-   ```
-
-3. **初回ログイン（管理者になる）**
+ **初回ログイン（管理者になる）**
    - 任意の姓・名・Gmail・パスワードでログイン
    - 初回ユーザーは自動的に管理者になります
 
@@ -187,39 +166,3 @@ shift_generator/
     ├─→ [過去のシフトデータ参照] (past_shifts.html)
     └─→ [管理者用画面] (admin.html) [管理者のみ]
         └─→ [シフト生成] (index.html)
-```
-
-## 💡 技術スタック
-
-- **フロントエンド**: HTML5, CSS3, JavaScript (ES6+)
-- **データ保存**: LocalStorage
-- **CSV処理**: PapaParse
-- **サーバー**: Python `http.server` (ローカル開発用)
-
-## 📝 注意事項
-
-- このアプリはLocalStorageを使用しているため、ブラウザごとにデータが保存されます
-- メール通知機能はテンプレートのみで、実際のメール送信は行われません（バックエンド実装が必要）
-- 本番環境では、バックエンドサーバーとデータベースの実装を推奨します
-
-## 📚 詳細ドキュメント
-
-- [DEMO.md](./DEMO.md) - デモシナリオと詳細ガイド
-
-## 🔗 アクセス
-
-### ローカル環境
-- **ログインページ**: [http://localhost:8000/login.html](http://localhost:8000/login.html)
-- **トップページ**: [http://localhost:8000/top.html](http://localhost:8000/top.html) (ログイン後)
-
-### GitHub Pages（デプロイ後）
-リポジトリのSettings → Pages でGitHub Pagesを有効化すると、以下のURLでアクセス可能：
-
-- **ログインページ**: `https://[ユーザー名].github.io/shift_generator/login.html`
-- **トップページ**: `https://[ユーザー名].github.io/shift_generator/top.html` (ログイン後)
-
-**👉 [リポジトリのトップページ](https://github.com/doraemon0218/shift_generator)**
-
-## 📄 ライセンス
-
-このプロジェクトはオープンソースです。
