@@ -3,8 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>手術室シフト表作成システム</title>
+  <title>シフト表生成 - 手術室シフト管理</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body { 
@@ -21,43 +22,22 @@
       padding: 24px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #e0e0e0;
+    }
     h1 {
-      margin: 0 0 8px 0;
+      margin: 0;
       color: #1a1a1a;
       font-size: 28px;
     }
-    .subtitle {
-      color: #666;
-      margin-bottom: 24px;
-    }
-    .controls {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-      padding: 20px;
-      background: #f9f9f9;
-      border-radius: 8px;
-    }
-    .control-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    label {
-      font-weight: 600;
-      font-size: 14px;
-      color: #333;
-    }
-    input[type="number"], input[type="file"], select {
-      padding: 8px 12px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      font-size: 14px;
-    }
     button {
-      padding: 10px 20px;
-      background: #4a90e2;
+      padding: 8px 16px;
+      background: #6c757d;
       color: white;
       border: none;
       border-radius: 6px;
@@ -67,191 +47,144 @@
       transition: background 0.2s;
     }
     button:hover {
-      background: #357abd;
+      background: #5a6268;
     }
     button:disabled {
       background: #ccc;
       cursor: not-allowed;
     }
-    .btn-secondary {
-      background: #6c757d;
-    }
-    .btn-secondary:hover {
-      background: #5a6268;
-    }
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
-      margin-bottom: 24px;
-    }
-    .stat-card {
-      padding: 16px;
-      background: #f0f7ff;
-      border-left: 4px solid #4a90e2;
-      border-radius: 6px;
-    }
-    .stat-label {
-      font-size: 12px;
-      color: #666;
-      margin-bottom: 4px;
-    }
-    .stat-value {
-      font-size: 20px;
-      font-weight: 700;
-      color: #1a1a1a;
-    }
-    .shift-table-container {
-      overflow-x: auto;
-      margin-bottom: 24px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    th {
+    .btn-primary {
       background: #4a90e2;
-      color: white;
-      padding: 12px 8px;
-      text-align: center;
-      font-weight: 600;
-      position: sticky;
-      top: 0;
-      z-index: 10;
     }
-    th:first-child {
-      position: sticky;
-      left: 0;
-      z-index: 11;
+    .btn-primary:hover {
       background: #357abd;
-      min-width: 120px;
     }
-    td {
-      padding: 10px 8px;
-      text-align: center;
-      border: 1px solid #e0e0e0;
+    .btn-success {
+      background: #28a745;
     }
-    td:first-child {
-      position: sticky;
-      left: 0;
-      background: white;
-      font-weight: 600;
-      text-align: left;
-      z-index: 9;
+    .btn-success:hover {
+      background: #218838;
     }
-    .day-shift { background: #fff3cd; }
-    .night-shift { background: #d1ecf1; }
-    .off-day { background: #d4edda; }
-    .violation { background: #f8d7da; }
-    .weekend { font-weight: 700; }
-    .legend {
-      display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
+    .form-group {
       margin-bottom: 16px;
-      padding: 12px;
-      background: #f9f9f9;
-      border-radius: 6px;
     }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
     }
-    .legend-color {
-      width: 24px;
-      height: 24px;
-      border-radius: 4px;
+    input[type="file"],
+    input[type="number"] {
+      padding: 8px;
       border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    input[type="number"] {
+      width: 100px;
+    }
+    .error {
+      color: #dc3545;
+      background: #f8d7da;
+      padding: 12px;
+      border-radius: 4px;
+      margin: 16px 0;
     }
     .loading {
       text-align: center;
       padding: 40px;
       color: #666;
     }
-    .error {
-      background: #f8d7da;
-      color: #721c24;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 16px;
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #f8f9fa;
+      font-weight: 600;
+    }
+    .weekend {
+      font-weight: bold;
+    }
+    .violation {
+      background: #ffebee;
+      color: #c62828;
+    }
+    .stats {
+      margin-top: 24px;
+    }
+    .stats-table {
+      width: 100%;
+      margin-top: 12px;
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="./script.js" type="module" defer></script>
+  <script src="./script.js" defer></script>
 </head>
 <body>
   <div class="container">
-    <h1>手術室シフト表作成システム</h1>
-    <p class="subtitle">2025年8月の2交代制シフト表を公平に作成します</p>
+    <div class="header">
+      <h1>⚙️ シフト表生成</h1>
+      <button onclick="window.location.href='top.html'">トップページに戻る</button>
+    </div>
+    
+    <p style="color: #666; margin-bottom: 24px;">
+      管理者ページからエクスポートしたCSVファイルをアップロードして、シフト表を生成します。
+    </p>
 
-    <div class="controls">
-      <div class="control-group">
-        <label>希望データCSVファイル</label>
-        <input type="file" id="fileInput" accept=".csv" />
-      </div>
-      <div class="control-group">
-        <label>日勤必要人数</label>
-        <input type="number" id="dayShiftRequired" value="3" min="1" />
-      </div>
-      <div class="control-group">
-        <label>夜勤必要人数</label>
-        <input type="number" id="nightShiftRequired" value="2" min="1" />
-      </div>
-      <div class="control-group">
-        <label>1ヶ月の目標勤務日数</label>
-        <input type="number" id="targetWorkDays" value="20" min="1" />
-      </div>
-      <div class="control-group" style="grid-column: span 2;">
-        <label>操作</label>
-        <div style="display: flex; gap: 8px;">
-          <button id="loadBtn">データを読み込む</button>
-          <button id="generateBtn" disabled>シフト表を生成</button>
-          <button id="exportBtn" class="btn-secondary" disabled>CSVでエクスポート</button>
-        </div>
-      </div>
+    <div class="form-group">
+      <label for="fileInput">CSVファイルを選択（またはデフォルトファイルを使用）</label>
+      <input type="file" id="fileInput" accept=".csv" />
+      <button id="loadBtn" class="btn-primary">データを読み込む</button>
     </div>
 
     <div id="errorContainer"></div>
-    <div id="statsContainer" style="display: none;">
-      <h2 style="font-size: 20px; margin-bottom: 12px;">公平性統計</h2>
-      <div class="stats" id="stats"></div>
-    </div>
 
-    <div id="legendContainer" style="display: none;">
-      <div class="legend">
-        <div class="legend-item">
-          <div class="legend-color" style="background: #fff3cd;"></div>
-          <span>日勤</span>
+    <div class="form-group">
+      <label>シフト設定</label>
+      <div style="display: flex; gap: 16px; align-items: center;">
+        <div>
+          <label for="dayShiftRequired" style="display: inline; margin-right: 8px;">日勤必要人数:</label>
+          <input type="number" id="dayShiftRequired" value="3" min="1" />
         </div>
-        <div class="legend-item">
-          <div class="legend-color" style="background: #d1ecf1;"></div>
-          <span>夜勤</span>
+        <div>
+          <label for="nightShiftRequired" style="display: inline; margin-right: 8px;">夜勤必要人数:</label>
+          <input type="number" id="nightShiftRequired" value="2" min="1" />
         </div>
-        <div class="legend-item">
-          <div class="legend-color" style="background: #d4edda;"></div>
-          <span>休日</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-color" style="background: #f8d7da;"></div>
-          <span>希望違反</span>
+        <div>
+          <label for="targetWorkDays" style="display: inline; margin-right: 8px;">1ヶ月の目標勤務日数:</label>
+          <input type="number" id="targetWorkDays" value="20" min="1" />
         </div>
       </div>
     </div>
 
-    <div id="tableContainer" style="display: none;">
-      <div class="shift-table-container">
-        <table id="shiftTable">
-          <thead></thead>
-          <tbody></tbody>
-        </table>
-      </div>
+    <button id="generateBtn" class="btn-success" disabled>シフト表を生成</button>
+
+    <div id="loadingContainer" style="display: none;">
+      <div class="loading">シフト表を生成中...</div>
     </div>
 
-    <div id="loadingContainer" class="loading" style="display: none;">
-      シフト表を生成中...
+    <div id="tableContainer" style="display: none;"></div>
+    <div id="statsContainer" style="display: none;" class="stats"></div>
+    <div id="legendContainer" style="display: none; margin-top: 24px;">
+      <h3>凡例</h3>
+      <ul>
+        <li><strong>日</strong>: 日勤</li>
+        <li><strong>夜</strong>: 夜勤</li>
+        <li><strong>休</strong>: 休日</li>
+        <li><span class="violation">赤背景</span>: 希望違反</li>
+        <li><strong>太字</strong>: 週末（土日）</li>
+      </ul>
+    </div>
+
+    <div style="margin-top: 24px;">
+      <button id="exportBtn" class="btn-primary" disabled>CSVでエクスポート</button>
     </div>
   </div>
 </body>

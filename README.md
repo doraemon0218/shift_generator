@@ -13,13 +13,18 @@ python3 -m http.server 8000
 
 ブラウザで以下のURLにアクセス：
 
-**👉 [http://localhost:8000/login.html](http://localhost:8000/login.html)**
+**👉 [ログインページ](http://localhost:8000/login.html) → [トップページ](http://localhost:8000/top.html)**
 
 または、デモ起動スクリプトを使用：
 
 ```bash
 ./DEMO_START.sh
 ```
+
+### 🔗 直接アクセス
+
+- **ログインページ**: [http://localhost:8000/login.html](http://localhost:8000/login.html)
+- **トップページ**: [http://localhost:8000/top.html](http://localhost:8000/top.html) (ログイン後)
 
 ### GitHub Pagesでデプロイ（推奨）
 
@@ -188,14 +193,16 @@ shift_generator/
 ## 🔗 アクセス
 
 ### ローカル環境
-```
-http://localhost:8000/login.html
-```
+- **ログインページ**: [http://localhost:8000/login.html](http://localhost:8000/login.html)
+- **トップページ**: [http://localhost:8000/top.html](http://localhost:8000/top.html) (ログイン後)
 
 ### GitHub Pages（デプロイ後）
-```
-https://[ユーザー名].github.io/shift_generator/login.html
-```
+リポジトリのSettings → Pages でGitHub Pagesを有効化すると、以下のURLでアクセス可能：
+
+- **ログインページ**: `https://[ユーザー名].github.io/shift_generator/login.html`
+- **トップページ**: `https://[ユーザー名].github.io/shift_generator/top.html` (ログイン後)
+
+**👉 [リポジトリのトップページ](https://github.com/doraemon0218/shift_generator)**
 
 ## 📄 ライセンス
 
