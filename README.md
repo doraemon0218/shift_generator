@@ -2,6 +2,22 @@
 
 看護師のシフト希望調査結果から、公平な2交代制の手術室シフト表を自動生成するWebアプリケーションです。
 
+## 🔗 アクセス
+
+### GitHub Pages（推奨）
+リポジトリのSettings → Pages でGitHub Pagesを有効化すると、以下のURLでアクセス可能：
+
+- **👉 [トップページ](https://doraemon0218.github.io/shift_generator/top.html)** - メインアプリケーション
+- **👉 [ログインページ](https://doraemon0218.github.io/shift_generator/login.html)** - ログイン
+
+### ローカル環境
+```bash
+cd shift_generator
+python3 -m http.server 8000
+```
+- **👉 [トップページ](http://localhost:8000/top.html)** - メインアプリケーション
+- **👉 [ログインページ](http://localhost:8000/login.html)** - ログイン
+
 ## 🚀 クイックスタート
 
 ### ローカルで起動
