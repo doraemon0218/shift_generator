@@ -3,49 +3,256 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Open Data Vibes</title>
+  <title>手術室シフト表作成システム</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin: 24px; }
-    header { max-width: 1000px; margin: 0 auto 16px; }
-    .grid { display: grid; gap: 16px; grid-template-columns: 1fr; max-width: 1000px; margin: 0 auto; }
-    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    input, select { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 8px; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 8px; border-bottom: 1px solid #eee; text-align: left; }
-    .muted { color: #6b7280; font-size: 14px; }
+    * { box-sizing: border-box; }
+    body { 
+      font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; 
+      margin: 0; 
+      padding: 20px; 
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      color: #1a1a1a;
+      font-size: 28px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 24px;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+      padding: 20px;
+      background: #f9f9f9;
+      border-radius: 8px;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    label {
+      font-weight: 600;
+      font-size: 14px;
+      color: #333;
+    }
+    input[type="number"], input[type="file"], select {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    button {
+      padding: 10px 20px;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #357abd;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: #6c757d;
+    }
+    .btn-secondary:hover {
+      background: #5a6268;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      padding: 16px;
+      background: #f0f7ff;
+      border-left: 4px solid #4a90e2;
+      border-radius: 6px;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+    .shift-table-container {
+      overflow-x: auto;
+      margin-bottom: 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      background: #4a90e2;
+      color: white;
+      padding: 12px 8px;
+      text-align: center;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    th:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 11;
+      background: #357abd;
+      min-width: 120px;
+    }
+    td {
+      padding: 10px 8px;
+      text-align: center;
+      border: 1px solid #e0e0e0;
+    }
+    td:first-child {
+      position: sticky;
+      left: 0;
+      background: white;
+      font-weight: 600;
+      text-align: left;
+      z-index: 9;
+    }
+    .day-shift { background: #fff3cd; }
+    .night-shift { background: #d1ecf1; }
+    .off-day { background: #d4edda; }
+    .violation { background: #f8d7da; }
+    .weekend { font-weight: 700; }
+    .legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      padding: 12px;
+      background: #f9f9f9;
+      border-radius: 6px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .legend-color {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
   </style>
-  <!-- CSVパース用（軽量） -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js" defer></script>
-  <!-- チャート用（お手軽） -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="./script.js" type="module" defer></script>
 </head>
 <body>
-  <header>
-    <h1>Open Data Vibes 🚀</h1>
-    <p class="muted">/data/data.csv を置くだけで可視化。CSVの列名は自由です（後で Cursor に喋って変えればOK）。</p>
-  </header>
+  <div class="container">
+    <h1>手術室シフト表作成システム</h1>
+    <p class="subtitle">2025年8月の2交代制シフト表を公平に作成します</p>
 
-  <section class="grid">
-    <div class="card">
-      <div class="row">
-        <label>数値列（Y軸）</label>
-        <select id="ySelect"></select>
-        <label>カテゴリ列（X軸）</label>
-        <select id="xSelect"></select>
-        <input id="filterInput" placeholder="フィルタ（部分一致）" />
-        <button id="downloadBtn">今の表をCSVでDL</button>
+    <div class="controls">
+      <div class="control-group">
+        <label>希望データCSVファイル</label>
+        <input type="file" id="fileInput" accept=".csv" />
       </div>
-      <canvas id="chart" height="120"></canvas>
+      <div class="control-group">
+        <label>日勤必要人数</label>
+        <input type="number" id="dayShiftRequired" value="3" min="1" />
+      </div>
+      <div class="control-group">
+        <label>夜勤必要人数</label>
+        <input type="number" id="nightShiftRequired" value="2" min="1" />
+      </div>
+      <div class="control-group">
+        <label>1ヶ月の目標勤務日数</label>
+        <input type="number" id="targetWorkDays" value="20" min="1" />
+      </div>
+      <div class="control-group" style="grid-column: span 2;">
+        <label>操作</label>
+        <div style="display: flex; gap: 8px;">
+          <button id="loadBtn">データを読み込む</button>
+          <button id="generateBtn" disabled>シフト表を生成</button>
+          <button id="exportBtn" class="btn-secondary" disabled>CSVでエクスポート</button>
+        </div>
+      </div>
     </div>
 
-    <div class="card">
-      <div class="row"><strong>プレビュー</strong><span class="muted" id="meta"></span></div>
-      <table id="table"><thead></thead><tbody></tbody></table>
+    <div id="errorContainer"></div>
+    <div id="statsContainer" style="display: none;">
+      <h2 style="font-size: 20px; margin-bottom: 12px;">公平性統計</h2>
+      <div class="stats" id="stats"></div>
     </div>
-  </section>
+
+    <div id="legendContainer" style="display: none;">
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-color" style="background: #fff3cd;"></div>
+          <span>日勤</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #d1ecf1;"></div>
+          <span>夜勤</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #d4edda;"></div>
+          <span>休日</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #f8d7da;"></div>
+          <span>希望違反</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="tableContainer" style="display: none;">
+      <div class="shift-table-container">
+        <table id="shiftTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="loadingContainer" class="loading" style="display: none;">
+      シフト表を生成中...
+    </div>
+  </div>
 </body>
 </html>

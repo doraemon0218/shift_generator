@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>トップページ - 手術室シフト管理システム</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { 
+      font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; 
+      margin: 0; 
+      padding: 20px; 
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    h1 {
+      margin: 0;
+      color: #1a1a1a;
+      font-size: 28px;
+    }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .user-name {
+      font-weight: 600;
+      color: #333;
+    }
+    button {
+      padding: 8px 16px;
+      background: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #5a6268;
+    }
+    .deadline-banner {
+      background: #dc3545;
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 32px;
+      text-align: center;
+    }
+    .deadline-banner.warning {
+      background: #ffc107;
+      color: #856404;
+    }
+    .deadline-banner.info {
+      background: #17a2b8;
+      color: white;
+    }
+    .deadline-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .deadline-date {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .deadline-countdown {
+      font-size: 14px;
+      margin-top: 8px;
+    }
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+    .menu-card {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      transition: transform 0.3s, box-shadow 0.3s;
+      border: 2px solid transparent;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+    .menu-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      border-color: #4a90e2;
+    }
+    .menu-card.admin {
+      border-color: #ffc107;
+    }
+    .menu-card.admin:hover {
+      border-color: #ff9800;
+    }
+    .menu-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    .menu-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    .menu-description {
+      color: #666;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .notification-info {
+      background: #e3f2fd;
+      border-left: 4px solid #2196f3;
+      padding: 16px;
+      border-radius: 6px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: #555;
+    }
+  </style>
+  <script src="./top.js" defer></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🏥 手術室シフト管理システム</h1>
+      <div class="user-info">
+        <span class="user-name" id="userName"></span>
+        <button id="logoutBtn">ログアウト</button>
+      </div>
+    </div>
+
+    <!-- 締め切り表示 -->
+    <div id="deadlineBanner" class="deadline-banner" style="display: none;">
+      <div class="deadline-title">シフト希望調査 締め切り</div>
+      <div class="deadline-date" id="deadlineDate"></div>
+      <div class="deadline-countdown" id="deadlineCountdown"></div>
+    </div>
+
+    <!-- 通知情報 -->
+    <div class="notification-info" id="notificationInfo" style="display: none;">
+      <strong>📧 メール通知について:</strong> 未提出の場合、締め切り3日前に登録したGmailアドレスに通知メールが送信されます。
+    </div>
+
+    <!-- メニュー -->
+    <div class="menu-grid">
+      <a href="nurse_input.html" class="menu-card">
+        <div class="menu-icon">📝</div>
+        <div class="menu-title">シフト希望入力</div>
+        <div class="menu-description">今月のシフト希望を入力・提出します</div>
+      </a>
+
+      <a href="nurse_input.html?page=settings" class="menu-card">
+        <div class="menu-icon">⚙️</div>
+        <div class="menu-title">個人設定</div>
+        <div class="menu-description">個人情報や勤務希望を設定します（いつでも修正可能）</div>
+      </a>
+
+      <a href="past_shifts.html" class="menu-card">
+        <div class="menu-icon">📅</div>
+        <div class="menu-title">過去のシフトデータ参照</div>
+        <div class="menu-description">過去の月毎のシフトデータを確認できます</div>
+      </a>
+
+      <a href="admin.html" class="menu-card admin" id="adminCard" style="display: none;">
+        <div class="menu-icon">👨‍💼</div>
+        <div class="menu-title">管理者用画面</div>
+        <div class="menu-description">締め切り設定・提出状況確認・シフト生成</div>
+      </a>
+    </div>
+  </div>
+
+</body>
+</html>
+

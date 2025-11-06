@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>過去のシフトデータ - 手術室シフト管理システム</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { 
+      font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; 
+      margin: 0; 
+      padding: 20px; 
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    h1 {
+      margin: 0;
+      color: #1a1a1a;
+      font-size: 28px;
+    }
+    button {
+      padding: 8px 16px;
+      background: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #5a6268;
+    }
+    .info-box {
+      background: #e3f2fd;
+      border-left: 4px solid #2196f3;
+      padding: 16px;
+      border-radius: 6px;
+      margin-bottom: 24px;
+      color: #555;
+    }
+  </style>
+  <script>
+    // ログイン状態を確認
+    document.addEventListener('DOMContentLoaded', () => {
+      const currentUser = localStorage.getItem('current_user');
+      if (!currentUser) {
+        window.location.href = 'login.html';
+        return;
+      }
+    });
+
+    function goBack() {
+      window.location.href = 'top.html';
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📅 過去のシフトデータ参照</h1>
+      <button onclick="goBack()">トップページに戻る</button>
+    </div>
+
+    <div class="info-box">
+      <strong>過去のシフトデータ</strong><br>
+      過去の月毎のシフトデータを確認できます。実装は今後追加予定です。
+    </div>
+
+    <p style="color: #666;">過去のシフトデータ機能は準備中です。</p>
+  </div>
+</body>
+</html>
+

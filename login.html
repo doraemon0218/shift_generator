@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ログイン - 手術室シフト管理システム</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { 
+      font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; 
+      margin: 0; 
+      padding: 20px; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 450px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 32px;
+      font-size: 14px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #333;
+      font-size: 14px;
+    }
+    input[type="text"], input[type="email"], input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+    input:focus {
+      outline: none;
+      border-color: #4a90e2;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 8px;
+    }
+    button:hover {
+      background: #357abd;
+    }
+    .error-message {
+      color: #dc3545;
+      font-size: 13px;
+      margin-top: 8px;
+      display: none;
+    }
+    .error-message.show {
+      display: block;
+    }
+    .register-link {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 14px;
+      color: #666;
+    }
+    .register-link a {
+      color: #4a90e2;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .register-link a:hover {
+      text-decoration: underline;
+    }
+  </style>
+  <script src="./login.js" defer></script>
+</head>
+<body>
+  <div class="login-container">
+    <h1>🏥 シフト管理システム</h1>
+    <p class="subtitle">ログインしてください</p>
+    
+    <form id="loginForm">
+      <div class="form-group">
+        <div class="form-row">
+          <div>
+            <label for="lastName">姓</label>
+            <input type="text" id="lastName" placeholder="山田" required />
+          </div>
+          <div>
+            <label for="firstName">名</label>
+            <input type="text" id="firstName" placeholder="太郎" required />
+          </div>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="email">Gmailアドレス</label>
+        <input type="email" id="email" placeholder="example@gmail.com" required />
+      </div>
+      
+      <div class="form-group">
+        <label for="password">パスワード</label>
+        <input type="password" id="password" placeholder="パスワードを入力" required />
+      </div>
+      
+      <div class="error-message" id="errorMessage"></div>
+      
+      <button type="submit">ログイン</button>
+    </form>
+    
+    <div class="register-link">
+      初めての方は <a href="#" onclick="alert('新規登録機能は準備中です'); return false;">新規登録</a>
+    </div>
+  </div>
+</body>
+</html>
+

@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>管理者ページ - 締め切り設定・シフト生成</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <style>
+    * { box-sizing: border-box; }
+    body { 
+      font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; 
+      margin: 0; 
+      padding: 20px; 
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      color: #1a1a1a;
+      font-size: 28px;
+    }
+    .section {
+      margin-bottom: 32px;
+      padding: 20px;
+      background: #f9f9f9;
+      border-radius: 8px;
+    }
+    .section-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #333;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #333;
+    }
+    input[type="datetime-local"], input[type="number"], button {
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    button {
+      background: #4a90e2;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #357abd;
+    }
+    .btn-success {
+      background: #28a745;
+    }
+    .btn-success:hover {
+      background: #218838;
+    }
+    .btn-danger {
+      background: #dc3545;
+    }
+    .btn-danger:hover {
+      background: #c82333;
+    }
+    .deadline-display {
+      padding: 16px;
+      background: #e3f2fd;
+      border-left: 4px solid #2196f3;
+      border-radius: 6px;
+      margin-top: 16px;
+    }
+    .deadline-display.warning {
+      background: #fff3cd;
+      border-left-color: #ffc107;
+    }
+    .deadline-display.passed {
+      background: #f8d7da;
+      border-left-color: #dc3545;
+    }
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .status-card {
+      padding: 16px;
+      background: white;
+      border-radius: 6px;
+      border-left: 4px solid #4a90e2;
+    }
+    .status-card.success {
+      border-left-color: #28a745;
+    }
+    .status-card.warning {
+      border-left-color: #ffc107;
+    }
+    .status-label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    .status-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+    .nurse-list {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 12px;
+      background: white;
+    }
+    .nurse-item {
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .nurse-item:last-child {
+      border-bottom: none;
+    }
+    .badge {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-success {
+      background: #d4edda;
+      color: #155724;
+    }
+    .badge-warning {
+      background: #fff3cd;
+      color: #856404;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="./admin.js" defer></script>
+</head>
+<body>
+  <div class="container">
+    <h1>👨‍💼 管理者ページ</h1>
+    <p style="color: #666; margin-bottom: 24px;">締め切り設定とシフト表生成</p>
+
+    <!-- 締め切り設定セクション -->
+    <div class="section">
+      <div class="section-title">📅 締め切り設定</div>
+      <div class="form-group">
+        <label>締め切り日時（毎月15日23:59に自動設定）</label>
+        <input type="datetime-local" id="deadlineInput" />
+        <button onclick="setDeadlineMonthly()" style="margin-left: 8px;">毎月15日23:59に設定</button>
+        <button onclick="setDeadline()" class="btn-success" style="margin-left: 8px;">設定</button>
+        <button onclick="clearDeadline()" class="btn-danger" style="margin-left: 8px;">クリア</button>
+      </div>
+      <div id="deadlineDisplay" class="deadline-display" style="display: none;"></div>
+    </div>
+
+    <!-- 提出状況確認セクション -->
+    <div class="section">
+      <div class="section-title">📊 提出状況確認</div>
+      <button onclick="loadSubmissionStatus()">提出状況を更新</button>
+      <div class="status-grid" id="statusGrid" style="display: none;"></div>
+      <div id="nurseList" class="nurse-list" style="display: none; margin-top: 16px;"></div>
+    </div>
+
+    <!-- 夜勤設定セクション -->
+    <div class="section">
+      <div class="section-title">🌙 看護師の夜勤設定</div>
+      <p style="color: #666; margin-bottom: 16px;">各看護師の夜勤（当直）設定を変更できます</p>
+      <button onclick="loadNurseNightShiftSettings()">夜勤設定一覧を表示</button>
+      <div id="nightShiftSettings" style="margin-top: 16px;"></div>
+    </div>
+
+    <!-- 管理者設定セクション -->
+    <div class="section">
+      <div class="section-title">👤 管理者設定</div>
+      <div class="form-group">
+        <label>管理者として設定するGmailアドレス</label>
+        <input type="email" id="adminEmailInput" placeholder="admin@example.com" style="width: 100%; max-width: 400px;" />
+        <button onclick="addAdmin()" style="margin-left: 8px;">管理者を追加</button>
+      </div>
+      <div id="adminList" style="margin-top: 16px;"></div>
+    </div>
+
+    <!-- CSVエクスポートセクション -->
+    <div class="section">
+      <div class="section-title">📥 希望データのエクスポート</div>
+      <p style="color: #666; margin-bottom: 16px;">看護師が入力した希望データをCSV形式でエクスポートします</p>
+      <button onclick="exportAllRequests()" class="btn-success">全希望データをCSVでエクスポート</button>
+      <div id="exportStatus" style="margin-top: 16px;"></div>
+    </div>
+
+    <!-- シフト生成セクション -->
+    <div class="section">
+      <div class="section-title">⚙️ シフト表生成</div>
+      <p style="color: #666; margin-bottom: 16px;">
+        <a href="index.html" style="color: #4a90e2; text-decoration: none; font-weight: 600;">
+          → シフト表生成ページへ移動
+        </a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+

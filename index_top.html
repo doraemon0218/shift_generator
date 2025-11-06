@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手術室シフト管理システム</title>
+    <script>
+      // ログイン状態を確認してリダイレクト
+      window.addEventListener('DOMContentLoaded', () => {
+        const currentUser = localStorage.getItem('current_user');
+        if (currentUser) {
+          window.location.href = 'top.html';
+        } else {
+          window.location.href = 'login.html';
+        }
+      });
+    </script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 60px 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 16px;
+        }
+        .card-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: 2px solid transparent;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            border-color: #4a90e2;
+        }
+        .card-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        .card-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+        }
+        .card-description {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        .card-button {
+            display: inline-block;
+            padding: 12px 32px;
+            background: #4a90e2;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        .card-button:hover {
+            background: #357abd;
+        }
+        .card.nurse .card-button {
+            background: #28a745;
+        }
+        .card.nurse .card-button:hover {
+            background: #218838;
+        }
+        .card.admin .card-button {
+            background: #6c757d;
+        }
+        .card.admin .card-button:hover {
+            background: #5a6268;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+        .info-box h3 {
+            color: #1976d2;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        .info-box ul {
+            color: #555;
+            padding-left: 20px;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #999;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏥 手術室シフト管理システム</h1>
+        <p class="subtitle">プロトタイプ版 - 2025年8月シフト希望管理</p>
+        
+        <div class="card-container">
+            <div class="card nurse">
+                <div class="card-icon">👩‍⚕️</div>
+                <div class="card-title">看護師用</div>
+                <div class="card-description">
+                    シフト希望を入力・提出します<br>
+                    カレンダー形式で簡単に入力できます
+                </div>
+                <a href="nurse_input.html" class="card-button">希望入力ページへ</a>
+            </div>
+            
+            <div class="card admin">
+                <div class="card-icon">👨‍💼</div>
+                <div class="card-title">管理者用</div>
+                <div class="card-description">
+                    締め切り設定・提出状況確認・シフト表生成<br>
+                    希望データの管理とシフト表の自動生成
+                </div>
+                <a href="admin.html" class="card-button">管理者ページへ</a>
+                <a href="index.html" class="card-button" style="margin-top: 8px; display: block;">シフト生成ページへ</a>
+            </div>
+            
+            <div class="card">
+                <div class="card-icon">🔐</div>
+                <div class="card-title">新ログインシステム</div>
+                <div class="card-description">
+                    新しいログインシステム（姓・名・Gmail・パスワード）<br>
+                    トップページから各機能にアクセス
+                </div>
+                <a href="login.html" class="card-button">ログインページへ</a>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <h3>📋 使い方</h3>
+            <ul>
+                <li><strong>看護師の方：</strong> 看護師名を入力してログインし、カレンダーで希望を入力して提出してください</li>
+                <li><strong>管理者の方：</strong> CSVファイルから希望データを読み込み、公平なシフト表を自動生成できます</li>
+                <li>データはブラウザのLocalStorageに保存されます（プロトタイプ版）</li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            <p>プロトタイプ版 - 動作確認用</p>
+            <p style="margin-top: 8px;">
+                <a href="test.html" style="color: #4a90e2; text-decoration: none;">サーバーテストページ</a> | 
+                <a href="data/shift_requests.csv" style="color: #4a90e2; text-decoration: none;">サンプルデータ</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+
