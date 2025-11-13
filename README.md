@@ -5,11 +5,11 @@
 ## 🔗 アクセス
 
 ### GitHub Pages（推奨）
-リポジトリのSettings → Pages でGitHub Pagesを有効化すると、以下のURLでアクセス可能：
+リポジトリのSettings → Pages でGitHub Pagesを有効化すると、以下のURL形式でアクセス可能：
 
-- **👉 [ログイン（トップページ）](https://doraemon0218.github.io/shift_generator/index.html)** - ログイン画面
-- **👉 [アプリトップ](https://doraemon0218.github.io/shift_generator/top.html)** - ログイン後メニュー
-- **👉 [シフト生成](https://doraemon0218.github.io/shift_generator/generator.html)** - 管理者向け
+- **👉 [ログイン（トップページ）](https://＜GitHubユーザー名＞.github.io/shift_generator/index.html)** - ログイン画面
+- **👉 [アプリトップ](https://＜GitHubユーザー名＞.github.io/shift_generator/top.html)** - ログイン後メニュー
+- **👉 [シフト生成](https://＜GitHubユーザー名＞.github.io/shift_generator/generator.html)** - 管理者向け
 
 ### ローカル環境
 ```bash
