@@ -235,18 +235,24 @@ function loadNurseNightShiftSettings() {
                   </div>
                 </td>
                 <td style="padding: 12px;">
-                  <button onclick="setNurseNightShift('${nurse.userKey}', true)" 
-                          style="padding: 6px 12px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px;">
-                    夜勤ON
-                  </button>
-                  <button onclick="setNurseNightShift('${nurse.userKey}', false)" 
-                          style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px;">
-                    夜勤OFF
-                  </button>
-                  <button onclick="setNurseNightShift('${nurse.userKey}', null)" 
-                          style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                    未設定
-                  </button>
+                  <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                    <button onclick="setNurseNightShift('${nurse.userKey}', true)" 
+                            style="padding: 6px 12px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                      夜勤ON
+                    </button>
+                    <button onclick="setNurseNightShift('${nurse.userKey}', false)" 
+                            style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                      夜勤OFF
+                    </button>
+                    <button onclick="setNurseNightShift('${nurse.userKey}', null)" 
+                            style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                      未設定
+                    </button>
+                    <button onclick="deleteNurseData('${nurse.userKey}')" 
+                            style="padding: 6px 12px; background: #b71c1c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                      登録データ削除
+                    </button>
+                  </div>
                 </td>
               </tr>
             `;
@@ -376,6 +382,39 @@ function setNurseNightShift(userKey, doesNightShift) {
   loadNurseNightShiftSettings();
   loadValuePreferences();
   alert('夜勤設定を更新しました');
+}
+
+// 看護師の登録データを削除
+function deleteNurseData(userKey) {
+  const users = getUserDirectory();
+  const user = users[userKey];
+  const displayName = user?.fullName || userKey;
+  if (!confirm(`「${displayName}」の登録データを削除しますか？\nシフト希望・提出状況・価値観などがリセットされます。`)) {
+    return;
+  }
+
+  const storageKey = STORAGE_KEY_PREFIX + userKey;
+  const submittedKey = SUBMITTED_KEY_PREFIX + userKey;
+  localStorage.removeItem(storageKey);
+  localStorage.removeItem(submittedKey);
+
+  if (user && user.email) {
+    const email = user.email;
+    const notificationPrefix = `notification_sent_${email}_`;
+    const keysToDelete = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(notificationPrefix)) {
+        keysToDelete.push(key);
+      }
+    }
+    keysToDelete.forEach(key => localStorage.removeItem(key));
+  }
+
+  alert('登録データを削除しました');
+  loadNurseNightShiftSettings();
+  loadSubmissionStatus();
+  loadValuePreferences();
 }
 
 // ページ読み込み時に実行
