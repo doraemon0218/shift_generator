@@ -405,11 +405,20 @@
     .quick-option-button:last-child {
       margin-bottom: 0;
     }
-    .quick-option-button strong {
-      display: block;
-      font-size: 13px;
-      color: #1a1a1a;
+    .quick-option-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       margin-bottom: 4px;
+    }
+    .quick-option-icon {
+      font-size: 18px;
+      line-height: 1;
+    }
+    .quick-option-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a1a1a;
     }
     .quick-option-desc {
       font-size: 11px;
@@ -465,6 +474,24 @@
       cursor: pointer;
       text-align: left;
       transition: all 0.2s;
+    }
+    .option-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+    .option-icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+    .option-desc {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+      line-height: 1.5;
     }
     .option-button:hover {
       border-color: #4a90e2;

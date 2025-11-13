@@ -42,6 +42,7 @@ let quickOptionsContainer = null;
 let quickOptionsDate = null;
 let quickOptionsHideTimeout = null;
 let quickOptionsInitialized = false;
+let quickPointer = { x: null, y: null };
 
 // 日付の生成（2025年8月）
 const dates = [];
@@ -333,8 +334,15 @@ function initCalendar() {
     // 編集可能かどうか
     if (isEditable) {
       dayCell.style.cursor = 'pointer';
-      dayCell.addEventListener('mouseenter', () => {
+      dayCell.addEventListener('mouseenter', (e) => {
+        quickPointer.x = e.clientX;
+        quickPointer.y = e.clientY;
         showQuickOptions(dayCell, date);
+      });
+      dayCell.addEventListener('mousemove', (e) => {
+        quickPointer.x = e.clientX;
+        quickPointer.y = e.clientY;
+        updateQuickOptionsPosition(dayCell, date);
       });
       dayCell.addEventListener('mouseleave', () => {
         hideQuickOptions();
@@ -390,29 +398,39 @@ function getRequestTypeLabel(requestType) {
 
 function getRequestOptions() {
   if (!currentData) return [];
-  const doesNightShift = currentData.doesNightShift;
-  
-  if (doesNightShift === true) {
-    return [
-      { value: 'available', label: '休み希望なし（勤務可能）', desc: '日勤・夜勤どちらも可能です' },
-      { value: 'no-day', label: '日勤のみ不可', desc: 'その日の日勤は不可ですが、夜勤は可能です' },
-      { value: 'no-night', label: '夜勤のみ不可', desc: 'その日の夜勤は不可ですが、日勤は可能です' },
-      { value: 'no-all', label: '終日不可', desc: 'その日は完全に休みたいです' },
-      { value: 'no-all-but-night-before', label: '夜勤明けならOK', desc: '基本的には休みたいですが、夜勤明けの休みなら歓迎します' }
-    ];
-  }
-  
-  return [
-    { value: 'available', label: '休み希望なし（勤務可能）', desc: '日勤可能です' },
-    { value: 'no-day', label: '日勤のみ不可', desc: 'その日の日勤は不可です（休み希望）' },
-    { value: 'no-all', label: '終日不可', desc: 'その日は完全に休みたいです' }
-  ];
+  const doesNightShift = currentData.doesNightShift === true;
+  const keys = doesNightShift
+    ? ['available', 'no-day', 'no-night', 'no-all', 'no-all-but-night-before']
+    : ['available', 'no-day', 'no-all'];
+
+  return keys.map(key => {
+    const preset = REQUEST_OPTION_PRESETS[key];
+    let desc = preset.desc;
+
+    if (!doesNightShift) {
+      if (key === 'available') {
+        desc = '日勤に入って大丈夫です';
+      } else if (key === 'no-day') {
+        desc = 'この日は日勤をお休みしたいです';
+      } else if (key === 'no-all') {
+        desc = 'この日は完全に休みたいです';
+      }
+    }
+
+    return {
+      value: key,
+      label: preset.label,
+      icon: preset.icon,
+      desc
+    };
+  });
 }
 
 function ensureQuickOptionsContainer() {
   if (quickOptionsContainer) return;
   quickOptionsContainer = document.createElement('div');
   quickOptionsContainer.className = 'quick-options';
+  quickOptionsContainer.dataset.currentDate = '';
   quickOptionsContainer.addEventListener('mouseenter', () => {
     if (quickOptionsHideTimeout) {
       clearTimeout(quickOptionsHideTimeout);
@@ -445,19 +463,22 @@ function showQuickOptions(cell, date) {
   if (options.length === 0) return;
 
   quickOptionsDate = date;
+  quickOptionsContainer.dataset.currentDate = String(date);
   const currentRequest = currentData.requests[date];
 
   const headerHtml = `<div class="quick-options-header">${date} (${getDayOfWeek(date)})</div>`;
   const optionsHtml = options.map(opt => `
-    <button type="button" class="quick-option-button ${currentRequest === opt.value ? 'selected' : ''}" data-value="${opt.value}">
-      <strong>${opt.label}</strong>
+    <button type="button" class="quick-option-button ${currentRequest === opt.value ? 'selected' : ''}" data-value="${opt.value}" title="${getRequestTypeLabel(opt.value)}">
+      <div class="quick-option-line">
+        <span class="quick-option-icon">${opt.icon}</span>
+        <span class="quick-option-label">${opt.label}</span>
+      </div>
       <div class="quick-option-desc">${opt.desc}</div>
     </button>
   `).join('');
 
   quickOptionsContainer.innerHTML = headerHtml + optionsHtml;
   quickOptionsContainer.style.display = 'block';
-  quickOptionsContainer.classList.remove('below');
 
   quickOptionsContainer.querySelectorAll('.quick-option-button').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -467,24 +488,133 @@ function showQuickOptions(cell, date) {
   });
 
   requestAnimationFrame(() => {
-    const rect = cell.getBoundingClientRect();
     const containerRect = quickOptionsContainer.getBoundingClientRect();
-    let top = rect.top + window.scrollY - containerRect.height - 12;
-    let left = rect.left + window.scrollX + rect.width / 2 - containerRect.width / 2;
+    const scrollX = window.scrollX || document.documentElement.scrollLeft || 0;
+    const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    const viewportWidth = document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight;
 
-    if (top < window.scrollY + 12) {
-      top = rect.bottom + window.scrollY + 12;
-      quickOptionsContainer.classList.add('below');
+    let top;
+    let left;
+    let placeBelow = true;
+
+    if (quickPointer.x !== null && quickPointer.y !== null) {
+      const anchorX = quickPointer.x + scrollX;
+      const anchorY = quickPointer.y + scrollY;
+      top = anchorY + 12;
+      left = anchorX + 12;
+
+      if (top + containerRect.height > scrollY + viewportHeight - 12) {
+        top = anchorY - containerRect.height - 12;
+        placeBelow = false;
+      }
+    } else {
+      const rect = cell.getBoundingClientRect();
+      const anchorX = rect.left + rect.width / 2 + scrollX;
+      const anchorY = rect.top + scrollY;
+      top = anchorY - containerRect.height - 12;
+      left = anchorX - containerRect.width / 2;
+      placeBelow = false;
+
+      if (top < scrollY + 12) {
+        top = rect.bottom + scrollY + 12;
+        placeBelow = true;
+      }
     }
 
-    const minLeft = window.scrollX + 12;
-    const maxLeft = window.scrollX + document.documentElement.clientWidth - containerRect.width - 12;
-    if (left < minLeft) left = minLeft;
-    if (left > maxLeft) left = maxLeft;
+    if (left + containerRect.width > scrollX + viewportWidth - 12) {
+      left = scrollX + viewportWidth - containerRect.width - 12;
+    }
+    if (left < scrollX + 12) {
+      left = scrollX + 12;
+    }
+
+    if (top < scrollY + 12) {
+      top = scrollY + 12;
+      placeBelow = true;
+    }
+    if (top + containerRect.height > scrollY + viewportHeight - 12) {
+      top = scrollY + viewportHeight - containerRect.height - 12;
+      placeBelow = false;
+    }
 
     quickOptionsContainer.style.top = `${top}px`;
     quickOptionsContainer.style.left = `${left}px`;
+
+    if (placeBelow) {
+      quickOptionsContainer.classList.add('below');
+    } else {
+      quickOptionsContainer.classList.remove('below');
+    }
   });
+}
+
+function updateQuickOptionsPosition(cell, date) {
+  if (!quickOptionsContainer || quickOptionsContainer.style.display !== 'block') return;
+  if (date && quickOptionsContainer.dataset.currentDate && quickOptionsContainer.dataset.currentDate !== String(date)) {
+    return;
+  }
+
+  const containerRect = quickOptionsContainer.getBoundingClientRect();
+  const scrollX = window.scrollX || document.documentElement.scrollLeft || 0;
+  const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  const viewportWidth = document.documentElement.clientWidth;
+  const viewportHeight = window.innerHeight;
+
+  let top;
+  let left;
+  let placeBelow = true;
+
+  if (quickPointer.x !== null && quickPointer.y !== null) {
+    const anchorX = quickPointer.x + scrollX;
+    const anchorY = quickPointer.y + scrollY;
+    top = anchorY + 12;
+    left = anchorX + 12;
+
+    if (top + containerRect.height > scrollY + viewportHeight - 12) {
+      top = anchorY - containerRect.height - 12;
+      placeBelow = false;
+    }
+  } else if (cell) {
+    const rect = cell.getBoundingClientRect();
+    const anchorX = rect.left + rect.width / 2 + scrollX;
+    const anchorY = rect.top + scrollY;
+    top = anchorY - containerRect.height - 12;
+    left = anchorX - containerRect.width / 2;
+    placeBelow = false;
+
+    if (top < scrollY + 12) {
+      top = rect.bottom + scrollY + 12;
+      placeBelow = true;
+    }
+  } else {
+    return;
+  }
+
+  if (left + containerRect.width > scrollX + viewportWidth - 12) {
+    left = scrollX + viewportWidth - containerRect.width - 12;
+  }
+  if (left < scrollX + 12) {
+    left = scrollX + 12;
+  }
+
+  if (top < scrollY + 12) {
+    top = scrollY + 12;
+    placeBelow = true;
+  }
+  if (top + containerRect.height > scrollY + viewportHeight - 12) {
+    top = scrollY + viewportHeight - containerRect.height - 12;
+    placeBelow = false;
+  }
+
+  quickOptionsContainer.style.top = `${top}px`;
+  quickOptionsContainer.style.left = `${left}px`;
+
+  if (placeBelow) {
+    quickOptionsContainer.classList.add('below');
+  } else {
+    quickOptionsContainer.classList.remove('below');
+  }
 }
 
 function hideQuickOptions(immediate = false) {
@@ -494,15 +624,24 @@ function hideQuickOptions(immediate = false) {
     quickOptionsHideTimeout = null;
   }
 
-  if (immediate) {
+  const finalizeHide = () => {
     quickOptionsContainer.style.display = 'none';
+    quickOptionsContainer.classList.remove('below');
+    quickOptionsContainer.dataset.currentDate = '';
+    quickOptionsDate = null;
+    quickPointer.x = null;
+    quickPointer.y = null;
+    quickOptionsHideTimeout = null;
+  };
+
+  if (immediate) {
+    finalizeHide();
     return;
   }
 
   quickOptionsHideTimeout = setTimeout(() => {
-    quickOptionsContainer.style.display = 'none';
-    quickOptionsHideTimeout = null;
-  }, 80);
+    finalizeHide();
+  }, 200);
 }
 
 function getValuePreferenceInfo(value) {
@@ -550,9 +689,12 @@ function openSelectionModal(date) {
   } else {
     optionsContainer.innerHTML = options.map(opt => `
       <button class="option-button ${currentRequest === opt.value ? 'selected' : ''}" 
-              data-value="${opt.value}">
-        <strong>${opt.label}</strong>
-        <div style="font-size: 12px; color: #666; margin-top: 4px;">${opt.desc}</div>
+              data-value="${opt.value}" title="${getRequestTypeLabel(opt.value)}">
+        <div class="option-title">
+          <span class="option-icon">${opt.icon}</span>
+          <span>${opt.label}</span>
+        </div>
+        <div class="option-desc">${opt.desc}</div>
       </button>
     `).join('');
   }
