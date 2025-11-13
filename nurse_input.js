@@ -197,6 +197,12 @@ function loadData() {
     saveData();
   }
 
+  const currentUserInfo = currentUser ? JSON.parse(currentUser) : null;
+  if ((currentData.doesNightShift === null || currentData.doesNightShift === undefined) && currentUserInfo && typeof currentUserInfo.initialNightShift === 'boolean') {
+    currentData.doesNightShift = currentUserInfo.initialNightShift;
+    saveData();
+  }
+
   // 提出状態を確認
   if (currentUser) {
     const user = JSON.parse(currentUser);

@@ -51,7 +51,7 @@
       color: #333;
       font-size: 14px;
     }
-    input[type="text"], input[type="email"], input[type="password"] {
+    input[type="text"], input[type="email"], input[type="password"], input[type="number"] {
       width: 100%;
       padding: 12px;
       border: 1px solid #ddd;
@@ -102,10 +102,49 @@
     .register-link a:hover {
       text-decoration: underline;
     }
+    .form-note {
+      font-size: 12px;
+      color: #888;
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+    .nightshift-options {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 8px 0 4px;
+    }
+    .nightshift-options label {
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 0;
+    }
+    .global-top-button {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      background: rgba(255,255,255,0.9);
+      color: #4a90e2;
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      transition: transform 0.2s, box-shadow 0.2s;
+      z-index: 1000;
+    }
+    .global-top-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    }
   </style>
   <script src="./login.js" defer></script>
 </head>
 <body>
+  <a href="top.html" class="global-top-button">トップページへ戻る</a>
   <div class="login-container">
     <h1>🏥 シフト管理システム</h1>
     <p class="subtitle">ログインしてください</p>
@@ -132,6 +171,21 @@
       <div class="form-group">
         <label for="password">パスワード</label>
         <input type="password" id="password" placeholder="パスワードを入力" required />
+      </div>
+
+      <div class="form-group">
+        <label for="hireYear">入職年（西暦）</label>
+        <input type="number" id="hireYear" placeholder="2020" min="1970" max="2100" />
+        <div class="form-note">※初回登録時に入力してください。既存アカウントの方は入力済みの値が優先されます。</div>
+      </div>
+
+      <div class="form-group">
+        <label>現在の夜勤状況</label>
+        <div class="nightshift-options">
+          <label><input type="radio" name="initialNightShift" value="on" /> 夜勤をする</label>
+          <label><input type="radio" name="initialNightShift" value="off" /> 夜勤はしない</label>
+        </div>
+        <div class="form-note">※初回登録時の希望です。以降の管理は管理者が行います。</div>
       </div>
       
       <div class="error-message" id="errorMessage"></div>

@@ -2,6 +2,7 @@
 const USER_STORAGE_KEY = 'shift_system_users';
 const CURRENT_USER_KEY = 'current_user';
 const ADMIN_USERS_KEY = 'admin_users';
+const STORAGE_KEY_PREFIX = 'shift_request_';
 
 // ユーザーデータを取得
 function getUsers() {
@@ -38,6 +39,50 @@ function hashPassword(password) {
   return hash.toString();
 }
 
+function ensureShiftProfile(userKey, fullName, initialNightShift) {
+  const storageKey = STORAGE_KEY_PREFIX + userKey;
+  const stored = localStorage.getItem(storageKey);
+
+  if (stored) {
+    try {
+      const data = JSON.parse(stored);
+      if ((data.doesNightShift === undefined || data.doesNightShift === null) && typeof initialNightShift === 'boolean') {
+        data.doesNightShift = initialNightShift;
+        localStorage.setItem(storageKey, JSON.stringify(data));
+      }
+    } catch (error) {
+      console.error('Failed to parse existing shift data', error);
+    }
+    return;
+  }
+
+  const baseData = {
+    nurseName: fullName,
+    userKey,
+    requests: {},
+    note: '',
+    submitted: false,
+    submittedAt: null,
+    doesNightShift: typeof initialNightShift === 'boolean' ? initialNightShift : null,
+    preferences: {
+      valuePreference: null
+    }
+  };
+
+  localStorage.setItem(storageKey, JSON.stringify(baseData));
+}
+
+function parseHireYear(value) {
+  if (!value) return null;
+  const parsed = parseInt(value, 10);
+  if (Number.isNaN(parsed)) return null;
+  const currentYear = new Date().getFullYear();
+  if (parsed < 1970 || parsed > currentYear + 1) {
+    return null;
+  }
+  return parsed;
+}
+
 // ログイン処理
 function handleLogin(event) {
   event.preventDefault();
@@ -46,6 +91,9 @@ function handleLogin(event) {
   const firstName = document.getElementById('firstName').value.trim();
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
+  const hireYearInput = document.getElementById('hireYear');
+  const hireYearRaw = hireYearInput ? hireYearInput.value.trim() : '';
+  const nightShiftChoice = document.querySelector('input[name="initialNightShift"]:checked');
   
   const errorMsg = document.getElementById('errorMessage');
   errorMsg.classList.remove('show');
@@ -59,24 +107,72 @@ function handleLogin(event) {
   const users = getUsers();
   const userKey = `${lastName}_${firstName}_${email}`;
   const hashedPassword = hashPassword(password);
-  
+  const existingUser = users[userKey];
+  const isNewUser = !existingUser;
+
+  let hireYear = existingUser ? existingUser.hireYear ?? null : null;
+  let initialNightShift = existingUser && typeof existingUser.initialNightShift === 'boolean'
+    ? existingUser.initialNightShift
+    : null;
+
+  if (isNewUser) {
+    const parsedYear = parseHireYear(hireYearRaw);
+    if (!parsedYear) {
+      errorMsg.textContent = '入職年（西暦）を正しく入力してください（1970年〜現在+1年まで）';
+      errorMsg.classList.add('show');
+      return;
+    }
+    if (!nightShiftChoice) {
+      errorMsg.textContent = '現在の夜勤状況を選択してください';
+      errorMsg.classList.add('show');
+      return;
+    }
+
+    hireYear = parsedYear;
+    initialNightShift = nightShiftChoice.value === 'on';
+  }
+
   // ユーザーが存在するか確認
-  if (users[userKey]) {
+  if (existingUser) {
     // パスワード確認
-    if (users[userKey].password !== hashedPassword) {
+    if (existingUser.password !== hashedPassword) {
       errorMsg.textContent = 'パスワードが正しくありません';
       errorMsg.classList.add('show');
       return;
     }
+
+    let userDataUpdated = false;
+
+    const parsedYear = parseHireYear(hireYearRaw);
+    if (parsedYear && parsedYear !== existingUser.hireYear) {
+      existingUser.hireYear = parsedYear;
+      hireYear = parsedYear;
+      userDataUpdated = true;
+    }
+
+    if (nightShiftChoice) {
+      const choiceValue = nightShiftChoice.value === 'on';
+      if (existingUser.initialNightShift !== choiceValue) {
+        existingUser.initialNightShift = choiceValue;
+        initialNightShift = choiceValue;
+        userDataUpdated = true;
+      }
+    }
+
+    if (userDataUpdated) {
+      users[userKey] = existingUser;
+      saveUsers(users);
+    }
   } else {
-    // 新規ユーザー登録（初回ログイン）
     users[userKey] = {
       lastName,
       firstName,
       email,
       password: hashedPassword,
       fullName: `${lastName} ${firstName}`,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      hireYear,
+      initialNightShift
     };
     saveUsers(users);
   }
@@ -91,15 +187,25 @@ function handleLogin(event) {
     saveAdminUsers(adminUsers);
     isAdmin = true;
   }
+
+  const fullName = `${lastName} ${firstName}`;
+  const resolvedHireYear = hireYear ?? parseHireYear(hireYearRaw);
+  const resolvedNightShift = typeof initialNightShift === 'boolean'
+    ? initialNightShift
+    : (nightShiftChoice ? nightShiftChoice.value === 'on' : null);
+
+  ensureShiftProfile(userKey, fullName, resolvedNightShift);
   
   // 現在のユーザー情報を保存
   const currentUser = {
     lastName,
     firstName,
     email,
-    fullName: `${lastName} ${firstName}`,
+    fullName,
     isAdmin,
-    userKey
+    userKey,
+    hireYear: resolvedHireYear ?? null,
+    initialNightShift: resolvedNightShift
   };
   localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
   

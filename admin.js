@@ -119,39 +119,65 @@ function loadNurseNightShiftSettings() {
   const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
   const users = getUserDirectory();
   
-  const nurseList = [];
+  const nurseMap = new Map();
   
   requestKeys.forEach(key => {
     const userKey = key.replace(STORAGE_KEY_PREFIX, '');
     const dataStr = localStorage.getItem(key);
-    
     if (!dataStr) return;
-    
-    const data = JSON.parse(dataStr);
-    
-    // ユーザー情報から名前を取得
-    let displayName = data.nurseName || userKey;
-    if (users[userKey]) {
-      displayName = users[userKey].fullName || displayName;
+
+    let data;
+    try {
+      data = JSON.parse(dataStr);
+    } catch (error) {
+      console.error('Failed to parse shift request data', error);
+      return;
     }
-    
-    nurseList.push({
-      name: displayName,
-      userKey: userKey,
-      doesNightShift: data.doesNightShift !== undefined ? data.doesNightShift : null
+
+    const userInfo = users[userKey] || {};
+    const hireYear = typeof userInfo.hireYear === 'number' ? userInfo.hireYear : null;
+    const initialNightShift = typeof userInfo.initialNightShift === 'boolean' ? userInfo.initialNightShift : null;
+
+    if ((data.doesNightShift === undefined || data.doesNightShift === null) && typeof initialNightShift === 'boolean') {
+      data.doesNightShift = initialNightShift;
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+
+    const nameFromData = data.nurseName || userInfo.fullName || userKey;
+    const adminNightShift = data.doesNightShift ?? null;
+    const effectiveNightShift = adminNightShift !== null ? adminNightShift : initialNightShift;
+
+    nurseMap.set(userKey, {
+      name: nameFromData,
+      userKey,
+      adminNightShift,
+      effectiveNightShift,
+      initialNightShift,
+      hireYear
     });
   });
   
-  // ユーザー情報から追加の看護師を取得
   Object.keys(users).forEach(userKey => {
-    if (!nurseList.find(n => n.userKey === userKey)) {
-      const user = users[userKey];
-      nurseList.push({
-        name: user.fullName || userKey,
-        userKey: userKey,
-        doesNightShift: null
-      });
-    }
+    if (nurseMap.has(userKey)) return;
+    const user = users[userKey];
+    const hireYear = typeof user?.hireYear === 'number' ? user.hireYear : null;
+    const initialNightShift = typeof user?.initialNightShift === 'boolean' ? user.initialNightShift : null;
+
+    nurseMap.set(userKey, {
+      name: user.fullName || userKey,
+      userKey,
+      adminNightShift: null,
+      effectiveNightShift: initialNightShift,
+      initialNightShift,
+      hireYear
+    });
+  });
+  
+  const nurseList = Array.from(nurseMap.values()).sort((a, b) => {
+    const yearA = a.hireYear ?? Number.MAX_SAFE_INTEGER;
+    const yearB = b.hireYear ?? Number.MAX_SAFE_INTEGER;
+    if (yearA !== yearB) return yearA - yearB;
+    return a.name.localeCompare(b.name, 'ja');
   });
   
   const container = document.getElementById('nightShiftSettings');
@@ -163,40 +189,68 @@ function loadNurseNightShiftSettings() {
   }
   
   container.innerHTML = `
-    <div style="background: white; border: 1px solid #ddd; border-radius: 6px; padding: 16px;">
-      <table style="width: 100%; border-collapse: collapse;">
+    <div style="background: white; border: 1px solid #ddd; border-radius: 6px; padding: 16px; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; min-width: 640px;">
         <thead>
           <tr style="background: #f8f9fa; border-bottom: 2px solid #ddd;">
+            <th style="padding: 12px; text-align: left;">入職年</th>
             <th style="padding: 12px; text-align: left;">看護師名</th>
             <th style="padding: 12px; text-align: left;">夜勤設定</th>
             <th style="padding: 12px; text-align: left;">操作</th>
           </tr>
         </thead>
         <tbody>
-          ${nurseList.map(nurse => `
-            <tr style="border-bottom: 1px solid #eee;">
-              <td style="padding: 12px;">${nurse.name}</td>
-              <td style="padding: 12px;">
-                <span id="nightShiftStatus_${nurse.userKey}" style="color: ${nurse.doesNightShift === null ? '#dc3545' : '#28a745'}; font-weight: 600;">
-                  ${nurse.doesNightShift === null ? '未設定' : nurse.doesNightShift ? '夜勤をします' : '夜勤はしません'}
-                </span>
-              </td>
-              <td style="padding: 12px;">
-                <button onclick="setNurseNightShift('${nurse.userKey}', true)" 
-                        style="padding: 6px 12px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px;">
-                  夜勤ON
-                </button>
-                <button onclick="setNurseNightShift('${nurse.userKey}', false)" 
-                        style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px;">
-                  夜勤OFF
-                </button>
-                <button onclick="setNurseNightShift('${nurse.userKey}', null)" 
-                        style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                  未設定
-                </button>
-              </td>
-            </tr>
-          `).join('')}
+          ${nurseList.map(nurse => {
+            const yearLabel = nurse.hireYear ? `${nurse.hireYear}年` : '未登録';
+            const adminSetting = nurse.adminNightShift;
+            let statusLabel;
+            let statusColor;
+            if (adminSetting === true) {
+              statusLabel = '夜勤をします（管理者設定）';
+              statusColor = '#28a745';
+            } else if (adminSetting === false) {
+              statusLabel = '夜勤はしません（管理者設定）';
+              statusColor = '#6c757d';
+            } else {
+              statusLabel = '未設定（管理者）';
+              statusColor = '#ff9800';
+            }
+            const initialLabel = typeof nurse.initialNightShift === 'boolean'
+              ? `本人申告: ${nurse.initialNightShift ? '夜勤をする' : '夜勤はしない'}`
+              : '本人申告: 未回答';
+            const additionalNote = (adminSetting === null && typeof nurse.initialNightShift === 'boolean')
+              ? '※ 現在は本人申告値が初期値として利用されています'
+              : '';
+
+            return `
+              <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 12px; white-space: nowrap;">${yearLabel}</td>
+                <td style="padding: 12px;">${nurse.name}</td>
+                <td style="padding: 12px;">
+                  <span id="nightShiftStatus_${nurse.userKey}" style="color: ${statusColor}; font-weight: 600;">
+                    ${statusLabel}
+                  </span>
+                  <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                    ${initialLabel}${additionalNote ? `<br>${additionalNote}` : ''}
+                  </div>
+                </td>
+                <td style="padding: 12px;">
+                  <button onclick="setNurseNightShift('${nurse.userKey}', true)" 
+                          style="padding: 6px 12px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px;">
+                    夜勤ON
+                  </button>
+                  <button onclick="setNurseNightShift('${nurse.userKey}', false)" 
+                          style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px;">
+                    夜勤OFF
+                  </button>
+                  <button onclick="setNurseNightShift('${nurse.userKey}', null)" 
+                          style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                    未設定
+                  </button>
+                </td>
+              </tr>
+            `;
+          }).join('')}
         </tbody>
       </table>
     </div>
@@ -211,7 +265,7 @@ function loadValuePreferences() {
   const allKeys = Object.keys(localStorage);
   const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
 
-  const preferenceMap = {};
+  const preferenceMap = new Map();
 
   requestKeys.forEach(key => {
     const userKey = key.replace(STORAGE_KEY_PREFIX, '');
@@ -219,29 +273,39 @@ function loadValuePreferences() {
     if (!dataStr) return;
     const data = JSON.parse(dataStr);
 
+    const userInfo = users[userKey] || {};
     const preferenceValue = data.preferences && data.preferences.valuePreference ? data.preferences.valuePreference : null;
-    const displayName = users[userKey]?.fullName || data.nurseName || userKey;
+    const displayName = userInfo.fullName || data.nurseName || userKey;
+    const hireYear = typeof userInfo.hireYear === 'number' ? userInfo.hireYear : null;
 
-    preferenceMap[userKey] = {
+    preferenceMap.set(userKey, {
       name: displayName,
-      preference: preferenceValue
-    };
+      preference: preferenceValue,
+      hireYear
+    });
   });
 
   Object.keys(users).forEach(userKey => {
-    if (!preferenceMap[userKey]) {
+    if (!preferenceMap.has(userKey)) {
       const user = users[userKey];
-      preferenceMap[userKey] = {
+      const hireYear = typeof user?.hireYear === 'number' ? user.hireYear : null;
+      preferenceMap.set(userKey, {
         name: user.fullName || userKey,
-        preference: null
-      };
+        preference: null,
+        hireYear
+      });
     }
   });
 
-  const preferenceList = Object.keys(preferenceMap).map(userKey => ({
+  const preferenceList = Array.from(preferenceMap.entries()).map(([userKey, value]) => ({
     userKey,
-    ...preferenceMap[userKey]
-  })).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    ...value
+  })).sort((a, b) => {
+    const yearA = a.hireYear ?? Number.MAX_SAFE_INTEGER;
+    const yearB = b.hireYear ?? Number.MAX_SAFE_INTEGER;
+    if (yearA !== yearB) return yearA - yearB;
+    return a.name.localeCompare(b.name, 'ja');
+  });
 
   if (preferenceList.length === 0) {
     container.innerHTML = '<p style="color: #666;">価値観のデータがまだありません</p>';
@@ -250,6 +314,7 @@ function loadValuePreferences() {
 
   container.innerHTML = preferenceList.map(item => {
     const info = item.preference ? VALUE_PREFERENCE_OPTIONS[item.preference] : null;
+    const hireYearLabel = item.hireYear ? `${item.hireYear}年入職` : '入職年: 未登録';
     if (!info) {
       return `
         <div class="value-card value-empty">
@@ -257,6 +322,7 @@ function loadValuePreferences() {
           <div>
             <div class="value-name">${item.name}</div>
             <div class="value-desc">価値観はまだ設定されていません</div>
+            <div class="value-meta">${hireYearLabel}</div>
           </div>
         </div>
       `;
@@ -269,6 +335,7 @@ function loadValuePreferences() {
           <div class="value-name">${item.name}</div>
           <div class="value-label">${info.label}</div>
           <div class="value-desc">${info.description}</div>
+          <div class="value-meta">${hireYearLabel}</div>
         </div>
       </div>
     `;
@@ -436,31 +503,47 @@ function loadSubmissionStatus() {
   const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
   const users = getUserDirectory();
 
-  let submitted = 0;
-  let notSubmitted = 0;
-  const nurseList = [];
+  const nurseMap = new Map();
 
   requestKeys.forEach(key => {
     const userKey = key.replace(STORAGE_KEY_PREFIX, '');
     const submittedKey = SUBMITTED_KEY_PREFIX + userKey;
     const isSubmitted = localStorage.getItem(submittedKey) === 'true';
 
-    const displayName = users[userKey]?.fullName || userKey;
+    const userInfo = users[userKey] || {};
+    const displayName = userInfo.fullName || userKey;
+    const hireYear = typeof userInfo.hireYear === 'number' ? userInfo.hireYear : null;
 
-    if (isSubmitted) {
-      submitted++;
-    } else {
-      notSubmitted++;
-    }
-
-    nurseList.push({
+    nurseMap.set(userKey, {
       name: displayName,
       userKey,
-      submitted: isSubmitted
+      submitted: isSubmitted,
+      hireYear
     });
   });
 
-  const total = submitted + notSubmitted;
+  Object.keys(users).forEach(userKey => {
+    if (nurseMap.has(userKey)) return;
+    const user = users[userKey];
+    const hireYear = typeof user?.hireYear === 'number' ? user.hireYear : null;
+    nurseMap.set(userKey, {
+      name: user.fullName || userKey,
+      userKey,
+      submitted: false,
+      hireYear
+    });
+  });
+
+  const nurseList = Array.from(nurseMap.values()).sort((a, b) => {
+    const yearA = a.hireYear ?? Number.MAX_SAFE_INTEGER;
+    const yearB = b.hireYear ?? Number.MAX_SAFE_INTEGER;
+    if (yearA !== yearB) return yearA - yearB;
+    return a.name.localeCompare(b.name, 'ja');
+  });
+
+  const submitted = nurseList.filter(item => item.submitted).length;
+  const total = nurseList.length;
+  const notSubmitted = total - submitted;
 
   const statusGrid = document.getElementById('statusGrid');
   if (statusGrid) {
@@ -489,21 +572,17 @@ function loadSubmissionStatus() {
   if (nurseListContainer) {
     if (nurseList.length > 0) {
       nurseListContainer.style.display = 'block';
-      nurseList.sort((a, b) => {
-        if (a.submitted !== b.submitted) {
-          return a.submitted ? -1 : 1;
-        }
-        return a.name.localeCompare(b.name, 'ja');
-      });
-
-      nurseListContainer.innerHTML = nurseList.map(nurse => `
-        <div class="nurse-item">
-          <span>${nurse.name}</span>
-          <span class="badge ${nurse.submitted ? 'badge-success' : 'badge-warning'}">
-            ${nurse.submitted ? '提出済み' : '未提出'}
-          </span>
-        </div>
-      `).join('');
+      nurseListContainer.innerHTML = nurseList.map(nurse => {
+        const hireYearLabel = nurse.hireYear ? `${nurse.hireYear}年入職` : '入職年未登録';
+        return `
+          <div class="nurse-item">
+            <span>${hireYearLabel}｜${nurse.name}</span>
+            <span class="badge ${nurse.submitted ? 'badge-success' : 'badge-warning'}">
+              ${nurse.submitted ? '提出済み' : '未提出'}
+            </span>
+          </div>
+        `;
+      }).join('');
     } else {
       nurseListContainer.style.display = 'none';
     }

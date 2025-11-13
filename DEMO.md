@@ -24,6 +24,8 @@ http://localhost:8000/index.html
    - 名: `太郎`
    - Gmail: `yamada@example.com`
    - パスワード: `password123`
+   - 入職年: `2018`
+   - 夜勤状況: `夜勤をする`
    - → ログインボタンをクリック
    - **初回ログイン時は自動的に管理者になります**
 
@@ -31,7 +33,6 @@ http://localhost:8000/index.html
    - 締め切り情報が表示されます
    - メニューから各機能にアクセスできます
 
-3. **管理者ページ** (`http://localhost:8000/admin.html`)
 3. **管理者ページ** (`http://localhost:8000/admin.html`)
    - 「締め切り設定」セクション
      - 「毎月15日23:59に設定」ボタンをクリック
@@ -47,6 +48,8 @@ http://localhost:8000/index.html
    - 名: `花子`
    - Gmail: `sato@example.com`
    - パスワード: `password456`
+   - 入職年: `2020`
+   - 夜勤状況: `夜勤をしない`
    - → ログイン
 
 2. **シフト希望入力** (`http://localhost:8000/nurse_input.html`)
