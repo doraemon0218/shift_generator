@@ -38,6 +38,34 @@ const VALUE_PREFERENCE_OPTIONS = {
   }
 };
 
+const REQUEST_OPTION_PRESETS = {
+  'available': {
+    label: '休み希望なし（勤務可能）',
+    icon: '✅',
+    desc: '日勤・夜勤どちらの勤務も対応できます'
+  },
+  'no-day': {
+    label: '日勤のみ不可',
+    icon: '🌞✖️',
+    desc: '日勤は休みたいですが、夜勤は調整できます'
+  },
+  'no-night': {
+    label: '夜勤のみ不可',
+    icon: '🌙✖️',
+    desc: '夜勤は難しいですが、日勤であれば勤務可能です'
+  },
+  'no-all': {
+    label: '終日不可',
+    icon: '🚫',
+    desc: 'この日は完全に休みたいです'
+  },
+  'no-all-but-night-before': {
+    label: '夜勤明けならOK',
+    icon: '🌙➡️🛌',
+    desc: '休み希望ですが夜勤明けの休みであれば歓迎します'
+  }
+};
+
 let quickOptionsContainer = null;
 let quickOptionsDate = null;
 let quickOptionsHideTimeout = null;
