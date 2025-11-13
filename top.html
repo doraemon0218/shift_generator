@@ -114,6 +114,31 @@
     .menu-card.admin:hover {
       border-color: #ff9800;
     }
+    .menu-card.locked {
+      border-color: #c0c0c0;
+      opacity: 0.7;
+      cursor: not-allowed;
+      position: relative;
+    }
+    .menu-card.locked:hover {
+      transform: none;
+      box-shadow: none;
+      border-color: #c0c0c0;
+    }
+    .menu-card.locked::after {
+      content: "🔒 管理者専用";
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-size: 12px;
+      color: #555;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 12px;
+      padding: 4px 10px;
+    }
+    .menu-card.locked .menu-description {
+      color: #999;
+    }
     .menu-icon {
       font-size: 48px;
       margin-bottom: 16px;
@@ -183,10 +208,13 @@
         <div class="menu-description">過去の月毎のシフトデータを確認できます</div>
       </a>
 
-      <a href="admin.html" class="menu-card admin" id="adminCard" style="display: none;">
+      <a href="admin.html" class="menu-card admin" id="adminCard">
         <div class="menu-icon">👨‍💼</div>
         <div class="menu-title">管理者用画面</div>
-        <div class="menu-description">締め切り設定・提出状況確認・シフト生成</div>
+        <div class="menu-description">
+          締め切り設定・提出状況確認・シフト生成などを行います。<br />
+          管理者権限が必要です。
+        </div>
       </a>
     </div>
   </div>

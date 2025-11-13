@@ -3,189 +3,147 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>シフト表生成 - 手術室シフト管理</title>
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <title>ログイン - 手術室シフト管理システム</title>
   <style>
     * { box-sizing: border-box; }
     body { 
       font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; 
       margin: 0; 
       padding: 20px; 
-      background: #f5f5f5;
-    }
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      background: white;
-      border-radius: 12px;
-      padding: 24px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      margin-bottom: 24px;
-      padding-bottom: 16px;
-      border-bottom: 2px solid #e0e0e0;
+      justify-content: center;
+    }
+    .login-container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 450px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     }
     h1 {
-      margin: 0;
-      color: #1a1a1a;
+      text-align: center;
+      color: #333;
       font-size: 28px;
+      margin-bottom: 8px;
     }
-    button {
-      padding: 8px 16px;
-      background: #6c757d;
-      color: white;
-      border: none;
-      border-radius: 6px;
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 32px;
       font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    button:hover {
-      background: #5a6268;
-    }
-    button:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
-    .btn-primary {
-      background: #4a90e2;
-    }
-    .btn-primary:hover {
-      background: #357abd;
-    }
-    .btn-success {
-      background: #28a745;
-    }
-    .btn-success:hover {
-      background: #218838;
     }
     .form-group {
-      margin-bottom: 16px;
+      margin-bottom: 20px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
     }
     label {
       display: block;
-      margin-bottom: 8px;
       font-weight: 600;
+      margin-bottom: 8px;
       color: #333;
-    }
-    input[type="file"],
-    input[type="number"] {
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
       font-size: 14px;
     }
-    input[type="number"] {
-      width: 100px;
-    }
-    .error {
-      color: #dc3545;
-      background: #f8d7da;
+    input[type="text"], input[type="email"], input[type="password"] {
+      width: 100%;
       padding: 12px;
-      border-radius: 4px;
-      margin: 16px 0;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.2s;
     }
-    .loading {
+    input:focus {
+      outline: none;
+      border-color: #4a90e2;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 8px;
+    }
+    button:hover {
+      background: #357abd;
+    }
+    .error-message {
+      color: #dc3545;
+      font-size: 13px;
+      margin-top: 8px;
+      display: none;
+    }
+    .error-message.show {
+      display: block;
+    }
+    .register-link {
       text-align: center;
-      padding: 40px;
+      margin-top: 20px;
+      font-size: 14px;
       color: #666;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    th, td {
-      border: 1px solid #ddd;
-      padding: 8px;
-      text-align: center;
-    }
-    th {
-      background: #f8f9fa;
+    .register-link a {
+      color: #4a90e2;
+      text-decoration: none;
       font-weight: 600;
     }
-    .weekend {
-      font-weight: bold;
-    }
-    .violation {
-      background: #ffebee;
-      color: #c62828;
-    }
-    .stats {
-      margin-top: 24px;
-    }
-    .stats-table {
-      width: 100%;
-      margin-top: 12px;
+    .register-link a:hover {
+      text-decoration: underline;
     }
   </style>
-  <script src="./script.js" defer></script>
+  <script src="./login.js" defer></script>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>⚙️ シフト表生成</h1>
-      <button onclick="window.location.href='top.html'">トップページに戻る</button>
-    </div>
+  <div class="login-container">
+    <h1>🏥 シフト管理システム</h1>
+    <p class="subtitle">ログインしてください</p>
     
-    <p style="color: #666; margin-bottom: 24px;">
-      管理者ページからエクスポートしたCSVファイルをアップロードして、シフト表を生成します。
-    </p>
-
-    <div class="form-group">
-      <label for="fileInput">CSVファイルを選択（またはデフォルトファイルを使用）</label>
-      <input type="file" id="fileInput" accept=".csv" />
-      <button id="loadBtn" class="btn-primary">データを読み込む</button>
-    </div>
-
-    <div id="errorContainer"></div>
-
-    <div class="form-group">
-      <label>シフト設定</label>
-      <div style="display: flex; gap: 16px; align-items: center;">
-        <div>
-          <label for="dayShiftRequired" style="display: inline; margin-right: 8px;">日勤必要人数:</label>
-          <input type="number" id="dayShiftRequired" value="3" min="1" />
-        </div>
-        <div>
-          <label for="nightShiftRequired" style="display: inline; margin-right: 8px;">夜勤必要人数:</label>
-          <input type="number" id="nightShiftRequired" value="2" min="1" />
-        </div>
-        <div>
-          <label for="targetWorkDays" style="display: inline; margin-right: 8px;">1ヶ月の目標勤務日数:</label>
-          <input type="number" id="targetWorkDays" value="20" min="1" />
+    <form id="loginForm">
+      <div class="form-group">
+        <div class="form-row">
+          <div>
+            <label for="lastName">姓</label>
+            <input type="text" id="lastName" placeholder="山田" required />
+          </div>
+          <div>
+            <label for="firstName">名</label>
+            <input type="text" id="firstName" placeholder="太郎" required />
+          </div>
         </div>
       </div>
-    </div>
-
-    <button id="generateBtn" class="btn-success" disabled>シフト表を生成</button>
-
-    <div id="loadingContainer" style="display: none;">
-      <div class="loading">シフト表を生成中...</div>
-    </div>
-
-    <div id="tableContainer" style="display: none;"></div>
-    <div id="statsContainer" style="display: none;" class="stats"></div>
-    <div id="legendContainer" style="display: none; margin-top: 24px;">
-      <h3>凡例</h3>
-      <ul>
-        <li><strong>日</strong>: 日勤</li>
-        <li><strong>夜</strong>: 夜勤</li>
-        <li><strong>休</strong>: 休日</li>
-        <li><span class="violation">赤背景</span>: 希望違反</li>
-        <li><strong>太字</strong>: 週末（土日）</li>
-      </ul>
-    </div>
-
-    <div style="margin-top: 24px;">
-      <button id="exportBtn" class="btn-primary" disabled>CSVでエクスポート</button>
+      
+      <div class="form-group">
+        <label for="email">Gmailアドレス</label>
+        <input type="email" id="email" placeholder="example@gmail.com" required />
+      </div>
+      
+      <div class="form-group">
+        <label for="password">パスワード</label>
+        <input type="password" id="password" placeholder="パスワードを入力" required />
+      </div>
+      
+      <div class="error-message" id="errorMessage"></div>
+      
+      <button type="submit">ログイン</button>
+    </form>
+    
+    <div class="register-link">
+      初めての方は <a href="#" onclick="alert('新規登録機能は準備中です'); return false;">新規登録</a>
     </div>
   </div>
 </body>
 </html>
+
+

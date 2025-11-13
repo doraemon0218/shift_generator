@@ -21,7 +21,7 @@ sleep 2
 echo "✅ サーバーが起動しました！"
 echo ""
 echo "【アクセスURL】"
-echo "  http://localhost:8000/login.html"
+echo "  http://localhost:8000/index.html"
 echo ""
 echo "【デモ用アカウント】"
 echo "  管理者:"

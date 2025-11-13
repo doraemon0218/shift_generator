@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>シフト表生成 - 手術室シフト管理</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { 
+      font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; 
+      margin: 0; 
+      padding: 20px; 
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    h1 {
+      margin: 0;
+      color: #1a1a1a;
+      font-size: 28px;
+    }
+    button {
+      padding: 8px 16px;
+      background: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #5a6268;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .btn-primary {
+      background: #4a90e2;
+    }
+    .btn-primary:hover {
+      background: #357abd;
+    }
+    .btn-success {
+      background: #28a745;
+    }
+    .btn-success:hover {
+      background: #218838;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+    }
+    input[type="file"],
+    input[type="number"] {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    input[type="number"] {
+      width: 100px;
+    }
+    .error {
+      color: #dc3545;
+      background: #f8d7da;
+      padding: 12px;
+      border-radius: 4px;
+      margin: 16px 0;
+    }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #f8f9fa;
+      font-weight: 600;
+    }
+    .weekend {
+      font-weight: bold;
+    }
+    .violation {
+      background: #ffebee;
+      color: #c62828;
+    }
+    .stats {
+      margin-top: 24px;
+    }
+    .stats-table {
+      width: 100%;
+      margin-top: 12px;
+    }
+  </style>
+  <script src="./script.js" defer></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>⚙️ シフト表生成</h1>
+      <button onclick="window.location.href='top.html'">トップページに戻る</button>
+    </div>
+    
+    <p style="color: #666; margin-bottom: 24px;">
+      管理者ページからエクスポートしたCSVファイルをアップロードして、シフト表を生成します。
+    </p>
+
+    <div class="form-group">
+      <label for="fileInput">CSVファイルを選択（またはデフォルトファイルを使用）</label>
+      <input type="file" id="fileInput" accept=".csv" />
+      <button id="loadBtn" class="btn-primary">データを読み込む</button>
+    </div>
+
+    <div id="errorContainer"></div>
+
+    <div class="form-group">
+      <label>シフト設定</label>
+      <div style="display: flex; gap: 16px; align-items: center;">
+        <div>
+          <label for="dayShiftRequired" style="display: inline; margin-right: 8px;">日勤必要人数:</label>
+          <input type="number" id="dayShiftRequired" value="3" min="1" />
+        </div>
+        <div>
+          <label for="nightShiftRequired" style="display: inline; margin-right: 8px;">夜勤必要人数:</label>
+          <input type="number" id="nightShiftRequired" value="2" min="1" />
+        </div>
+        <div>
+          <label for="targetWorkDays" style="display: inline; margin-right: 8px;">1ヶ月の目標勤務日数:</label>
+          <input type="number" id="targetWorkDays" value="20" min="1" />
+        </div>
+      </div>
+    </div>
+
+    <button id="generateBtn" class="btn-success" disabled>シフト表を生成</button>
+
+    <div id="loadingContainer" style="display: none;">
+      <div class="loading">シフト表を生成中...</div>
+    </div>
+
+    <div id="tableContainer" style="display: none;"></div>
+    <div id="statsContainer" style="display: none;" class="stats"></div>
+    <div id="legendContainer" style="display: none; margin-top: 24px;">
+      <h3>凡例</h3>
+      <ul>
+        <li><strong>日</strong>: 日勤</li>
+        <li><strong>夜</strong>: 夜勤</li>
+        <li><strong>休</strong>: 休日</li>
+        <li><span class="violation">赤背景</span>: 希望違反</li>
+        <li><strong>太字</strong>: 週末（土日）</li>
+      </ul>
+    </div>
+
+    <div style="margin-top: 24px;">
+      <button id="exportBtn" class="btn-primary" disabled>CSVでエクスポート</button>
+    </div>
+  </div>
+</body>
+</html>

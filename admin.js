@@ -316,7 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ログイン状態と管理者権限を確認
   const currentUser = localStorage.getItem('current_user');
   if (!currentUser) {
-    window.location.href = 'login.html';
+    window.location.href = 'index.html';
     return;
   }
   

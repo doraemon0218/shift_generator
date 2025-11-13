@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ログイン状態を確認
   const currentUser = localStorage.getItem(CURRENT_USER_KEY);
   if (!currentUser) {
-    window.location.href = 'login.html';
+    window.location.href = 'index.html';
     return;
   }
 
@@ -16,8 +16,17 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('userName').textContent = user.fullName;
   
   // 管理者の場合は管理者メニューを表示
-  if (user.isAdmin) {
-    document.getElementById('adminCard').style.display = 'block';
+  const adminCard = document.getElementById('adminCard');
+  if (adminCard) {
+    if (user.isAdmin) {
+      adminCard.classList.remove('locked');
+    } else {
+      adminCard.classList.add('locked');
+      adminCard.addEventListener('click', event => {
+        event.preventDefault();
+        alert('この画面は管理者専用です。管理者アカウントでログインしてください。');
+      });
+    }
   }
   
   // 締め切り情報を表示
@@ -32,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     logoutBtn.addEventListener('click', () => {
       if (confirm('ログアウトしますか？')) {
         localStorage.removeItem('current_user');
-        window.location.href = 'login.html';
+        window.location.href = 'index.html';
       }
     });
   }

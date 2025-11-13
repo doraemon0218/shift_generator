@@ -82,7 +82,7 @@ function checkLoginStatus() {
 // 自動ログイン
 function autoLogin() {
   if (!checkLoginStatus()) {
-    window.location.href = 'login.html';
+    window.location.href = 'index.html';
     return;
   }
   

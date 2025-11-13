@@ -7,16 +7,18 @@
 ### GitHub Pages（推奨）
 リポジトリのSettings → Pages でGitHub Pagesを有効化すると、以下のURLでアクセス可能：
 
-- **👉 [トップページ](https://doraemon0218.github.io/shift_generator/top.html)** - メインアプリケーション
-- **👉 [ログインページ](https://doraemon0218.github.io/shift_generator/login.html)** - ログイン
+- **👉 [ログイン（トップページ）](https://doraemon0218.github.io/shift_generator/index.html)** - ログイン画面
+- **👉 [アプリトップ](https://doraemon0218.github.io/shift_generator/top.html)** - ログイン後メニュー
+- **👉 [シフト生成](https://doraemon0218.github.io/shift_generator/generator.html)** - 管理者向け
 
 ### ローカル環境
 ```bash
 cd shift_generator
 python3 -m http.server 8000
 ```
-- **👉 [トップページ](http://localhost:8000/top.html)** - メインアプリケーション
-- **👉 [ログインページ](http://localhost:8000/login.html)** - ログイン
+- **👉 [ログイン（トップページ）](http://localhost:8000/index.html)** - ログイン画面
+- **👉 [アプリトップ](http://localhost:8000/top.html)** - ログイン後メニュー
+- **👉 [シフト生成](http://localhost:8000/generator.html)** - 管理者向け
 
 ## 🚀 クイックスタート
 
@@ -29,7 +31,7 @@ python3 -m http.server 8000
 
 ブラウザで以下のURLにアクセス：
 
-**👉 [ログインページ](http://localhost:8000/login.html) → [トップページ](http://localhost:8000/top.html)**
+**👉 [ログイン（トップページ）](http://localhost:8000/index.html) → [アプリトップ](http://localhost:8000/top.html)**
 
 または、デモ起動スクリプトを使用：
 
@@ -39,8 +41,9 @@ python3 -m http.server 8000
 
 ### 🔗 直接アクセス
 
-- **ログインページ**: [http://localhost:8000/login.html](http://localhost:8000/login.html)
-- **トップページ**: [http://localhost:8000/top.html](http://localhost:8000/top.html) (ログイン後)
+- **ログイン（トップページ）**: [http://localhost:8000/index.html](http://localhost:8000/index.html)
+- **アプリトップ**: [http://localhost:8000/top.html](http://localhost:8000/top.html) (ログイン後)
+- **シフト生成**: [http://localhost:8000/generator.html](http://localhost:8000/generator.html) (管理者)
 
 ## 📋 主な機能
 
@@ -102,13 +105,13 @@ python3 -m http.server 8000
 
 5. **シフト表を生成**
    - 管理者ページ → 「シフト表生成ページへ移動」
-   - CSVファイルをアップロード
+   - `generator.html` でCSVファイルをアップロード
    - 「シフト表を生成」ボタン
 
 ### 看護師としての使い方
 
 1. **ログイン**
-   - ログインページで姓・名・Gmail・パスワードを入力
+   - ログイン（トップページ）で姓・名・Gmail・パスワードを入力
 
 2. **シフト希望を入力**
    - トップページ → 「シフト希望入力」
@@ -116,15 +119,15 @@ python3 -m http.server 8000
    - 「💾 下書き保存」で途中保存
    - 「📤 管理者に提出」で提出完了
 
-3. **個人設定**
-   - トップページ → 「個人設定」
-   - 休日に関する希望を設定
+3. **価値観設定**
+   - トップページ → 「価値観設定」
+   - 夜勤明けの過ごし方などの価値観を設定
 
 ## 📁 ファイル構成
 
 ```
 shift_generator/
-├── login.html              # ログインページ
+├── index.html              # ログインページ（トップ）
 ├── login.js                # ログイン処理
 ├── top.html                # トップページ
 ├── top.js                  # トップページ処理
@@ -132,7 +135,7 @@ shift_generator/
 ├── nurse_input.js          # 希望入力処理
 ├── admin.html              # 管理者ページ
 ├── admin.js                # 管理者機能
-├── index.html              # シフト生成ページ
+├── generator.html          # シフト生成ページ
 ├── script.js               # シフト生成ロジック
 ├── past_shifts.html        # 過去データ参照ページ
 ├── DEMO.md                 # デモガイド
@@ -158,11 +161,13 @@ shift_generator/
 ## 🎨 画面遷移
 
 ```
-[ログインページ] (login.html)
+[ログイン（トップ）] (index.html)
     ↓
-[トップページ] (top.html)
+[アプリトップ] (top.html)
     ├─→ [シフト希望入力] (nurse_input.html)
-    ├─→ [個人設定] (nurse_input.html?page=settings)
+    ├─→ [価値観設定] (nurse_input.html?page=settings)
     ├─→ [過去のシフトデータ参照] (past_shifts.html)
-    └─→ [管理者用画面] (admin.html) [管理者のみ]
-        └─→ [シフト生成] (index.html)
+    └─→ [管理者用画面] (admin.html) ※管理者のみ
+            └─→ [シフト生成] (generator.html)
+
+```

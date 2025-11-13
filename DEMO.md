@@ -12,14 +12,14 @@ python3 -m http.server 8000
 ### 2. ブラウザでアクセス
 
 ```
-http://localhost:8000/login.html
+http://localhost:8000/index.html
 ```
 
 ## 📋 デモシナリオ
 
 ### シナリオ1: 初回ログイン（管理者）
 
-1. **ログインページ** (`http://localhost:8000/login.html`)
+1. **ログインページ** (`http://localhost:8000/index.html`)
    - 姓: `山田`
    - 名: `太郎`
    - Gmail: `yamada@example.com`
@@ -31,6 +31,7 @@ http://localhost:8000/login.html
    - 締め切り情報が表示されます
    - メニューから各機能にアクセスできます
 
+3. **管理者ページ** (`http://localhost:8000/admin.html`)
 3. **管理者ページ** (`http://localhost:8000/admin.html`)
    - 「締め切り設定」セクション
      - 「毎月15日23:59に設定」ボタンをクリック
@@ -79,7 +80,7 @@ http://localhost:8000/login.html
    - CSVファイルがダウンロードされます
 
 3. **シフト生成**
-   - 「シフト表生成ページへ移動」リンクをクリック
+   - 「シフト表生成ページへ移動」リンクをクリック（`generator.html`）
    - エクスポートしたCSVファイルをアップロード
    - 「シフト表を生成」ボタンをクリック
    - 公平性指標とシフト表が表示されます
