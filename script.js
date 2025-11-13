@@ -430,7 +430,7 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
             }
           }
         });
-      });
+  });
     });
   }
 

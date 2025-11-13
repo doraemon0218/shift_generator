@@ -15,6 +15,34 @@ const REQUEST_TYPES = {
   NO_ALL_BUT_NIGHT_BEFORE: 'no-all-but-night-before'
 };
 
+const VALUE_PREFERENCE_OPTIONS = {
+  'go-out': {
+    label: '夜勤明けは、遊びに行きたい',
+    icon: '🎢',
+    description: '夜勤明けでもアクティブに過ごしたい。イベントやお出かけの予定を入れたいタイプです。'
+  },
+  'relax-home': {
+    label: '夜勤明けは、家でゆっくりしたい',
+    icon: '🛋️',
+    description: '夜勤明けは自宅でゆっくり休みたい。無理せず体力回復を優先するスタイルです。'
+  },
+  'chain-holiday': {
+    label: '夜勤明けの翌日は、公休で休みをつなぎたい',
+    icon: '🌙➡️🛌',
+    description: '夜勤明けから連続して休みがあると嬉しい。しっかりと体力を回復させたい派です。'
+  },
+  'no-holiday': {
+    label: '夜勤明けの翌日は、むしろ公休を入れないでほしい',
+    icon: '💪',
+    description: '夜勤明け後は通常勤務に戻したい。連続休みよりリズムを崩さず働きたいタイプです。'
+  }
+};
+
+let quickOptionsContainer = null;
+let quickOptionsDate = null;
+let quickOptionsHideTimeout = null;
+let quickOptionsInitialized = false;
+
 // 日付の生成（2025年8月）
 const dates = [];
 for (let i = 1; i <= 31; i++) {
@@ -162,14 +190,12 @@ function loadData() {
       submittedAt: null,
       doesNightShift: null,
       preferences: {
-        consecutiveDaysOffAfterNight: false,
-        consecutiveDaysOff: false,
-        distributeDaysOff: false
+        valuePreference: null
       }
     };
     saveData();
   }
-  
+
   // 提出状態を確認
   if (currentUser) {
     const user = JSON.parse(currentUser);
@@ -178,23 +204,40 @@ function loadData() {
     const isSubmitted = localStorage.getItem(submittedKey) === 'true';
     currentData.submitted = isSubmitted;
   }
-  
-  // 設定が未設定の場合は初期化
-  if (!currentData.preferences) {
-    currentData.preferences = {
-      consecutiveDaysOffAfterNight: false,
-      consecutiveDaysOff: false,
-      distributeDaysOff: false
-    };
+
+  // 設定が未設定の場合は初期化（旧データの互換も考慮）
+  if (!currentData.preferences || typeof currentData.preferences !== 'object') {
+    currentData.preferences = { valuePreference: null };
     saveData();
+  } else {
+    if (currentData.preferences.valuePreference === undefined) {
+      let inferred = null;
+      if (currentData.preferences.consecutiveDaysOffAfterNight) {
+        inferred = 'chain-holiday';
+      } else if (currentData.preferences.consecutiveDaysOff) {
+        inferred = 'chain-holiday';
+      } else if (currentData.preferences.distributeDaysOff) {
+        inferred = 'relax-home';
+      }
+      currentData.preferences = { valuePreference: inferred };
+      saveData();
+    }
   }
-  
+
+  if (currentData.preferences) {
+    delete currentData.preferences.consecutiveDaysOffAfterNight;
+    delete currentData.preferences.consecutiveDaysOff;
+    delete currentData.preferences.distributeDaysOff;
+  }
+
   // UIを更新
   const currentNurseNameEl = document.getElementById('currentNurseName');
   const noteInputEl = document.getElementById('noteInput');
-  
+
   if (currentNurseNameEl) currentNurseNameEl.textContent = currentNurse;
   if (noteInputEl) noteInputEl.value = currentData.note || '';
+
+  updateValuePreferenceDisplay();
 }
 
 // データの保存
@@ -219,9 +262,10 @@ function saveData() {
 function initCalendar() {
   const calendarGrid = document.getElementById('calendarGrid');
   if (!calendarGrid || !currentData) return;
-  
+
+  hideQuickOptions(true);
   calendarGrid.innerHTML = '';
-  
+
   // 締め切りチェック
   const deadlineStr = localStorage.getItem(DEADLINE_KEY);
   const isDeadlinePassed = deadlineStr ? new Date(deadlineStr) < new Date() : false;
@@ -289,6 +333,12 @@ function initCalendar() {
     // 編集可能かどうか
     if (isEditable) {
       dayCell.style.cursor = 'pointer';
+      dayCell.addEventListener('mouseenter', () => {
+        showQuickOptions(dayCell, date);
+      });
+      dayCell.addEventListener('mouseleave', () => {
+        hideQuickOptions();
+      });
       dayCell.addEventListener('click', function(e) {
         e.stopPropagation();
         openSelectionModal(date);
@@ -338,10 +388,151 @@ function getRequestTypeLabel(requestType) {
   return labels[requestType] || '';
 }
 
+function getRequestOptions() {
+  if (!currentData) return [];
+  const doesNightShift = currentData.doesNightShift;
+  
+  if (doesNightShift === true) {
+    return [
+      { value: 'available', label: '休み希望なし（勤務可能）', desc: '日勤・夜勤どちらも可能です' },
+      { value: 'no-day', label: '日勤のみ不可', desc: 'その日の日勤は不可ですが、夜勤は可能です' },
+      { value: 'no-night', label: '夜勤のみ不可', desc: 'その日の夜勤は不可ですが、日勤は可能です' },
+      { value: 'no-all', label: '終日不可', desc: 'その日は完全に休みたいです' },
+      { value: 'no-all-but-night-before', label: '夜勤明けならOK', desc: '基本的には休みたいですが、夜勤明けの休みなら歓迎します' }
+    ];
+  }
+  
+  return [
+    { value: 'available', label: '休み希望なし（勤務可能）', desc: '日勤可能です' },
+    { value: 'no-day', label: '日勤のみ不可', desc: 'その日の日勤は不可です（休み希望）' },
+    { value: 'no-all', label: '終日不可', desc: 'その日は完全に休みたいです' }
+  ];
+}
+
+function ensureQuickOptionsContainer() {
+  if (quickOptionsContainer) return;
+  quickOptionsContainer = document.createElement('div');
+  quickOptionsContainer.className = 'quick-options';
+  quickOptionsContainer.addEventListener('mouseenter', () => {
+    if (quickOptionsHideTimeout) {
+      clearTimeout(quickOptionsHideTimeout);
+      quickOptionsHideTimeout = null;
+    }
+  });
+  quickOptionsContainer.addEventListener('mouseleave', () => {
+    hideQuickOptions();
+  });
+  document.body.appendChild(quickOptionsContainer);
+}
+
+function initQuickOptions() {
+  if (quickOptionsInitialized) return;
+  ensureQuickOptionsContainer();
+  window.addEventListener('scroll', () => hideQuickOptions(true));
+  window.addEventListener('resize', () => hideQuickOptions(true));
+  quickOptionsInitialized = true;
+}
+
+function showQuickOptions(cell, date) {
+  if (!currentData || currentData.submitted) return;
+  ensureQuickOptionsContainer();
+  if (quickOptionsHideTimeout) {
+    clearTimeout(quickOptionsHideTimeout);
+    quickOptionsHideTimeout = null;
+  }
+
+  const options = getRequestOptions();
+  if (options.length === 0) return;
+
+  quickOptionsDate = date;
+  const currentRequest = currentData.requests[date];
+
+  const headerHtml = `<div class="quick-options-header">${date} (${getDayOfWeek(date)})</div>`;
+  const optionsHtml = options.map(opt => `
+    <button type="button" class="quick-option-button ${currentRequest === opt.value ? 'selected' : ''}" data-value="${opt.value}">
+      <strong>${opt.label}</strong>
+      <div class="quick-option-desc">${opt.desc}</div>
+    </button>
+  `).join('');
+
+  quickOptionsContainer.innerHTML = headerHtml + optionsHtml;
+  quickOptionsContainer.style.display = 'block';
+  quickOptionsContainer.classList.remove('below');
+
+  quickOptionsContainer.querySelectorAll('.quick-option-button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const value = btn.dataset.value;
+      setRequest(date, value);
+    });
+  });
+
+  requestAnimationFrame(() => {
+    const rect = cell.getBoundingClientRect();
+    const containerRect = quickOptionsContainer.getBoundingClientRect();
+    let top = rect.top + window.scrollY - containerRect.height - 12;
+    let left = rect.left + window.scrollX + rect.width / 2 - containerRect.width / 2;
+
+    if (top < window.scrollY + 12) {
+      top = rect.bottom + window.scrollY + 12;
+      quickOptionsContainer.classList.add('below');
+    }
+
+    const minLeft = window.scrollX + 12;
+    const maxLeft = window.scrollX + document.documentElement.clientWidth - containerRect.width - 12;
+    if (left < minLeft) left = minLeft;
+    if (left > maxLeft) left = maxLeft;
+
+    quickOptionsContainer.style.top = `${top}px`;
+    quickOptionsContainer.style.left = `${left}px`;
+  });
+}
+
+function hideQuickOptions(immediate = false) {
+  if (!quickOptionsContainer) return;
+  if (quickOptionsHideTimeout) {
+    clearTimeout(quickOptionsHideTimeout);
+    quickOptionsHideTimeout = null;
+  }
+
+  if (immediate) {
+    quickOptionsContainer.style.display = 'none';
+    return;
+  }
+
+  quickOptionsHideTimeout = setTimeout(() => {
+    quickOptionsContainer.style.display = 'none';
+    quickOptionsHideTimeout = null;
+  }, 80);
+}
+
+function getValuePreferenceInfo(value) {
+  if (!value) return null;
+  return VALUE_PREFERENCE_OPTIONS[value] || null;
+}
+
+function updateValuePreferenceDisplay() {
+  const wrapper = document.getElementById('valuePreferenceStatus');
+  const badge = document.getElementById('valuePreferenceBadge');
+  if (!wrapper || !badge) return;
+
+  const value = currentData && currentData.preferences ? currentData.preferences.valuePreference : null;
+  const info = getValuePreferenceInfo(value);
+
+  wrapper.style.display = 'flex';
+  if (info) {
+    badge.classList.remove('value-badge--empty');
+    badge.innerHTML = `<span class="emoji">${info.icon}</span><span>${info.label}</span>`;
+  } else {
+    badge.classList.add('value-badge--empty');
+    badge.innerHTML = '未設定';
+  }
+}
+
 // 選択モーダルを開く
 function openSelectionModal(date) {
   if (!currentData || currentData.submitted) return;
   
+  hideQuickOptions(true);
   selectedDate = date;
   const modal = document.getElementById('selectionModal');
   const dateLabel = document.getElementById('selectedDate');
@@ -351,38 +542,20 @@ function openSelectionModal(date) {
   
   dateLabel.textContent = `${date} (${getDayOfWeek(date)})`;
   
-  // 休みたいかどうかに基づいた選択肢
-  const doesNightShift = currentData.doesNightShift;
+  const options = getRequestOptions();
   const currentRequest = currentData.requests[date];
   
-  let options = [];
-  
-  if (doesNightShift === true) {
-    // 夜勤をする人の選択肢
-    options = [
-      { value: 'available', label: '休み希望なし（勤務可能）', desc: '日勤・夜勤どちらも可能です' },
-      { value: 'no-day', label: '日勤のみ不可', desc: 'その日の日勤は不可ですが、夜勤は可能です' },
-      { value: 'no-night', label: '夜勤のみ不可', desc: 'その日の夜勤は不可ですが、日勤は可能です' },
-      { value: 'no-all', label: '終日不可', desc: 'その日は完全に休みたいです' },
-      { value: 'no-all-but-night-before', label: '夜勤明けならOK', desc: '基本的には休みたいですが、夜勤明けの休みなら歓迎します' }
-    ];
+  if (options.length === 0) {
+    optionsContainer.innerHTML = '<p style="color: #666;">選択肢が利用できません</p>';
   } else {
-    // 夜勤をしない人、または未設定の人の選択肢
-    options = [
-      { value: 'available', label: '休み希望なし（勤務可能）', desc: '日勤可能です' },
-      { value: 'no-day', label: '日勤のみ不可', desc: 'その日の日勤は不可です（休み希望）' },
-      { value: 'no-all', label: '終日不可', desc: 'その日は完全に休みたいです' }
-    ];
+    optionsContainer.innerHTML = options.map(opt => `
+      <button class="option-button ${currentRequest === opt.value ? 'selected' : ''}" 
+              data-value="${opt.value}">
+        <strong>${opt.label}</strong>
+        <div style="font-size: 12px; color: #666; margin-top: 4px;">${opt.desc}</div>
+      </button>
+    `).join('');
   }
-  
-  // 選択肢ボタンを生成
-  optionsContainer.innerHTML = options.map(opt => `
-    <button class="option-button ${currentRequest === opt.value ? 'selected' : ''}" 
-            data-value="${opt.value}">
-      <strong>${opt.label}</strong>
-      <div style="font-size: 12px; color: #666; margin-top: 4px;">${opt.desc}</div>
-    </button>
-  `).join('');
   
   // イベントリスナーを追加
   optionsContainer.querySelectorAll('.option-button').forEach(btn => {
@@ -401,6 +574,7 @@ function closeSelectionModal() {
   if (modal) {
     modal.classList.remove('active');
   }
+  hideQuickOptions(true);
   selectedDate = null;
 }
 
@@ -446,6 +620,7 @@ function setRequest(date, requestType) {
   // 自動保存
   saveData();
   updateProgress();
+  hideQuickOptions(true);
   closeSelectionModal();
 }
 
@@ -670,16 +845,11 @@ function openSettingsPage() {
   const settingsModal = document.getElementById('settingsModal');
   if (!settingsModal) return;
   
-  // 現在の設定値を反映
-  if (currentData.preferences) {
-    const prefConsecutiveAfterNight = document.getElementById('prefConsecutiveDaysOffAfterNight');
-    const prefConsecutive = document.getElementById('prefConsecutiveDaysOff');
-    const prefDistribute = document.getElementById('prefDistributeDaysOff');
-    
-    if (prefConsecutiveAfterNight) prefConsecutiveAfterNight.checked = currentData.preferences.consecutiveDaysOffAfterNight || false;
-    if (prefConsecutive) prefConsecutive.checked = currentData.preferences.consecutiveDaysOff || false;
-    if (prefDistribute) prefDistribute.checked = currentData.preferences.distributeDaysOff || false;
-  }
+  const currentValue = currentData.preferences ? currentData.preferences.valuePreference : null;
+  const radios = document.querySelectorAll('input[name="valuePreference"]');
+  radios.forEach(radio => {
+    radio.checked = radio.value === currentValue;
+  });
   
   settingsModal.classList.add('active');
 }
@@ -697,20 +867,20 @@ function saveSettings() {
   if (!currentData) return;
   
   if (!currentData.preferences) {
-    currentData.preferences = {};
+    currentData.preferences = { valuePreference: null };
   }
   
-  const prefConsecutiveAfterNight = document.getElementById('prefConsecutiveDaysOffAfterNight');
-  const prefConsecutive = document.getElementById('prefConsecutiveDaysOff');
-  const prefDistribute = document.getElementById('prefDistributeDaysOff');
+  const selected = document.querySelector('input[name="valuePreference"]:checked');
+  if (!selected) {
+    alert('夜勤明けの過ごし方を1つ選択してください。');
+    return;
+  }
   
-  if (prefConsecutiveAfterNight) currentData.preferences.consecutiveDaysOffAfterNight = prefConsecutiveAfterNight.checked;
-  if (prefConsecutive) currentData.preferences.consecutiveDaysOff = prefConsecutive.checked;
-  if (prefDistribute) currentData.preferences.distributeDaysOff = prefDistribute.checked;
-  
+  currentData.preferences.valuePreference = selected.value;
   saveData();
+  updateValuePreferenceDisplay();
   closeSettingsPage();
-  alert('設定を保存しました');
+  alert('価値観を保存しました');
 }
 
 // トップページに戻る
@@ -722,6 +892,7 @@ function goToTop() {
 document.addEventListener('DOMContentLoaded', () => {
   // ログイン状態を確認
   autoLogin();
+  initQuickOptions();
   
   // 下書き保存ボタン
   const saveDraftBtn = document.getElementById('saveDraftBtn');

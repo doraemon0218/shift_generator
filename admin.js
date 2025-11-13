@@ -3,6 +3,35 @@ const STORAGE_KEY_PREFIX = 'shift_request_';
 const SUBMITTED_KEY_PREFIX = 'shift_submitted_';
 const ADMIN_USERS_KEY = 'admin_users';
 
+const VALUE_PREFERENCE_OPTIONS = {
+  'go-out': {
+    label: '夜勤明けは、遊びに行きたい',
+    icon: '🎢',
+    description: '夜勤明けでもアクティブに過ごしたい。イベントやお出かけの予定を入れたいタイプです。'
+  },
+  'relax-home': {
+    label: '夜勤明けは、家でゆっくりしたい',
+    icon: '🛋️',
+    description: '夜勤明けは自宅でゆっくり休みたい。無理せず体力回復を優先するスタイルです。'
+  },
+  'chain-holiday': {
+    label: '夜勤明けの翌日は、公休で休みをつなぎたい',
+    icon: '🌙➡️🛌',
+    description: '夜勤明けから連続して休みがあると嬉しい。しっかりと体力を回復させたい派です。'
+  },
+  'no-holiday': {
+    label: '夜勤明けの翌日は、むしろ公休を入れないでほしい',
+    icon: '💪',
+    description: '夜勤明け後は通常勤務に戻したい。連続休みよりリズムを崩さず働きたいタイプです。'
+  }
+};
+
+function getUserDirectory() {
+  const USER_STORAGE_KEY = 'shift_system_users';
+  const stored = localStorage.getItem(USER_STORAGE_KEY);
+  return stored ? JSON.parse(stored) : {};
+}
+
 // 管理者ユーザーを取得
 function getAdminUsers() {
   const stored = localStorage.getItem(ADMIN_USERS_KEY);
@@ -88,8 +117,7 @@ function loadAdminList() {
 function loadNurseNightShiftSettings() {
   const allKeys = Object.keys(localStorage);
   const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
-  const USER_STORAGE_KEY = 'shift_system_users';
-  const users = localStorage.getItem(USER_STORAGE_KEY) ? JSON.parse(localStorage.getItem(USER_STORAGE_KEY)) : {};
+  const users = getUserDirectory();
   
   const nurseList = [];
   
@@ -175,6 +203,78 @@ function loadNurseNightShiftSettings() {
   `;
 }
 
+function loadValuePreferences() {
+  const container = document.getElementById('valuePreferenceList');
+  if (!container) return;
+
+  const users = getUserDirectory();
+  const allKeys = Object.keys(localStorage);
+  const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
+
+  const preferenceMap = {};
+
+  requestKeys.forEach(key => {
+    const userKey = key.replace(STORAGE_KEY_PREFIX, '');
+    const dataStr = localStorage.getItem(key);
+    if (!dataStr) return;
+    const data = JSON.parse(dataStr);
+
+    const preferenceValue = data.preferences && data.preferences.valuePreference ? data.preferences.valuePreference : null;
+    const displayName = users[userKey]?.fullName || data.nurseName || userKey;
+
+    preferenceMap[userKey] = {
+      name: displayName,
+      preference: preferenceValue
+    };
+  });
+
+  Object.keys(users).forEach(userKey => {
+    if (!preferenceMap[userKey]) {
+      const user = users[userKey];
+      preferenceMap[userKey] = {
+        name: user.fullName || userKey,
+        preference: null
+      };
+    }
+  });
+
+  const preferenceList = Object.keys(preferenceMap).map(userKey => ({
+    userKey,
+    ...preferenceMap[userKey]
+  })).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+
+  if (preferenceList.length === 0) {
+    container.innerHTML = '<p style="color: #666;">価値観のデータがまだありません</p>';
+    return;
+  }
+
+  container.innerHTML = preferenceList.map(item => {
+    const info = item.preference ? VALUE_PREFERENCE_OPTIONS[item.preference] : null;
+    if (!info) {
+      return `
+        <div class="value-card value-empty">
+          <div class="value-emoji">📝</div>
+          <div>
+            <div class="value-name">${item.name}</div>
+            <div class="value-desc">価値観はまだ設定されていません</div>
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="value-card">
+        <div class="value-emoji">${info.icon}</div>
+        <div>
+          <div class="value-name">${item.name}</div>
+          <div class="value-label">${info.label}</div>
+          <div class="value-desc">${info.description}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 // 看護師の夜勤設定を変更
 function setNurseNightShift(userKey, doesNightShift) {
   const storageKey = STORAGE_KEY_PREFIX + userKey;
@@ -185,8 +285,7 @@ function setNurseNightShift(userKey, doesNightShift) {
     data = JSON.parse(dataStr);
   } else {
     // ユーザー情報から名前を取得
-    const USER_STORAGE_KEY = 'shift_system_users';
-    const users = localStorage.getItem(USER_STORAGE_KEY) ? JSON.parse(localStorage.getItem(USER_STORAGE_KEY)) : {};
+    const users = getUserDirectory();
     const user = users[userKey];
     
     data = {
@@ -198,9 +297,7 @@ function setNurseNightShift(userKey, doesNightShift) {
       submittedAt: null,
       doesNightShift: null,
       preferences: {
-        consecutiveDaysOffAfterNight: false,
-        consecutiveDaysOff: false,
-        distributeDaysOff: false
+        valuePreference: null
       }
     };
   }
@@ -210,6 +307,7 @@ function setNurseNightShift(userKey, doesNightShift) {
   
   // 表示を更新
   loadNurseNightShiftSettings();
+  loadValuePreferences();
   alert('夜勤設定を更新しました');
 }
 
@@ -233,6 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadSubmissionStatus();
   loadAdminList();
   loadNurseNightShiftSettings();
+  loadValuePreferences();
 });
 
 // 毎月15日23:59に設定
@@ -335,84 +434,79 @@ function formatDateTimeLocal(date) {
 function loadSubmissionStatus() {
   const allKeys = Object.keys(localStorage);
   const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
-  
-  // ユーザー情報から看護師名を取得
-  const USER_STORAGE_KEY = 'shift_system_users';
-  const users = localStorage.getItem(USER_STORAGE_KEY) ? JSON.parse(localStorage.getItem(USER_STORAGE_KEY)) : {};
-  
+  const users = getUserDirectory();
+
   let submitted = 0;
   let notSubmitted = 0;
   const nurseList = [];
-  
+
   requestKeys.forEach(key => {
     const userKey = key.replace(STORAGE_KEY_PREFIX, '');
     const submittedKey = SUBMITTED_KEY_PREFIX + userKey;
     const isSubmitted = localStorage.getItem(submittedKey) === 'true';
-    
-    // ユーザー情報から名前を取得
-    let displayName = userKey;
-    if (users[userKey]) {
-      displayName = users[userKey].fullName || userKey;
-    }
-    
+
+    const displayName = users[userKey]?.fullName || userKey;
+
     if (isSubmitted) {
       submitted++;
     } else {
       notSubmitted++;
     }
-    
+
     nurseList.push({
       name: displayName,
-      userKey: userKey,
+      userKey,
       submitted: isSubmitted
     });
   });
-  
+
   const total = submitted + notSubmitted;
-  
-  // ステータスカードを表示
+
   const statusGrid = document.getElementById('statusGrid');
-  statusGrid.style.display = 'grid';
-  statusGrid.innerHTML = `
-    <div class="status-card">
-      <div class="status-label">総看護師数</div>
-      <div class="status-value">${total}</div>
-    </div>
-    <div class="status-card success">
-      <div class="status-label">提出済み</div>
-      <div class="status-value">${submitted}</div>
-    </div>
-    <div class="status-card warning">
-      <div class="status-label">未提出</div>
-      <div class="status-value">${notSubmitted}</div>
-    </div>
-    <div class="status-card">
-      <div class="status-label">提出率</div>
-      <div class="status-value">${total > 0 ? Math.round((submitted / total) * 100) : 0}%</div>
-    </div>
-  `;
-  
-  // 看護師リストを表示
-  const nurseListContainer = document.getElementById('nurseList');
-  if (nurseList.length > 0) {
-    nurseListContainer.style.display = 'block';
-    nurseList.sort((a, b) => {
-      if (a.submitted !== b.submitted) {
-        return a.submitted ? -1 : 1;
-      }
-      return a.name.localeCompare(b.name);
-    });
-    
-    nurseListContainer.innerHTML = nurseList.map(nurse => `
-      <div class="nurse-item">
-        <span>${nurse.name}</span>
-        <span class="badge ${nurse.submitted ? 'badge-success' : 'badge-warning'}">
-          ${nurse.submitted ? '提出済み' : '未提出'}
-        </span>
+  if (statusGrid) {
+    statusGrid.style.display = 'grid';
+    statusGrid.innerHTML = `
+      <div class="status-card">
+        <div class="status-label">総看護師数</div>
+        <div class="status-value">${total}</div>
       </div>
-    `).join('');
-  } else {
-    nurseListContainer.style.display = 'none';
+      <div class="status-card success">
+        <div class="status-label">提出済み</div>
+        <div class="status-value">${submitted}</div>
+      </div>
+      <div class="status-card warning">
+        <div class="status-label">未提出</div>
+        <div class="status-value">${notSubmitted}</div>
+      </div>
+      <div class="status-card">
+        <div class="status-label">提出率</div>
+        <div class="status-value">${total > 0 ? Math.round((submitted / total) * 100) : 0}%</div>
+      </div>
+    `;
+  }
+
+  const nurseListContainer = document.getElementById('nurseList');
+  if (nurseListContainer) {
+    if (nurseList.length > 0) {
+      nurseListContainer.style.display = 'block';
+      nurseList.sort((a, b) => {
+        if (a.submitted !== b.submitted) {
+          return a.submitted ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name, 'ja');
+      });
+
+      nurseListContainer.innerHTML = nurseList.map(nurse => `
+        <div class="nurse-item">
+          <span>${nurse.name}</span>
+          <span class="badge ${nurse.submitted ? 'badge-success' : 'badge-warning'}">
+            ${nurse.submitted ? '提出済み' : '未提出'}
+          </span>
+        </div>
+      `).join('');
+    } else {
+      nurseListContainer.style.display = 'none';
+    }
   }
 }
 
@@ -420,48 +514,45 @@ function loadSubmissionStatus() {
 function exportAllRequests() {
   const allKeys = Object.keys(localStorage);
   const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
-  
+
   if (requestKeys.length === 0) {
     alert('エクスポートするデータがありません');
     return;
   }
-  
-  // 日付の生成（2025年8月）
+
   const dates = [];
   for (let i = 1; i <= 31; i++) {
     dates.push(`8/${i}`);
   }
-  
-  // CSVヘッダー
-  const header = ['氏名', 'シフト希望期間', '備考', ...dates];
+
+  const users = getUserDirectory();
+
+  const header = ['氏名', 'シフト希望期間', '価値観', '備考', ...dates];
   const rows = [header];
-  
-  // 各看護師のデータ
+
   requestKeys.forEach(key => {
     const userKey = key.replace(STORAGE_KEY_PREFIX, '');
     const dataStr = localStorage.getItem(key);
-    
     if (!dataStr) return;
-    
+
     const data = JSON.parse(dataStr);
-    
-    // ユーザー情報から名前を取得
-    let displayName = data.nurseName || userKey;
-    if (users[userKey]) {
-      displayName = users[userKey].fullName || displayName;
-    }
-    
+
+    const displayName = data.nurseName || users[userKey]?.fullName || userKey;
+    const preferenceValue = data.preferences && data.preferences.valuePreference ? data.preferences.valuePreference : null;
+    const preferenceInfo = preferenceValue ? VALUE_PREFERENCE_OPTIONS[preferenceValue] : null;
+    const preferenceLabel = preferenceInfo ? `${preferenceInfo.icon} ${preferenceInfo.label}` : '';
+
     const row = [
       displayName,
       '2025年8月1日〜8月31日',
+      preferenceLabel,
       data.note || ''
     ];
-    
-    // 希望データをCSV形式に変換
+
     dates.forEach(date => {
       const request = data.requests[date];
       let value = '';
-      
+
       if (request === 'available') {
         value = '休み希望なし（勤務可能）';
       } else if (request === 'no-day') {
@@ -473,33 +564,33 @@ function exportAllRequests() {
       } else if (request === 'no-all-but-night-before') {
         value = '夜勤明けならOK';
       }
-      
+
       row.push(value);
     });
-    
+
     rows.push(row);
   });
-  
-  // CSV文字列を作成
-  const csvContent = rows.map(row => 
+
+  const csvContent = rows.map(row =>
     row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
   ).join('\n');
-  
-  // ダウンロード
+
   const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = `shift_requests_export_${new Date().toISOString().split('T')[0]}.csv`;
   link.click();
-  
-  // ステータス表示
+
   const statusDiv = document.getElementById('exportStatus');
-  statusDiv.innerHTML = `<div style="color: #28a745; padding: 8px; background: #d4edda; border-radius: 4px;">
-    ✅ ${requestKeys.length}名の希望データをエクスポートしました
-  </div>`;
-  
-  setTimeout(() => {
-    statusDiv.innerHTML = '';
-  }, 3000);
+  if (statusDiv) {
+    statusDiv.innerHTML = `<div style="color: #28a745; padding: 8px; background: #d4edda; border-radius: 4px;">
+      ✅ ${requestKeys.length}名の希望データをエクスポートしました
+    </div>`;
+
+    setTimeout(() => {
+      statusDiv.innerHTML = '';
+    }, 3000);
+  }
 }
 
+// EOF
