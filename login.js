@@ -14,6 +14,8 @@ function normalizeShiftCapability(value) {
   if (value === SHIFT_CAPABILITIES.NIGHT || value === SHIFT_CAPABILITIES.LATE || value === SHIFT_CAPABILITIES.DAY) {
     return value;
   }
+  if (value === 'on') return SHIFT_CAPABILITIES.NIGHT;
+  if (value === 'off') return SHIFT_CAPABILITIES.LATE;
   if (value === true) return SHIFT_CAPABILITIES.NIGHT;
   if (value === false) return SHIFT_CAPABILITIES.LATE;
   return null;
@@ -115,7 +117,8 @@ function handleLogin(event) {
   const password = document.getElementById('password').value;
   const hireYearInput = document.getElementById('hireYear');
   const hireYearRaw = hireYearInput ? hireYearInput.value.trim() : '';
-  const nightShiftChoice = document.querySelector('input[name="initialShiftCapability"]:checked');
+  const nightShiftChoice = document.querySelector('input[name="initialShiftCapability"]:checked')
+    || document.querySelector('input[name="initialNightShift"]:checked');
   
   const errorMsg = document.getElementById('errorMessage');
   errorMsg.classList.remove('show');
