@@ -62,7 +62,7 @@ function parseNurseData(rows) {
 
     dateColumns.forEach(date => {
       const request = row[date] || '';
-      if (request.includes('有給休暇希望')) {
+      if (request.includes('公休希望') || request.includes('有給休暇希望')) {
         nurse.requests[date] = REQUEST_TYPES.PAID_LEAVE;
       } else if (request.includes('夜勤のみ可能') || request.includes('夜勤のみ可')) {
         nurse.requests[date] = REQUEST_TYPES.NIGHT_ONLY;

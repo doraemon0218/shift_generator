@@ -66,9 +66,9 @@ const REQUEST_OPTION_PRESETS = {
     desc: '夜勤のみ対応できます'
   },
   'paid-leave': {
-    label: '有給休暇希望',
+    label: '公休希望(有給休暇を含む)',
     icon: '🏖️',
-    desc: 'この日は有給休暇を希望します'
+    desc: 'この日は公休希望（有給休暇を含む）です'
   }
 };
 

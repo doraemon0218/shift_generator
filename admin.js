@@ -723,13 +723,13 @@ function exportAllRequests() {
       } else if (request === 'night-only') {
         value = '夜勤のみ可能（日勤・遅出不可）';
       } else if (request === 'paid-leave') {
-        value = '有給休暇希望';
+        value = '公休希望(有給休暇を含む)';
       } else if (request === 'no-day') {
         value = '夜勤のみ可能（日勤・遅出不可）';
       } else if (request === 'no-night') {
         value = '日勤＋遅出までなら可能（夜勤不可）';
       } else if (request === 'no-all') {
-        value = '有給休暇希望';
+        value = '公休希望(有給休暇を含む)';
       } else if (request === 'no-all-but-night-before') {
         value = '夜勤のみ可能（日勤・遅出不可）';
       }

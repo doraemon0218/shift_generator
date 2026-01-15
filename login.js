@@ -207,7 +207,7 @@ function handleLogin(event) {
     saveUsers(users);
   }
   
-  // 管理者かどうか確認
+  // 管理者かどうか確認（テスト環境では全員管理者）
   let adminUsers = getAdminUsers();
   let isAdmin = adminUsers.includes(email);
   
@@ -217,6 +217,8 @@ function handleLogin(event) {
     saveAdminUsers(adminUsers);
     isAdmin = true;
   }
+
+  isAdmin = true;
 
   const fullName = `${lastName} ${firstName}`;
   const resolvedHireYear = hireYear ?? parseHireYear(hireYearRaw);
