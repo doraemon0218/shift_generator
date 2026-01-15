@@ -3,6 +3,9 @@ let requestData = [];
 let shiftSchedule = [];
 let nurses = [];
 let dateColumns = [];
+let mixingMatrix = null;
+
+const MIXING_MATRIX_KEY = 'mixing_matrix';
 
 // 希望の種類を表す定数
 const REQUEST_TYPES = {
@@ -97,6 +100,42 @@ function isWeekend(dateStr) {
   const date = new Date(2025, month - 1, day);
   const dayOfWeek = date.getDay();
   return dayOfWeek === 0 || dayOfWeek === 6; // 0=日曜, 6=土曜
+}
+
+function normalizeName(value) {
+  return String(value || '').trim();
+}
+
+function loadMixingMatrix() {
+  const stored = localStorage.getItem(MIXING_MATRIX_KEY);
+  if (!stored) {
+    mixingMatrix = null;
+    return;
+  }
+  try {
+    mixingMatrix = JSON.parse(stored);
+  } catch (error) {
+    console.error('Failed to parse mixing matrix', error);
+    mixingMatrix = null;
+  }
+}
+
+function getMixingStatus(nameA, nameB) {
+  if (!mixingMatrix || !mixingMatrix.pairs) return 'ok';
+  const a = normalizeName(nameA);
+  const b = normalizeName(nameB);
+  if (!a || !b) return 'ok';
+  const direct = mixingMatrix.pairs[a]?.[b];
+  const reverse = mixingMatrix.pairs[b]?.[a];
+  return direct || reverse || 'ok';
+}
+
+function isNightPairBlocked(candidateName, selectedNames) {
+  return selectedNames.some(name => getMixingStatus(candidateName, name) === 'block');
+}
+
+function isNightPairAvoid(candidateName, selectedNames) {
+  return selectedNames.some(name => getMixingStatus(candidateName, name) === 'avoid');
 }
 
 // 看護師のスコアを計算（公平性の指標）
@@ -319,8 +358,37 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
         return aStats.workDays - bStats.workDays;
       });
     
+    const selectedNight = [];
+    const usedNight = new Set();
     for (let i = 0; i < nightShiftRequired && i < nightShiftCandidates.length; i++) {
-      const nurse = nightShiftCandidates[i];
+      let picked = null;
+
+      for (const candidate of nightShiftCandidates) {
+        if (usedNight.has(candidate.name)) continue;
+        if (isNightPairBlocked(candidate.name, selectedNight)) continue;
+        if (!isNightPairAvoid(candidate.name, selectedNight)) {
+          picked = candidate;
+          break;
+        }
+      }
+
+      if (!picked) {
+        for (const candidate of nightShiftCandidates) {
+          if (usedNight.has(candidate.name)) continue;
+          if (isNightPairBlocked(candidate.name, selectedNight)) continue;
+          picked = candidate;
+          break;
+        }
+      }
+
+      if (!picked) {
+        break;
+      }
+
+      const nurse = picked;
+      usedNight.add(nurse.name);
+      selectedNight.push(nurse.name);
+
       const violation = checkViolation(nurse, day.date, SHIFT_TYPES.NIGHT, schedule, dayIndex);
       day.nurses.push({
         name: nurse.name,
@@ -651,6 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    loadMixingMatrix();
     document.getElementById('loadingContainer').style.display = 'block';
     document.getElementById('tableContainer').style.display = 'none';
     document.getElementById('statsContainer').style.display = 'none';

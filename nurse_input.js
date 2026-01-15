@@ -493,11 +493,9 @@ function getRequestTypeLabel(requestType) {
 function getRequestOptions() {
   if (!currentData) return [];
   const capability = resolveShiftCapability(currentData, null);
-  let keys = ['available', 'day-only', 'paid-leave'];
+  let keys = ['day-only', 'paid-leave'];
   if (!capability || capability === SHIFT_CAPABILITIES.NIGHT) {
     keys = ['available', 'day-only', 'day-late', 'night-only', 'paid-leave'];
-  } else if (capability === SHIFT_CAPABILITIES.LATE) {
-    keys = ['available', 'day-only', 'day-late', 'paid-leave'];
   }
 
   return keys.map(key => {
@@ -519,6 +517,14 @@ function getRequestOptions() {
       desc
     };
   });
+}
+
+function getAllowedRequestKeys() {
+  const capability = resolveShiftCapability(currentData, null);
+  if (!capability || capability === SHIFT_CAPABILITIES.NIGHT) {
+    return ['available', 'day-only', 'day-late', 'night-only', 'paid-leave'];
+  }
+  return ['day-only', 'paid-leave'];
 }
 
 function ensureQuickOptionsContainer() {
@@ -813,6 +819,11 @@ function closeSelectionModal() {
 // 希望を設定
 function setRequest(date, requestType) {
   if (!currentNurse || !currentData) return;
+
+  if (!getAllowedRequestKeys().includes(requestType)) {
+    alert('現在の夜勤・遅出の対応状況では選択できない希望です。');
+    return;
+  }
   
   // 締め切りチェック
   const deadlineStr = localStorage.getItem(DEADLINE_KEY);
