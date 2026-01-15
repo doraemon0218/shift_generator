@@ -160,21 +160,21 @@
       background: #d4edda;
       border-color: #28a745;
     }
-    .day-cell.no-day {
+    .day-cell.day-only {
       background: #fff3cd;
       border-color: #ffc107;
     }
-    .day-cell.no-night {
+    .day-cell.day-late {
       background: #d1ecf1;
       border-color: #17a2b8;
     }
-    .day-cell.no-all {
+    .day-cell.night-only {
+      background: #e4ddff;
+      border-color: #6f42c1;
+    }
+    .day-cell.paid-leave {
       background: #f8d7da;
       border-color: #dc3545;
-    }
-    .day-cell.no-all-but-night-before {
-      background: #f8d7da;
-      border: 2px dashed #dc3545;
     }
     .day-cell.weekend {
       font-weight: 700;
@@ -642,19 +642,19 @@
       </div>
       <div class="legend-item">
         <div class="legend-color" style="background: #fff3cd;"></div>
-        <span>日勤のみ不可</span>
+        <span>日勤のみ可能（遅出・夜勤不可）</span>
       </div>
-      <div class="legend-item" id="nightShiftLegend" style="display: none;">
+      <div class="legend-item" id="legendDayLate" style="display: none;">
         <div class="legend-color" style="background: #d1ecf1;"></div>
-        <span>夜勤のみ不可</span>
+        <span>日勤＋遅出までなら可能（夜勤不可）</span>
       </div>
       <div class="legend-item">
         <div class="legend-color" style="background: #f8d7da;"></div>
-        <span>終日不可</span>
+        <span>有給休暇希望</span>
       </div>
-      <div class="legend-item" id="nightBeforeLegend" style="display: none;">
-        <div class="legend-color" style="background: #f8d7da; border: 2px dashed #dc3545;"></div>
-        <span>夜勤明けならOK</span>
+      <div class="legend-item" id="legendNightOnly" style="display: none;">
+        <div class="legend-color" style="background: #e4ddff; border: 1px solid #6f42c1;"></div>
+        <span>夜勤のみ可能（日勤・遅出不可）</span>
       </div>
     </div>
 
@@ -667,7 +667,7 @@
 
     <div class="note-section">
       <label for="noteInput">備考（有給、旅行予定、通院など）</label>
-      <textarea id="noteInput" placeholder="例: 8/15-8/16は旅行のため終日不可希望"></textarea>
+      <textarea id="noteInput" placeholder="例: 8/15-8/16は旅行のため有給休暇希望"></textarea>
     </div>
 
     <div class="action-buttons">

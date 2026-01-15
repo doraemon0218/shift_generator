@@ -6,10 +6,11 @@ let dateColumns = [];
 
 // 希望の種類を表す定数
 const REQUEST_TYPES = {
-  AVAILABLE: '希望なし（終日勤務可能）',
-  NO_DAY: '日勤不可',
-  NO_NIGHT: '夜勤不可',
-  NO_ALL: '終日不可'
+  AVAILABLE: 'available',
+  DAY_ONLY: 'day-only',
+  DAY_LATE: 'day-late',
+  NIGHT_ONLY: 'night-only',
+  PAID_LEAVE: 'paid-leave'
 };
 
 // シフトの種類
@@ -61,14 +62,24 @@ function parseNurseData(rows) {
 
     dateColumns.forEach(date => {
       const request = row[date] || '';
-      if (request.includes('夜勤明けならOK') || request.includes('夜勤明けの休みならば歓迎') || request.includes('当直明けなら可') || request.includes('終日不可（夜勤明け')) {
-        nurse.requests[date] = 'no-all-but-night-before';
+      if (request.includes('有給休暇希望')) {
+        nurse.requests[date] = REQUEST_TYPES.PAID_LEAVE;
+      } else if (request.includes('夜勤のみ可能') || request.includes('夜勤のみ可')) {
+        nurse.requests[date] = REQUEST_TYPES.NIGHT_ONLY;
+      } else if (request.includes('日勤＋遅出までなら可能') || request.includes('日勤＋遅出までなら可')) {
+        nurse.requests[date] = REQUEST_TYPES.DAY_LATE;
+      } else if (request.includes('日勤のみ可能') || request.includes('日勤のみ可')) {
+        nurse.requests[date] = REQUEST_TYPES.DAY_ONLY;
+      } else if (request.includes('休み希望なし') || request.includes('勤務可能')) {
+        nurse.requests[date] = REQUEST_TYPES.AVAILABLE;
+      } else if (request.includes('夜勤明けならOK') || request.includes('夜勤明けの休みならば歓迎') || request.includes('当直明けなら可')) {
+        nurse.requests[date] = REQUEST_TYPES.NIGHT_ONLY;
       } else if (request.includes('終日不可')) {
-        nurse.requests[date] = REQUEST_TYPES.NO_ALL;
+        nurse.requests[date] = REQUEST_TYPES.PAID_LEAVE;
       } else if (request.includes('日勤のみ不可') || request.includes('日勤不可')) {
-        nurse.requests[date] = REQUEST_TYPES.NO_DAY;
+        nurse.requests[date] = REQUEST_TYPES.NIGHT_ONLY;
       } else if (request.includes('夜勤のみ不可') || request.includes('夜勤不可')) {
-        nurse.requests[date] = REQUEST_TYPES.NO_NIGHT;
+        nurse.requests[date] = REQUEST_TYPES.DAY_LATE;
       } else {
         nurse.requests[date] = REQUEST_TYPES.AVAILABLE;
       }
@@ -105,7 +116,7 @@ function calculateNurseScore(nurse, schedule, targetWorkDays) {
   
   // 夜勤回数の偏差（夜勤可能な人の中で）
   const nightEligible = nurses.filter(n => 
-    Object.values(n.requests).some(r => r !== REQUEST_TYPES.NO_NIGHT)
+    Object.values(n.requests).some(r => r !== REQUEST_TYPES.DAY_ONLY && r !== REQUEST_TYPES.DAY_LATE && r !== REQUEST_TYPES.PAID_LEAVE)
   );
   if (nightEligible.length > 0) {
     const nightEligibleStats = nightEligible.map(n => getNurseStats(n.name, schedule));
@@ -153,32 +164,14 @@ function checkViolation(nurse, date, shift, schedule, dateIndex) {
   // 希望データがない場合は違反なし（全てOK）
   if (!request || request === REQUEST_TYPES.AVAILABLE) return false;
   
-  // 当直明けなら可の場合
-  if (request === 'no-all-but-night-before') {
-    // 前日の夜勤が許容される場合
-    if (dateIndex > 0) {
-      const prevDate = dateColumns[dateIndex - 1];
-      const prevDay = schedule.find(d => d.date === prevDate);
-      if (prevDay) {
-        const prevAssignment = prevDay.nurses.find(n => n.name === nurse.name);
-        if (prevAssignment && prevAssignment.shift === SHIFT_TYPES.NIGHT) {
-          // 前日が夜勤の場合、当日はOK
-          return false;
-        }
-      }
-    }
-    // 前日が夜勤でない場合、当日は終日不可
+  if (request === REQUEST_TYPES.PAID_LEAVE) {
     return shift !== SHIFT_TYPES.OFF;
   }
-  
-  if (request === REQUEST_TYPES.NO_ALL) {
-    return shift !== SHIFT_TYPES.OFF;
-  }
-  if (request === REQUEST_TYPES.NO_DAY) {
-    return shift === SHIFT_TYPES.DAY;
-  }
-  if (request === REQUEST_TYPES.NO_NIGHT) {
+  if (request === REQUEST_TYPES.DAY_ONLY || request === REQUEST_TYPES.DAY_LATE) {
     return shift === SHIFT_TYPES.NIGHT;
+  }
+  if (request === REQUEST_TYPES.NIGHT_ONLY) {
+    return shift === SHIFT_TYPES.DAY;
   }
   return false;
 }
@@ -199,7 +192,9 @@ function isNightShiftEligible(nurse) {
   
   // 夜勤不可が多すぎる場合は夜勤をしない人とみなす
   const totalDays = Object.keys(nurse.requests).length;
-  const noNightCount = Object.values(nurse.requests).filter(r => r === REQUEST_TYPES.NO_NIGHT || r === REQUEST_TYPES.NO_ALL).length;
+  const noNightCount = Object.values(nurse.requests).filter(r =>
+    r === REQUEST_TYPES.DAY_ONLY || r === REQUEST_TYPES.DAY_LATE || r === REQUEST_TYPES.PAID_LEAVE
+  ).length;
   // 半分以上が夜勤不可の場合は夜勤をしない人と判定
   return (noNightCount / totalDays) < 0.5;
 }
@@ -235,10 +230,10 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
     return bPriority - aPriority;
   });
 
-  // まず終日不可の日を割り当て
+  // まず有給希望の日を割り当て
   schedule.forEach(day => {
     sortedNurses.forEach(nurse => {
-      if (nurse.requests[day.date] === REQUEST_TYPES.NO_ALL) {
+      if (nurse.requests[day.date] === REQUEST_TYPES.PAID_LEAVE) {
         day.nurses.push({
           name: nurse.name,
           shift: SHIFT_TYPES.OFF,
@@ -267,25 +262,8 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
       .filter(n => {
         // 希望チェック（希望データがない場合はOK）
         const request = n.requests[day.date];
-        if (request === REQUEST_TYPES.NO_DAY || request === REQUEST_TYPES.NO_ALL) {
+        if (request === REQUEST_TYPES.NIGHT_ONLY || request === REQUEST_TYPES.PAID_LEAVE) {
           return false;
-        }
-        // 当直明けなら可の場合、前日の夜勤がない場合は不可
-        if (request === 'no-all-but-night-before') {
-          if (dayIndex > 0) {
-            const prevDate = dateColumns[dayIndex - 1];
-            const prevDay = schedule.find(d => d.date === prevDate);
-            if (prevDay) {
-              const prevAssignment = prevDay.nurses.find(n2 => n2.name === n.name);
-              if (!prevAssignment || prevAssignment.shift !== SHIFT_TYPES.NIGHT) {
-                return false; // 前日が夜勤でない場合は不可
-              }
-            } else {
-              return false;
-            }
-          } else {
-            return false; // 月初日は不可
-          }
         }
         // 夜勤をしない人は週末は日勤も不可
         if (!isNightShiftEligible(n) && isWeekend(day.date)) {
@@ -322,12 +300,8 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
       .filter(n => {
         // 希望チェック
         const request = n.requests[day.date];
-        if (request === REQUEST_TYPES.NO_NIGHT || request === REQUEST_TYPES.NO_ALL) {
+        if (request === REQUEST_TYPES.DAY_ONLY || request === REQUEST_TYPES.DAY_LATE || request === REQUEST_TYPES.PAID_LEAVE) {
           return false;
-        }
-        // 当直明けなら可は、前日の夜勤がある場合のみOK（夜勤は不可）
-        if (request === 'no-all-but-night-before') {
-          return false; // 当日の夜勤は不可
         }
         // 夜勤をしない人は除外
         if (!isNightShiftEligible(n)) {

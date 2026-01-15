@@ -15,17 +15,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // ユーザー名を表示
   document.getElementById('userName').textContent = user.fullName;
   
-  // 管理者の場合は管理者メニューを表示
+  // 管理者カードは閲覧可能（非管理者は閲覧モード）
   const adminCard = document.getElementById('adminCard');
-  if (adminCard) {
-    if (user.isAdmin) {
-      adminCard.classList.remove('locked');
-    } else {
-      adminCard.classList.add('locked');
-      adminCard.addEventListener('click', event => {
-        event.preventDefault();
-        alert('この画面は管理者専用です。管理者アカウントでログインしてください。');
-      });
+  if (adminCard && !user.isAdmin) {
+    adminCard.classList.remove('locked');
+    const description = adminCard.querySelector('.menu-description');
+    if (description && !description.textContent.includes('閲覧モード')) {
+      description.innerHTML += '<br />※ 閲覧モードで開きます';
     }
   }
   

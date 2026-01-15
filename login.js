@@ -4,6 +4,21 @@ const CURRENT_USER_KEY = 'current_user';
 const ADMIN_USERS_KEY = 'admin_users';
 const STORAGE_KEY_PREFIX = 'shift_request_';
 
+const SHIFT_CAPABILITIES = {
+  NIGHT: 'night',
+  LATE: 'late',
+  DAY: 'day'
+};
+
+function normalizeShiftCapability(value) {
+  if (value === SHIFT_CAPABILITIES.NIGHT || value === SHIFT_CAPABILITIES.LATE || value === SHIFT_CAPABILITIES.DAY) {
+    return value;
+  }
+  if (value === true) return SHIFT_CAPABILITIES.NIGHT;
+  if (value === false) return SHIFT_CAPABILITIES.LATE;
+  return null;
+}
+
 // ユーザーデータを取得
 function getUsers() {
   const stored = localStorage.getItem(USER_STORAGE_KEY);
@@ -39,23 +54,29 @@ function hashPassword(password) {
   return hash.toString();
 }
 
-function ensureShiftProfile(userKey, fullName, initialNightShift) {
+function ensureShiftProfile(userKey, fullName, initialShiftCapability) {
   const storageKey = STORAGE_KEY_PREFIX + userKey;
   const stored = localStorage.getItem(storageKey);
 
   if (stored) {
     try {
       const data = JSON.parse(stored);
-      if ((data.doesNightShift === undefined || data.doesNightShift === null) && typeof initialNightShift === 'boolean') {
-        data.doesNightShift = initialNightShift;
-        localStorage.setItem(storageKey, JSON.stringify(data));
+      const normalizedShift = normalizeShiftCapability(data.shiftCapability) ?? normalizeShiftCapability(data.doesNightShift);
+      const resolvedShift = normalizedShift ?? normalizeShiftCapability(initialShiftCapability);
+      if (!normalizedShift && resolvedShift) {
+        data.shiftCapability = resolvedShift;
       }
+      if (resolvedShift && typeof data.doesNightShift !== 'boolean') {
+        data.doesNightShift = resolvedShift === SHIFT_CAPABILITIES.NIGHT;
+      }
+      localStorage.setItem(storageKey, JSON.stringify(data));
     } catch (error) {
       console.error('Failed to parse existing shift data', error);
     }
     return;
   }
 
+  const resolvedShift = normalizeShiftCapability(initialShiftCapability);
   const baseData = {
     nurseName: fullName,
     userKey,
@@ -63,7 +84,8 @@ function ensureShiftProfile(userKey, fullName, initialNightShift) {
     note: '',
     submitted: false,
     submittedAt: null,
-    doesNightShift: typeof initialNightShift === 'boolean' ? initialNightShift : null,
+    shiftCapability: resolvedShift,
+    doesNightShift: resolvedShift === SHIFT_CAPABILITIES.NIGHT,
     preferences: {
       valuePreference: null
     }
@@ -93,7 +115,7 @@ function handleLogin(event) {
   const password = document.getElementById('password').value;
   const hireYearInput = document.getElementById('hireYear');
   const hireYearRaw = hireYearInput ? hireYearInput.value.trim() : '';
-  const nightShiftChoice = document.querySelector('input[name="initialNightShift"]:checked');
+  const nightShiftChoice = document.querySelector('input[name="initialShiftCapability"]:checked');
   
   const errorMsg = document.getElementById('errorMessage');
   errorMsg.classList.remove('show');
@@ -111,8 +133,10 @@ function handleLogin(event) {
   const isNewUser = !existingUser;
 
   let hireYear = existingUser ? existingUser.hireYear ?? null : null;
-  let initialNightShift = existingUser && typeof existingUser.initialNightShift === 'boolean'
-    ? existingUser.initialNightShift
+  let initialShiftCapability = existingUser
+    ? (normalizeShiftCapability(existingUser.initialShiftCapability)
+      ?? normalizeShiftCapability(existingUser.shiftCapability)
+      ?? normalizeShiftCapability(existingUser.initialNightShift))
     : null;
 
   if (isNewUser) {
@@ -123,13 +147,13 @@ function handleLogin(event) {
       return;
     }
     if (!nightShiftChoice) {
-      errorMsg.textContent = '現在の夜勤状況を選択してください';
+      errorMsg.textContent = '夜勤・遅出の対応状況を選択してください';
       errorMsg.classList.add('show');
       return;
     }
 
     hireYear = parsedYear;
-    initialNightShift = nightShiftChoice.value === 'on';
+    initialShiftCapability = normalizeShiftCapability(nightShiftChoice.value);
   }
 
   // ユーザーが存在するか確認
@@ -151,12 +175,15 @@ function handleLogin(event) {
     }
 
     if (nightShiftChoice) {
-      const choiceValue = nightShiftChoice.value === 'on';
-      if (existingUser.initialNightShift !== choiceValue) {
-        existingUser.initialNightShift = choiceValue;
-        initialNightShift = choiceValue;
+      const choiceValue = normalizeShiftCapability(nightShiftChoice.value);
+      if (choiceValue && existingUser.initialShiftCapability !== choiceValue) {
+        existingUser.initialShiftCapability = choiceValue;
+        initialShiftCapability = choiceValue;
         userDataUpdated = true;
       }
+    } else if (!existingUser.initialShiftCapability && initialShiftCapability) {
+      existingUser.initialShiftCapability = initialShiftCapability;
+      userDataUpdated = true;
     }
 
     if (userDataUpdated) {
@@ -172,7 +199,7 @@ function handleLogin(event) {
       fullName: `${lastName} ${firstName}`,
       createdAt: new Date().toISOString(),
       hireYear,
-      initialNightShift
+      initialShiftCapability
     };
     saveUsers(users);
   }
@@ -190,11 +217,10 @@ function handleLogin(event) {
 
   const fullName = `${lastName} ${firstName}`;
   const resolvedHireYear = hireYear ?? parseHireYear(hireYearRaw);
-  const resolvedNightShift = typeof initialNightShift === 'boolean'
-    ? initialNightShift
-    : (nightShiftChoice ? nightShiftChoice.value === 'on' : null);
+  const resolvedShiftCapability = normalizeShiftCapability(initialShiftCapability)
+    ?? normalizeShiftCapability(nightShiftChoice ? nightShiftChoice.value : null);
 
-  ensureShiftProfile(userKey, fullName, resolvedNightShift);
+  ensureShiftProfile(userKey, fullName, resolvedShiftCapability);
   
   // 現在のユーザー情報を保存
   const currentUser = {
@@ -205,7 +231,7 @@ function handleLogin(event) {
     isAdmin,
     userKey,
     hireYear: resolvedHireYear ?? null,
-    initialNightShift: resolvedNightShift
+    initialShiftCapability: resolvedShiftCapability
   };
   localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
   

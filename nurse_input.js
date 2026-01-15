@@ -6,13 +6,19 @@ const STORAGE_KEY_PREFIX = 'shift_request_';
 const DEADLINE_KEY = 'shift_deadline';
 const SUBMITTED_KEY_PREFIX = 'shift_submitted_';
 
+const SHIFT_CAPABILITIES = {
+  NIGHT: 'night',
+  LATE: 'late',
+  DAY: 'day'
+};
+
 // 希望の種類
 const REQUEST_TYPES = {
   AVAILABLE: 'available',
-  NO_DAY: 'no-day',
-  NO_NIGHT: 'no-night',
-  NO_ALL: 'no-all',
-  NO_ALL_BUT_NIGHT_BEFORE: 'no-all-but-night-before'
+  DAY_ONLY: 'day-only',
+  DAY_LATE: 'day-late',
+  NIGHT_ONLY: 'night-only',
+  PAID_LEAVE: 'paid-leave'
 };
 
 const VALUE_PREFERENCE_OPTIONS = {
@@ -42,27 +48,27 @@ const REQUEST_OPTION_PRESETS = {
   'available': {
     label: '休み希望なし（勤務可能）',
     icon: '✅',
-    desc: '日勤・夜勤どちらの勤務も対応できます'
+    desc: '日勤・遅出・夜勤どれも対応できます'
   },
-  'no-day': {
-    label: '日勤のみ不可',
-    icon: '🌞✖️',
-    desc: '日勤は休みたいですが、夜勤は調整できます'
+  'day-only': {
+    label: '日勤のみ可能（遅出・夜勤不可）',
+    icon: '🌞',
+    desc: '日勤のみ対応できます'
   },
-  'no-night': {
-    label: '夜勤のみ不可',
-    icon: '🌙✖️',
-    desc: '夜勤は難しいですが、日勤であれば勤務可能です'
+  'day-late': {
+    label: '日勤＋遅出までなら可能（夜勤不可）',
+    icon: '🌇',
+    desc: '日勤・遅出は可能、夜勤は不可です'
   },
-  'no-all': {
-    label: '終日不可',
-    icon: '🚫',
-    desc: 'この日は完全に休みたいです'
+  'night-only': {
+    label: '夜勤のみ可能（日勤・遅出不可）',
+    icon: '🌙',
+    desc: '夜勤のみ対応できます'
   },
-  'no-all-but-night-before': {
-    label: '夜勤明けならOK',
-    icon: '🌙➡️🛌',
-    desc: '休み希望ですが夜勤明けの休みであれば歓迎します'
+  'paid-leave': {
+    label: '有給休暇希望',
+    icon: '🏖️',
+    desc: 'この日は有給休暇を希望します'
   }
 };
 
@@ -71,6 +77,58 @@ let quickOptionsDate = null;
 let quickOptionsHideTimeout = null;
 let quickOptionsInitialized = false;
 let quickPointer = { x: null, y: null };
+
+function normalizeShiftCapability(value) {
+  if (value === SHIFT_CAPABILITIES.NIGHT || value === SHIFT_CAPABILITIES.LATE || value === SHIFT_CAPABILITIES.DAY) {
+    return value;
+  }
+  if (value === true) return SHIFT_CAPABILITIES.NIGHT;
+  if (value === false) return SHIFT_CAPABILITIES.LATE;
+  return null;
+}
+
+function getShiftCapabilityLabel(capability) {
+  if (capability === SHIFT_CAPABILITIES.NIGHT) return '夜勤をする';
+  if (capability === SHIFT_CAPABILITIES.LATE) return '夜勤はしない（遅出まで）';
+  if (capability === SHIFT_CAPABILITIES.DAY) return '遅出も夜勤もしない';
+  return '未設定（管理者に連絡してください）';
+}
+
+function resolveShiftCapability(data, userInfo) {
+  return normalizeShiftCapability(data?.shiftCapability)
+    ?? normalizeShiftCapability(data?.doesNightShift)
+    ?? normalizeShiftCapability(userInfo?.initialShiftCapability)
+    ?? normalizeShiftCapability(userInfo?.initialNightShift)
+    ?? null;
+}
+
+function normalizeRequestType(value) {
+  if (!value) return value;
+  const supported = [
+    REQUEST_TYPES.AVAILABLE,
+    REQUEST_TYPES.DAY_ONLY,
+    REQUEST_TYPES.DAY_LATE,
+    REQUEST_TYPES.NIGHT_ONLY,
+    REQUEST_TYPES.PAID_LEAVE
+  ];
+  if (supported.includes(value)) return value;
+
+  if (value === 'no-day') return REQUEST_TYPES.NIGHT_ONLY;
+  if (value === 'no-night') return REQUEST_TYPES.DAY_LATE;
+  if (value === 'no-all') return REQUEST_TYPES.PAID_LEAVE;
+  if (value === 'no-all-but-night-before') return REQUEST_TYPES.NIGHT_ONLY;
+  if (value === 'available') return REQUEST_TYPES.AVAILABLE;
+  return REQUEST_TYPES.AVAILABLE;
+}
+
+function isQuickOptionsTarget(target) {
+  return Boolean(quickOptionsContainer && target instanceof Node && quickOptionsContainer.contains(target));
+}
+
+function isDayCellTarget(target) {
+  if (!target || !(target instanceof Element)) return false;
+  return Boolean(target.closest('.day-cell'));
+}
 
 // 日付の生成（2025年8月）
 const dates = [];
@@ -156,18 +214,11 @@ function showCalendarPage() {
   const nightShiftStatus = document.getElementById('nightShiftStatus');
   
   if (nightShiftInfo) {
-    if (currentData.doesNightShift === null || currentData.doesNightShift === undefined) {
-      nightShiftInfo.style.display = 'block';
-      if (nightShiftStatus) {
-        nightShiftStatus.textContent = '未設定（管理者に連絡してください）';
-        nightShiftStatus.style.color = '#dc3545';
-      }
-    } else {
-      nightShiftInfo.style.display = 'block';
-      if (nightShiftStatus) {
-        nightShiftStatus.textContent = currentData.doesNightShift ? '夜勤をします' : '夜勤はしません';
-        nightShiftStatus.style.color = '#28a745';
-      }
+    nightShiftInfo.style.display = 'block';
+    const capability = resolveShiftCapability(currentData, null);
+    if (nightShiftStatus) {
+      nightShiftStatus.textContent = getShiftCapabilityLabel(capability);
+      nightShiftStatus.style.color = capability ? '#28a745' : '#dc3545';
     }
   }
   
@@ -178,13 +229,14 @@ function showCalendarPage() {
   }
   
   // 凡例を更新（夜勤をする人の場合のみ夜勤関連の選択肢を表示）
-  const nightShiftLegend = document.getElementById('nightShiftLegend');
-  const nightBeforeLegend = document.getElementById('nightBeforeLegend');
-  if (nightShiftLegend) {
-    nightShiftLegend.style.display = (currentData.doesNightShift === true) ? 'flex' : 'none';
+  const legendDayLate = document.getElementById('legendDayLate');
+  const legendNightOnly = document.getElementById('legendNightOnly');
+  const capability = resolveShiftCapability(currentData, null);
+  if (legendDayLate) {
+    legendDayLate.style.display = capability === SHIFT_CAPABILITIES.DAY ? 'none' : 'flex';
   }
-  if (nightBeforeLegend) {
-    nightBeforeLegend.style.display = (currentData.doesNightShift === true) ? 'flex' : 'none';
+  if (legendNightOnly) {
+    legendNightOnly.style.display = capability ? (capability === SHIFT_CAPABILITIES.NIGHT ? 'flex' : 'none') : 'flex';
   }
   
   // カレンダーを初期化
@@ -217,6 +269,7 @@ function loadData() {
       note: '',
       submitted: false,
       submittedAt: null,
+      shiftCapability: null,
       doesNightShift: null,
       preferences: {
         valuePreference: null
@@ -226,9 +279,25 @@ function loadData() {
   }
 
   const currentUserInfo = currentUser ? JSON.parse(currentUser) : null;
-  if ((currentData.doesNightShift === null || currentData.doesNightShift === undefined) && currentUserInfo && typeof currentUserInfo.initialNightShift === 'boolean') {
-    currentData.doesNightShift = currentUserInfo.initialNightShift;
+  const resolvedCapability = resolveShiftCapability(currentData, currentUserInfo);
+  if (!currentData.shiftCapability && resolvedCapability) {
+    currentData.shiftCapability = resolvedCapability;
+    currentData.doesNightShift = resolvedCapability === SHIFT_CAPABILITIES.NIGHT;
     saveData();
+  }
+
+  if (currentData.requests && typeof currentData.requests === 'object') {
+    let normalized = false;
+    Object.keys(currentData.requests).forEach(date => {
+      const updated = normalizeRequestType(currentData.requests[date]);
+      if (updated !== currentData.requests[date]) {
+        currentData.requests[date] = updated;
+        normalized = true;
+      }
+    });
+    if (normalized) {
+      saveData();
+    }
   }
 
   // 提出状態を確認
@@ -378,7 +447,10 @@ function initCalendar() {
         quickPointer.y = e.clientY;
         updateQuickOptionsPosition(dayCell, date);
       });
-      dayCell.addEventListener('mouseleave', () => {
+      dayCell.addEventListener('mouseleave', (e) => {
+        if (isQuickOptionsTarget(e.relatedTarget)) {
+          return;
+        }
         hideQuickOptions();
       });
       dayCell.addEventListener('click', function(e) {
@@ -408,46 +480,35 @@ function initCalendar() {
 
 // 短縮ラベルを取得
 function getRequestTypeLabelShort(requestType) {
-  const labels = {
-    'available': '勤務OK',
-    'no-day': '日勤✕',
-    'no-night': '夜勤✕',
-    'no-all': '終日✕',
-    'no-all-but-night-before': '明けOK'
-  };
-  return labels[requestType] || '未入力';
+  const preset = REQUEST_OPTION_PRESETS[requestType];
+  return preset ? preset.label : '未入力';
 }
 
 // 希望タイプのラベルを取得
 function getRequestTypeLabel(requestType) {
-  const labels = {
-    'available': '休み希望なし（勤務可能）',
-    'no-day': '日勤のみ不可',
-    'no-night': '夜勤のみ不可',
-    'no-all': '終日不可',
-    'no-all-but-night-before': '夜勤明けならOK'
-  };
-  return labels[requestType] || '';
+  const preset = REQUEST_OPTION_PRESETS[requestType];
+  return preset ? preset.label : '';
 }
 
 function getRequestOptions() {
   if (!currentData) return [];
-  const doesNightShift = currentData.doesNightShift === true;
-  const keys = doesNightShift
-    ? ['available', 'no-day', 'no-night', 'no-all', 'no-all-but-night-before']
-    : ['available', 'no-day', 'no-all'];
+  const capability = resolveShiftCapability(currentData, null);
+  let keys = ['available', 'day-only', 'paid-leave'];
+  if (!capability || capability === SHIFT_CAPABILITIES.NIGHT) {
+    keys = ['available', 'day-only', 'day-late', 'night-only', 'paid-leave'];
+  } else if (capability === SHIFT_CAPABILITIES.LATE) {
+    keys = ['available', 'day-only', 'day-late', 'paid-leave'];
+  }
 
   return keys.map(key => {
     const preset = REQUEST_OPTION_PRESETS[key];
     let desc = preset.desc;
 
-    if (!doesNightShift) {
-      if (key === 'available') {
-        desc = '日勤に入って大丈夫です';
-      } else if (key === 'no-day') {
-        desc = 'この日は日勤をお休みしたいです';
-      } else if (key === 'no-all') {
-        desc = 'この日は完全に休みたいです';
+    if (key === 'available') {
+      if (capability === SHIFT_CAPABILITIES.DAY) {
+        desc = '日勤のみ対応できます';
+      } else if (capability === SHIFT_CAPABILITIES.LATE) {
+        desc = '日勤・遅出は対応できます';
       }
     }
 
@@ -471,7 +532,10 @@ function ensureQuickOptionsContainer() {
       quickOptionsHideTimeout = null;
     }
   });
-  quickOptionsContainer.addEventListener('mouseleave', () => {
+  quickOptionsContainer.addEventListener('mouseleave', (e) => {
+    if (isDayCellTarget(e.relatedTarget)) {
+      return;
+    }
     hideQuickOptions();
   });
   document.body.appendChild(quickOptionsContainer);
@@ -523,8 +587,6 @@ function showQuickOptions(cell, date) {
 
   requestAnimationFrame(() => {
     const containerRect = quickOptionsContainer.getBoundingClientRect();
-    const scrollX = window.scrollX || document.documentElement.scrollLeft || 0;
-    const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
     const viewportWidth = document.documentElement.clientWidth;
     const viewportHeight = window.innerHeight;
 
@@ -533,42 +595,40 @@ function showQuickOptions(cell, date) {
     let placeBelow = true;
 
     if (quickPointer.x !== null && quickPointer.y !== null) {
-      const anchorX = quickPointer.x + scrollX;
-      const anchorY = quickPointer.y + scrollY;
-      top = anchorY + 12;
-      left = anchorX + 12;
+      top = quickPointer.y + 12;
+      left = quickPointer.x + 12;
 
-      if (top + containerRect.height > scrollY + viewportHeight - 12) {
-        top = anchorY - containerRect.height - 12;
+      if (top + containerRect.height > viewportHeight - 12) {
+        top = quickPointer.y - containerRect.height - 12;
         placeBelow = false;
       }
     } else {
       const rect = cell.getBoundingClientRect();
-      const anchorX = rect.left + rect.width / 2 + scrollX;
-      const anchorY = rect.top + scrollY;
+      const anchorX = rect.left + rect.width / 2;
+      const anchorY = rect.top;
       top = anchorY - containerRect.height - 12;
       left = anchorX - containerRect.width / 2;
       placeBelow = false;
 
-      if (top < scrollY + 12) {
-        top = rect.bottom + scrollY + 12;
+      if (top < 12) {
+        top = rect.bottom + 12;
         placeBelow = true;
       }
     }
 
-    if (left + containerRect.width > scrollX + viewportWidth - 12) {
-      left = scrollX + viewportWidth - containerRect.width - 12;
+    if (left + containerRect.width > viewportWidth - 12) {
+      left = viewportWidth - containerRect.width - 12;
     }
-    if (left < scrollX + 12) {
-      left = scrollX + 12;
+    if (left < 12) {
+      left = 12;
     }
 
-    if (top < scrollY + 12) {
-      top = scrollY + 12;
+    if (top < 12) {
+      top = 12;
       placeBelow = true;
     }
-    if (top + containerRect.height > scrollY + viewportHeight - 12) {
-      top = scrollY + viewportHeight - containerRect.height - 12;
+    if (top + containerRect.height > viewportHeight - 12) {
+      top = viewportHeight - containerRect.height - 12;
       placeBelow = false;
     }
 
@@ -590,8 +650,6 @@ function updateQuickOptionsPosition(cell, date) {
   }
 
   const containerRect = quickOptionsContainer.getBoundingClientRect();
-  const scrollX = window.scrollX || document.documentElement.scrollLeft || 0;
-  const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
   const viewportWidth = document.documentElement.clientWidth;
   const viewportHeight = window.innerHeight;
 
@@ -600,44 +658,42 @@ function updateQuickOptionsPosition(cell, date) {
   let placeBelow = true;
 
   if (quickPointer.x !== null && quickPointer.y !== null) {
-    const anchorX = quickPointer.x + scrollX;
-    const anchorY = quickPointer.y + scrollY;
-    top = anchorY + 12;
-    left = anchorX + 12;
+    top = quickPointer.y + 12;
+    left = quickPointer.x + 12;
 
-    if (top + containerRect.height > scrollY + viewportHeight - 12) {
-      top = anchorY - containerRect.height - 12;
+    if (top + containerRect.height > viewportHeight - 12) {
+      top = quickPointer.y - containerRect.height - 12;
       placeBelow = false;
     }
   } else if (cell) {
     const rect = cell.getBoundingClientRect();
-    const anchorX = rect.left + rect.width / 2 + scrollX;
-    const anchorY = rect.top + scrollY;
+    const anchorX = rect.left + rect.width / 2;
+    const anchorY = rect.top;
     top = anchorY - containerRect.height - 12;
     left = anchorX - containerRect.width / 2;
     placeBelow = false;
 
-    if (top < scrollY + 12) {
-      top = rect.bottom + scrollY + 12;
+    if (top < 12) {
+      top = rect.bottom + 12;
       placeBelow = true;
     }
   } else {
     return;
   }
 
-  if (left + containerRect.width > scrollX + viewportWidth - 12) {
-    left = scrollX + viewportWidth - containerRect.width - 12;
+  if (left + containerRect.width > viewportWidth - 12) {
+    left = viewportWidth - containerRect.width - 12;
   }
-  if (left < scrollX + 12) {
-    left = scrollX + 12;
+  if (left < 12) {
+    left = 12;
   }
 
-  if (top < scrollY + 12) {
-    top = scrollY + 12;
+  if (top < 12) {
+    top = 12;
     placeBelow = true;
   }
-  if (top + containerRect.height > scrollY + viewportHeight - 12) {
-    top = scrollY + viewportHeight - containerRect.height - 12;
+  if (top + containerRect.height > viewportHeight - 12) {
+    top = viewportHeight - containerRect.height - 12;
     placeBelow = false;
   }
 
@@ -773,7 +829,7 @@ function setRequest(date, requestType) {
   const cell = document.querySelector(`[data-date="${date}"]`);
   if (cell) {
     // 既存のクラスを削除
-    cell.classList.remove('available', 'no-day', 'no-night', 'no-all', 'no-all-but-night-before');
+    cell.classList.remove('available', 'day-only', 'day-late', 'night-only', 'paid-leave');
     cell.classList.add(requestType);
     cell.style.background = '';
     

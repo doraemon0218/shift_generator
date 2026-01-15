@@ -3,6 +3,30 @@ const STORAGE_KEY_PREFIX = 'shift_request_';
 const SUBMITTED_KEY_PREFIX = 'shift_submitted_';
 const ADMIN_USERS_KEY = 'admin_users';
 
+const SHIFT_CAPABILITIES = {
+  NIGHT: 'night',
+  LATE: 'late',
+  DAY: 'day'
+};
+
+let isReadOnlyAdminView = false;
+
+function normalizeShiftCapability(value) {
+  if (value === SHIFT_CAPABILITIES.NIGHT || value === SHIFT_CAPABILITIES.LATE || value === SHIFT_CAPABILITIES.DAY) {
+    return value;
+  }
+  if (value === true) return SHIFT_CAPABILITIES.NIGHT;
+  if (value === false) return SHIFT_CAPABILITIES.LATE;
+  return null;
+}
+
+function getShiftCapabilityLabel(capability) {
+  if (capability === SHIFT_CAPABILITIES.NIGHT) return '夜勤をする';
+  if (capability === SHIFT_CAPABILITIES.LATE) return '夜勤はしない（遅出まで）';
+  if (capability === SHIFT_CAPABILITIES.DAY) return '遅出も夜勤もしない';
+  return '未設定（管理者）';
+}
+
 const VALUE_PREFERENCE_OPTIONS = {
   'go-out': {
     label: '夜勤明けは、遊びに行きたい',
@@ -106,7 +130,9 @@ function loadAdminList() {
       ${admins.map(email => `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee;">
           <span>${email}</span>
-          <button onclick="removeAdmin('${email}')" style="padding: 4px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">削除</button>
+          ${isReadOnlyAdminView ? '' : `
+            <button onclick="removeAdmin('${email}')" style="padding: 4px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">削除</button>
+          `}
         </div>
       `).join('')}
     </div>
@@ -136,23 +162,28 @@ function loadNurseNightShiftSettings() {
 
     const userInfo = users[userKey] || {};
     const hireYear = typeof userInfo.hireYear === 'number' ? userInfo.hireYear : null;
-    const initialNightShift = typeof userInfo.initialNightShift === 'boolean' ? userInfo.initialNightShift : null;
+    const initialShiftCapability = normalizeShiftCapability(userInfo.initialShiftCapability)
+      ?? normalizeShiftCapability(userInfo.initialNightShift);
 
-    if ((data.doesNightShift === undefined || data.doesNightShift === null) && typeof initialNightShift === 'boolean') {
-      data.doesNightShift = initialNightShift;
+    const storedCapability = normalizeShiftCapability(data.shiftCapability)
+      ?? normalizeShiftCapability(data.doesNightShift);
+
+    if (!storedCapability && initialShiftCapability) {
+      data.shiftCapability = initialShiftCapability;
+      data.doesNightShift = initialShiftCapability === SHIFT_CAPABILITIES.NIGHT;
       localStorage.setItem(key, JSON.stringify(data));
     }
 
     const nameFromData = data.nurseName || userInfo.fullName || userKey;
-    const adminNightShift = data.doesNightShift ?? null;
-    const effectiveNightShift = adminNightShift !== null ? adminNightShift : initialNightShift;
+    const adminShiftCapability = storedCapability ?? null;
+    const effectiveShiftCapability = adminShiftCapability !== null ? adminShiftCapability : initialShiftCapability;
 
     nurseMap.set(userKey, {
       name: nameFromData,
       userKey,
-      adminNightShift,
-      effectiveNightShift,
-      initialNightShift,
+      adminShiftCapability,
+      effectiveShiftCapability,
+      initialShiftCapability,
       hireYear
     });
   });
@@ -161,14 +192,15 @@ function loadNurseNightShiftSettings() {
     if (nurseMap.has(userKey)) return;
     const user = users[userKey];
     const hireYear = typeof user?.hireYear === 'number' ? user.hireYear : null;
-    const initialNightShift = typeof user?.initialNightShift === 'boolean' ? user.initialNightShift : null;
+    const initialShiftCapability = normalizeShiftCapability(user?.initialShiftCapability)
+      ?? normalizeShiftCapability(user?.initialNightShift);
 
     nurseMap.set(userKey, {
       name: user.fullName || userKey,
       userKey,
-      adminNightShift: null,
-      effectiveNightShift: initialNightShift,
-      initialNightShift,
+      adminShiftCapability: null,
+      effectiveShiftCapability: initialShiftCapability,
+      initialShiftCapability,
       hireYear
     });
   });
@@ -202,23 +234,20 @@ function loadNurseNightShiftSettings() {
         <tbody>
           ${nurseList.map(nurse => {
             const yearLabel = nurse.hireYear ? `${nurse.hireYear}年` : '未登録';
-            const adminSetting = nurse.adminNightShift;
+            const adminSetting = nurse.adminShiftCapability;
             let statusLabel;
             let statusColor;
-            if (adminSetting === true) {
-              statusLabel = '夜勤をします（管理者設定）';
+            if (adminSetting) {
+              statusLabel = `${getShiftCapabilityLabel(adminSetting)}（管理者設定）`;
               statusColor = '#28a745';
-            } else if (adminSetting === false) {
-              statusLabel = '夜勤はしません（管理者設定）';
-              statusColor = '#6c757d';
             } else {
               statusLabel = '未設定（管理者）';
               statusColor = '#ff9800';
             }
-            const initialLabel = typeof nurse.initialNightShift === 'boolean'
-              ? `本人申告: ${nurse.initialNightShift ? '夜勤をする' : '夜勤はしない'}`
+            const initialLabel = nurse.initialShiftCapability
+              ? `本人申告: ${getShiftCapabilityLabel(nurse.initialShiftCapability)}`
               : '本人申告: 未回答';
-            const additionalNote = (adminSetting === null && typeof nurse.initialNightShift === 'boolean')
+            const additionalNote = (adminSetting === null && nurse.initialShiftCapability)
               ? '※ 現在は本人申告値が初期値として利用されています'
               : '';
 
@@ -235,16 +264,21 @@ function loadNurseNightShiftSettings() {
                   </div>
                 </td>
                 <td style="padding: 12px;">
+                  ${isReadOnlyAdminView ? '<span style="color: #999;">閲覧のみ</span>' : `
                   <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                    <button onclick="setNurseNightShift('${nurse.userKey}', true)" 
+                    <button onclick="setNurseShiftCapability('${nurse.userKey}', '${SHIFT_CAPABILITIES.NIGHT}')" 
                             style="padding: 6px 12px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                      夜勤ON
+                      夜勤可
                     </button>
-                    <button onclick="setNurseNightShift('${nurse.userKey}', false)" 
+                    <button onclick="setNurseShiftCapability('${nurse.userKey}', '${SHIFT_CAPABILITIES.LATE}')" 
                             style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                      夜勤OFF
+                      夜勤不可（遅出まで）
                     </button>
-                    <button onclick="setNurseNightShift('${nurse.userKey}', null)" 
+                    <button onclick="setNurseShiftCapability('${nurse.userKey}', '${SHIFT_CAPABILITIES.DAY}')" 
+                            style="padding: 6px 12px; background: #5e35b1; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                      遅出・夜勤不可
+                    </button>
+                    <button onclick="setNurseShiftCapability('${nurse.userKey}', null)" 
                             style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                       未設定
                     </button>
@@ -253,6 +287,7 @@ function loadNurseNightShiftSettings() {
                       登録データ削除
                     </button>
                   </div>
+                  `}
                 </td>
               </tr>
             `;
@@ -348,8 +383,8 @@ function loadValuePreferences() {
   }).join('');
 }
 
-// 看護師の夜勤設定を変更
-function setNurseNightShift(userKey, doesNightShift) {
+// 看護師の勤務対応設定を変更
+function setNurseShiftCapability(userKey, shiftCapability) {
   const storageKey = STORAGE_KEY_PREFIX + userKey;
   const dataStr = localStorage.getItem(storageKey);
   
@@ -368,20 +403,23 @@ function setNurseNightShift(userKey, doesNightShift) {
       note: '',
       submitted: false,
       submittedAt: null,
+      shiftCapability: null,
       doesNightShift: null,
       preferences: {
         valuePreference: null
       }
     };
   }
-  
-  data.doesNightShift = doesNightShift;
+
+  const resolvedCapability = normalizeShiftCapability(shiftCapability);
+  data.shiftCapability = resolvedCapability;
+  data.doesNightShift = resolvedCapability === SHIFT_CAPABILITIES.NIGHT;
   localStorage.setItem(storageKey, JSON.stringify(data));
   
   // 表示を更新
   loadNurseNightShiftSettings();
   loadValuePreferences();
-  alert('夜勤設定を更新しました');
+  alert('勤務対応設定を更新しました');
 }
 
 // 看護師の登録データを削除
@@ -427,10 +465,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   const user = JSON.parse(currentUser);
-  if (!user.isAdmin) {
-    alert('管理者権限が必要です');
-    window.location.href = 'top.html';
-    return;
+  isReadOnlyAdminView = !user.isAdmin;
+  if (isReadOnlyAdminView) {
+    const notice = document.getElementById('readOnlyNotice');
+    if (notice) notice.style.display = 'block';
+    document.body.classList.add('read-only');
+    document.querySelectorAll('.admin-action').forEach(el => {
+      el.setAttribute('disabled', 'true');
+      el.classList.add('disabled');
+    });
   }
   
   updateDeadlineDisplay();
@@ -673,14 +716,22 @@ function exportAllRequests() {
 
       if (request === 'available') {
         value = '休み希望なし（勤務可能）';
+      } else if (request === 'day-only') {
+        value = '日勤のみ可能（遅出・夜勤不可）';
+      } else if (request === 'day-late') {
+        value = '日勤＋遅出までなら可能（夜勤不可）';
+      } else if (request === 'night-only') {
+        value = '夜勤のみ可能（日勤・遅出不可）';
+      } else if (request === 'paid-leave') {
+        value = '有給休暇希望';
       } else if (request === 'no-day') {
-        value = '日勤のみ不可';
+        value = '夜勤のみ可能（日勤・遅出不可）';
       } else if (request === 'no-night') {
-        value = '夜勤のみ不可';
+        value = '日勤＋遅出までなら可能（夜勤不可）';
       } else if (request === 'no-all') {
-        value = '終日不可';
+        value = '有給休暇希望';
       } else if (request === 'no-all-but-night-before') {
-        value = '夜勤明けならOK';
+        value = '夜勤のみ可能（日勤・遅出不可）';
       }
 
       row.push(value);
@@ -712,3 +763,5 @@ function exportAllRequests() {
 }
 
 // EOF
+
+
