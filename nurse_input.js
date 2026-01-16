@@ -471,10 +471,10 @@ function initCalendar() {
       dayCell.classList.add('weekend');
     }
     
-    // 日付番号
+    // 日付番号（曜日も含める）
     const dayNumber = document.createElement('div');
     dayNumber.className = 'day-number';
-    dayNumber.textContent = day;
+    dayNumber.textContent = `${day}(${dayOfWeek})`;
     dayCell.appendChild(dayNumber);
     
     // ラベル

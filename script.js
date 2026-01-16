@@ -131,6 +131,15 @@ function isWeekend(dateStr) {
   return dayOfWeek === 0 || dayOfWeek === 6; // 0=日曜, 6=土曜
 }
 
+// 日付文字列から曜日を取得
+function getDayOfWeek(dateStr) {
+  const [month, day] = dateStr.split('/').map(Number);
+  const date = new Date(2025, month - 1, day);
+  const dayOfWeek = date.getDay();
+  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+  return weekdays[dayOfWeek];
+}
+
 function normalizeName(value) {
   return String(value || '').trim();
 }
@@ -520,9 +529,26 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
     // 現在の日までに割り当てられた看護師の統計を計算
     const currentSchedule = schedule.slice(0, dayIndex + 1);
     
+    // 前日が明け休みの人は除外（明け休みの翌日は必ず公休）
+    const prevDayAssignments = prevDay ? prevDay.nurses : [];
+    const prevDayOffAfterNight = new Set(
+      prevDayAssignments
+        .filter(a => a.isDayOffAfterNight)
+        .map(a => a.name)
+    );
+    
     // 日勤を割り当て
     const dayShiftCandidates = shuffleArray(available
       .filter(n => {
+        // 明け休みの翌日は除外（必ず公休）
+        if (prevDayOffAfterNight.has(n.name)) {
+          return false;
+        }
+        // 既に明け休みとして設定されている人は除外
+        const existingAssignment = day.nurses.find(a => a.name === n.name);
+        if (existingAssignment && existingAssignment.isDayOffAfterNight) {
+          return false;
+        }
         // 希望チェック（希望データがない場合はOK）
         const request = n.requests[day.date];
         if (request === REQUEST_TYPES.NIGHT_ONLY || request === REQUEST_TYPES.PAID_LEAVE) {
@@ -651,19 +677,52 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
       nurseStats[nurse.name].nightShifts++;
       if (violation) nurseStats[nurse.name].violations++;
       
-      // 夜勤の翌日は明け休み（休日にカウントされない）
+      // 夜勤の翌日は明け休み（必ず設定、上書きされない）
       if (dayIndex < dateColumns.length - 1) {
         const nextDate = dateColumns[dayIndex + 1];
         const nextDay = schedule.find(d => d.date === nextDate);
         if (nextDay) {
-          const existingAssignment = nextDay.nurses.find(n => n.name === nurse.name);
-          if (!existingAssignment) {
+          const existingIndex = nextDay.nurses.findIndex(n => n.name === nurse.name);
+          if (existingIndex >= 0) {
+            // 既存の割り当てを明け休みに上書き
+            nextDay.nurses[existingIndex] = {
+              name: nurse.name,
+              shift: SHIFT_TYPES.OFF,
+              violation: false,
+              isDayOffAfterNight: true // 明け休みフラグ
+            };
+          } else {
             nextDay.nurses.push({
               name: nurse.name,
               shift: SHIFT_TYPES.OFF,
               violation: false,
               isDayOffAfterNight: true // 明け休みフラグ
             });
+          }
+          
+          // 明け休みの翌日は必ず公休にする
+          if (dayIndex + 1 < dateColumns.length - 1) {
+            const afterNextDate = dateColumns[dayIndex + 2];
+            const afterNextDay = schedule.find(d => d.date === afterNextDate);
+            if (afterNextDay) {
+              const afterNextExistingIndex = afterNextDay.nurses.findIndex(n => n.name === nurse.name);
+              if (afterNextExistingIndex >= 0) {
+                // 既存の割り当てを公休に上書き（ただし明け休みではない）
+                afterNextDay.nurses[afterNextExistingIndex] = {
+                  name: nurse.name,
+                  shift: SHIFT_TYPES.OFF,
+                  violation: false,
+                  isDayOffAfterNight: false // 公休（明け休みではない）
+                };
+              } else {
+                afterNextDay.nurses.push({
+                  name: nurse.name,
+                  shift: SHIFT_TYPES.OFF,
+                  violation: false,
+                  isDayOffAfterNight: false // 公休（明け休みではない）
+                });
+              }
+            }
           }
         }
       }
@@ -702,6 +761,22 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
           const otherNurse = nurses.find(n => n.name === other.name);
           if (!otherNurse) return;
 
+          // 明け休みやその翌日の公休は交換不可
+          if (assignment.isDayOffAfterNight || other.isDayOffAfterNight) {
+            continue;
+          }
+          
+          // 前日が明け休みの場合も交換不可（翌日は公休である必要がある）
+          const prevDay = getPreviousDayShift(schedule, dayIndex);
+          if (prevDay) {
+            const prevAssignment = prevDay.nurses.find(a => a.name === nurse.name);
+            const prevOtherAssignment = prevDay.nurses.find(a => a.name === otherNurse.name);
+            if ((prevAssignment && prevAssignment.isDayOffAfterNight) || 
+                (prevOtherAssignment && prevOtherAssignment.isDayOffAfterNight)) {
+              continue;
+            }
+          }
+          
           // 交換して違反がないか確認
           const canSwap = !checkViolation(nurse, day.date, other.shift) &&
                          !checkViolation(otherNurse, day.date, assignment.shift) &&
@@ -750,7 +825,8 @@ function renderShiftTable(schedule, container) {
 
   dateColumns.forEach(date => {
     const th = document.createElement('th');
-    th.textContent = date;
+    const dayOfWeek = getDayOfWeek(date);
+    th.textContent = `${date}(${dayOfWeek})`;
     if (isWeekend(date)) {
       th.classList.add('weekend');
     }
@@ -778,14 +854,30 @@ function renderShiftTable(schedule, container) {
         td.textContent = assignment.shift;
         if (assignment.shift === SHIFT_TYPES.DAY) {
           td.classList.add('day-shift');
+          // 遅出可能な人に色をつける
+          const nurse = nurses.find(n => n.name === assignment.name);
+          if (nurse) {
+            const request = nurse.requests[date];
+            const canLate = nurse.shiftCapability === 'day-late' || 
+                           nurse.shiftCapability === 'all' ||
+                           request === REQUEST_TYPES.DAY_LATE ||
+                           (request === REQUEST_TYPES.AVAILABLE && (nurse.shiftCapability === 'day-late' || nurse.shiftCapability === 'all'));
+            if (canLate) {
+              td.classList.add('late-capable');
+              td.title = '遅出可能';
+            }
+          }
         } else if (assignment.shift === SHIFT_TYPES.NIGHT) {
           td.classList.add('night-shift');
         } else {
           td.classList.add('off-day');
+          if (assignment.isDayOffAfterNight) {
+            td.title = '明け休み';
+          }
         }
         if (assignment.violation) {
           td.classList.add('violation');
-          td.title = '希望に違反しています';
+          td.title = (td.title ? td.title + ' / ' : '') + '希望に違反しています';
         }
       } else {
         td.textContent = '?';
