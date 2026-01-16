@@ -1150,7 +1150,7 @@ function updateDeadlineInfo() {
     }
 
     if (sageImg) {
-      sageImg.src = getSageImageUri(diff);
+      sageImg.src = getSageImageUriNurse(diff);
     }
   } else {
     deadlineBanner.style.display = 'none';
