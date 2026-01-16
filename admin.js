@@ -100,6 +100,215 @@ function updateMixingMatrixStatus() {
   }
 }
 
+function formatHireYearLabel(year) {
+  return year ? `${year}年入職` : '入職年未登録';
+}
+
+function resolveDisplayName(userKey, data, userInfo) {
+  return data?.nurseName || userInfo?.fullName || userKey;
+}
+
+function resolveNightShiftCapability(data, userInfo) {
+  return normalizeShiftCapability(data?.shiftCapability)
+    ?? normalizeShiftCapability(data?.doesNightShift)
+    ?? normalizeShiftCapability(userInfo?.initialShiftCapability)
+    ?? normalizeShiftCapability(userInfo?.initialNightShift)
+    ?? null;
+}
+
+function isNightShiftEligible(capability) {
+  return capability === SHIFT_CAPABILITIES.ALL || capability === SHIFT_CAPABILITIES.DAY_NIGHT;
+}
+
+function getNightShiftCandidatesFromSubmitted() {
+  const users = getUserDirectory();
+  const allKeys = Object.keys(localStorage);
+  const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
+  const seen = new Set();
+  const candidates = [];
+
+  requestKeys.forEach(key => {
+    const userKey = key.replace(STORAGE_KEY_PREFIX, '');
+    const submittedKey = SUBMITTED_KEY_PREFIX + userKey;
+    if (localStorage.getItem(submittedKey) !== 'true') return;
+
+    const dataStr = localStorage.getItem(key);
+    if (!dataStr) return;
+
+    let data;
+    try {
+      data = JSON.parse(dataStr);
+    } catch (error) {
+      console.error('Failed to parse shift request data', error);
+      return;
+    }
+
+    const userInfo = users[userKey] || {};
+    const capability = resolveNightShiftCapability(data, userInfo);
+    if (!isNightShiftEligible(capability)) return;
+
+    const name = resolveDisplayName(userKey, data, userInfo);
+    if (seen.has(name)) return;
+    seen.add(name);
+
+    const hireYear = typeof userInfo.hireYear === 'number' ? userInfo.hireYear : null;
+    candidates.push({
+      name,
+      hireYear,
+      userKey
+    });
+  });
+
+  return candidates.sort((a, b) => {
+    const yearA = a.hireYear ?? Number.MAX_SAFE_INTEGER;
+    const yearB = b.hireYear ?? Number.MAX_SAFE_INTEGER;
+    if (yearA !== yearB) return yearA - yearB;
+    return a.name.localeCompare(b.name, 'ja');
+  });
+}
+
+function getStoredMixingMatrix() {
+  const stored = localStorage.getItem(MIXING_MATRIX_KEY);
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored);
+  } catch (error) {
+    console.error('Failed to parse mixing matrix', error);
+    return null;
+  }
+}
+
+function getMixingStatusForPair(pairs, nameA, nameB) {
+  if (!pairs) return '';
+  return pairs[nameA]?.[nameB] || pairs[nameB]?.[nameA] || '';
+}
+
+function renderNightPairMatrix() {
+  const container = document.getElementById('nightPairMatrix');
+  if (!container) return;
+
+  if (!nightPairCandidates || nightPairCandidates.length === 0) {
+    container.innerHTML = '<p style="color: #666; margin: 0;">提出済みの夜勤者がまだいません。</p>';
+    return;
+  }
+
+  if (nightPairCandidates.length === 1) {
+    container.innerHTML = '<p style="color: #666; margin: 0;">夜勤者が1名のみのため、相性表は作成できません。</p>';
+    return;
+  }
+
+  const storedMatrix = getStoredMixingMatrix();
+  const pairs = storedMatrix?.pairs || {};
+
+  const headerCells = nightPairCandidates.map(candidate => `
+    <th>
+      ${candidate.name}<br>
+      <span style="font-size: 11px; color: #777;">${formatHireYearLabel(candidate.hireYear)}</span>
+    </th>
+  `).join('');
+
+  const rows = nightPairCandidates.map((rowCandidate, rowIndex) => {
+    const cells = nightPairCandidates.map((colCandidate, colIndex) => {
+      if (rowIndex === colIndex) {
+        return '<td class="pair-diagonal">-</td>';
+      }
+
+      const status = getMixingStatusForPair(pairs, rowCandidate.name, colCandidate.name);
+      const disabled = isReadOnlyAdminView ? 'disabled' : '';
+      return `
+        <td>
+          <select class="pair-select" data-a="${rowCandidate.name}" data-b="${colCandidate.name}" ${disabled}>
+            <option value="">未設定</option>
+            <option value="ok" ${status === 'ok' ? 'selected' : ''}>○ 問題なし</option>
+            <option value="avoid" ${status === 'avoid' ? 'selected' : ''}>△ 極力避けたい</option>
+            <option value="block" ${status === 'block' ? 'selected' : ''}>× 禁忌</option>
+          </select>
+        </td>
+      `;
+    }).join('');
+
+    return `
+      <tr>
+        <th class="name-cell">
+          ${rowCandidate.name}<br>
+          <span style="font-size: 11px; color: #777;">${formatHireYearLabel(rowCandidate.hireYear)}</span>
+        </th>
+        ${cells}
+      </tr>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th class="name-cell">氏名</th>
+          ${headerCells}
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+  `;
+
+  if (!isReadOnlyAdminView) {
+    container.querySelectorAll('select.pair-select').forEach(select => {
+      select.addEventListener('change', () => {
+        const a = select.dataset.a;
+        const b = select.dataset.b;
+        const value = select.value;
+        container.querySelectorAll(`select.pair-select[data-a="${b}"][data-b="${a}"]`).forEach(target => {
+          if (target.value !== value) {
+            target.value = value;
+          }
+        });
+      });
+    });
+  }
+}
+
+function loadNightPairMatrix() {
+  nightPairCandidates = getNightShiftCandidatesFromSubmitted();
+  renderNightPairMatrix();
+}
+
+function saveNightPairMatrix() {
+  if (isReadOnlyAdminView) return;
+  const container = document.getElementById('nightPairMatrix');
+  if (!container || !nightPairCandidates || nightPairCandidates.length < 2) {
+    alert('夜勤者が2名以上いないため、保存できません。');
+    return;
+  }
+
+  const pairs = {};
+  container.querySelectorAll('select.pair-select').forEach(select => {
+    const value = select.value;
+    if (!value) return;
+    const a = select.dataset.a;
+    const b = select.dataset.b;
+    if (!pairs[a]) pairs[a] = {};
+    if (!pairs[b]) pairs[b] = {};
+    pairs[a][b] = value;
+    pairs[b][a] = value;
+  });
+
+  const names = nightPairCandidates.map(candidate => candidate.name);
+  localStorage.setItem(MIXING_MATRIX_KEY, JSON.stringify({ names, pairs }));
+  updateMixingMatrixStatus();
+  alert('相性表を保存しました');
+}
+
+function clearNightPairMatrix() {
+  if (isReadOnlyAdminView) return;
+  if (!confirm('相性表の設定を全てクリアしますか？')) {
+    return;
+  }
+  localStorage.removeItem(MIXING_MATRIX_KEY);
+  renderNightPairMatrix();
+  updateMixingMatrixStatus();
+}
+
 function uploadMixingMatrix() {
   const input = document.getElementById('mixingMatrixInput');
   if (!input || !input.files || input.files.length === 0) {
@@ -724,6 +933,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadNurseNightShiftSettings();
   loadValuePreferences();
   updateMixingMatrixStatus();
+  loadNightPairMatrix();
 });
 
 // 毎月15日23:59に設定
