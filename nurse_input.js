@@ -641,9 +641,6 @@ function loadSharedRequestsTable() {
     const nightA = a.shiftCapability === SHIFT_CAPABILITIES.DAY_NIGHT || a.shiftCapability === SHIFT_CAPABILITIES.ALL;
     const nightB = b.shiftCapability === SHIFT_CAPABILITIES.DAY_NIGHT || b.shiftCapability === SHIFT_CAPABILITIES.ALL;
     if (nightA !== nightB) return nightA ? -1 : 1;
-    const yearA = a.hireYear ?? Number.MAX_SAFE_INTEGER;
-    const yearB = b.hireYear ?? Number.MAX_SAFE_INTEGER;
-    if (yearA !== yearB) return yearA - yearB;
     return a.name.localeCompare(b.name, 'ja');
   });
 
