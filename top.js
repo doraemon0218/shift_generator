@@ -1,34 +1,14 @@
-const DEADLINE_KEY = 'shift_deadline';
-const CURRENT_USER_KEY = 'current_user';
-
-const SAGE_SVGS = {
-  calm: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 45 Q36 53 46 45" stroke="#333" stroke-width="3" fill="none"/></svg>',
-  sweat: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 48 Q36 42 46 48" stroke="#333" stroke-width="3" fill="none"/><path d="M54 38 Q60 42 56 50 Q50 46 54 38" fill="#6ec6ff" stroke="#2c7fb8" stroke-width="1"/></svg>',
-  angry: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><path d="M22 30 L30 26" stroke="#333" stroke-width="3"/><path d="M50 30 L42 26" stroke="#333" stroke-width="3"/><circle cx="27" cy="36" r="3" fill="#333"/><circle cx="45" cy="36" r="3" fill="#333"/><path d="M26 50 Q36 42 46 50" stroke="#333" stroke-width="3" fill="none"/></svg>'
-};
-
-// getSageImageUri は common.js から継承（top.jsではSVGを使用）
-const SAGE_SVGS = {
-  calm: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 45 Q36 53 46 45" stroke="#333" stroke-width="3" fill="none"/></svg>',
-  sweat: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 48 Q36 42 46 48" stroke="#333" stroke-width="3" fill="none"/><path d="M54 38 Q60 42 56 50 Q50 46 54 38" fill="#6ec6ff" stroke="#2c7fb8" stroke-width="1"/></svg>',
-  angry: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><path d="M22 30 L30 26" stroke="#333" stroke-width="3"/><path d="M50 30 L42 26" stroke="#333" stroke-width="3"/><circle cx="27" cy="36" r="3" fill="#333"/><circle cx="45" cy="36" r="3" fill="#333"/><path d="M26 50 Q36 42 46 50" stroke="#333" stroke-width="3" fill="none"/></svg>'
-};
-function getSageImageUriTop(diffMs) {
-  const hoursLeft = diffMs / (1000 * 60 * 60);
-  let state = hoursLeft <= 24 ? 'angry' : hoursLeft <= 72 ? 'sweat' : 'calm';
-  return `data:image/svg+xml;utf8,${encodeURIComponent(SAGE_SVGS[state])}`;
-}
+// 定数は common.js から継承
+// getSageImageUri は common.js から継承（SVG版を使用する場合は nurse_input.js の実装を参照）
 
 // ページ読み込み時に実行
 document.addEventListener('DOMContentLoaded', () => {
   // ログイン状態を確認
-  const currentUser = localStorage.getItem(CURRENT_USER_KEY);
-  if (!currentUser) {
+  const user = getCurrentUser();
+  if (!user) {
     window.location.href = 'index.html';
     return;
   }
-
-  const user = JSON.parse(currentUser);
   
   // ユーザー名を表示
   document.getElementById('userName').textContent = user.fullName;
@@ -55,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
       if (confirm('ログアウトしますか？')) {
-        localStorage.removeItem('current_user');
+        localStorage.removeItem(CURRENT_USER_KEY);
         window.location.href = 'index.html';
       }
     });
@@ -83,7 +63,17 @@ function renderAdminToggle(user) {
       return;
     }
     user.isAdmin = nextValue;
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    const users = getUsers();
+    const userKey = user.userKey || user.email;
+    if (users[userKey]) {
+      users[userKey].isAdmin = nextValue;
+      saveUsers(users);
+    }
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      currentUser.isAdmin = nextValue;
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
+    }
     updateLabel(nextValue);
   });
 }
@@ -94,7 +84,7 @@ function updateDeadlineDisplay() {
   const deadlineStr = localStorage.getItem(DEADLINE_KEY);
   
   if (!deadlineStr) {
-    banner.style.display = 'none';
+    if (banner) banner.style.display = 'none';
     return;
   }
   
@@ -103,38 +93,57 @@ function updateDeadlineDisplay() {
   const diff = deadline - now;
   const sageImg = document.getElementById('deadlineSage');
   
-  banner.style.display = 'block';
+  if (banner) banner.style.display = 'block';
   
   const deadlineDateEl = document.getElementById('deadlineDate');
   const countdownEl = document.getElementById('deadlineCountdown');
   
-  deadlineDateEl.textContent = deadline.toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  if (deadlineDateEl) {
+    deadlineDateEl.textContent = deadline.toLocaleString('ja-JP', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
   
-  if (diff > 0) {
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    countdownEl.textContent = `残り: ${days}日 ${hours}時間 ${minutes}分`;
-    
-    if (days <= 3) {
-      banner.className = 'deadline-banner warning';
+  if (countdownEl) {
+    if (diff > 0) {
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      
+      countdownEl.textContent = `残り: ${days}日 ${hours}時間 ${minutes}分`;
+      
+      if (banner) {
+        if (days <= 3) {
+          banner.className = 'deadline-banner warning';
+        } else {
+          banner.className = 'deadline-banner info';
+        }
+      }
     } else {
-      banner.className = 'deadline-banner info';
+      if (banner) banner.className = 'deadline-banner';
+      countdownEl.textContent = '締め切り済み';
     }
-  } else {
-    banner.className = 'deadline-banner';
-    countdownEl.textContent = '締め切り済み';
   }
 
   if (sageImg) {
-    sageImg.src = getSageImageUriTop(diff);
+    // SVG版のgetSageImageUriを使用（nurse_input.jsの実装を参考）
+    const hoursLeft = diff / (1000 * 60 * 60);
+    let state = 'calm';
+    if (hoursLeft <= 24) {
+      state = 'angry';
+    } else if (hoursLeft <= 72) {
+      state = 'sweat';
+    }
+    const SAGE_SVGS = {
+      calm: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 45 Q36 53 46 45" stroke="#333" stroke-width="3" fill="none"/></svg>',
+      sweat: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 48 Q36 42 46 48" stroke="#333" stroke-width="3" fill="none"/><path d="M54 38 Q60 42 56 50 Q50 46 54 38" fill="#6ec6ff" stroke="#2c7fb8" stroke-width="1"/></svg>',
+      angry: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><path d="M22 30 L30 26" stroke="#333" stroke-width="3"/><path d="M50 30 L42 26" stroke="#333" stroke-width="3"/><circle cx="27" cy="36" r="3" fill="#333"/><circle cx="45" cy="36" r="3" fill="#333"/><path d="M26 50 Q36 42 46 50" stroke="#333" stroke-width="3" fill="none"/></svg>'
+    };
+    sageImg.src = `data:image/svg+xml;utf8,${encodeURIComponent(SAGE_SVGS[state])}`;
   }
 }
 
@@ -150,12 +159,10 @@ function checkNotification() {
   
   // 3日前のチェック
   if (daysUntilDeadline === 3) {
-    const currentUser = JSON.parse(localStorage.getItem(CURRENT_USER_KEY));
+    const currentUser = getCurrentUser();
     if (!currentUser) return;
     
-    const userKey = currentUser.userKey || `${currentUser.lastName}_${currentUser.firstName}_${currentUser.email}`;
-    const STORAGE_KEY_PREFIX = 'shift_request_';
-    const SUBMITTED_KEY_PREFIX = 'shift_submitted_';
+    const userKey = getCurrentUserKey();
     const storageKey = STORAGE_KEY_PREFIX + userKey;
     const submittedKey = SUBMITTED_KEY_PREFIX + userKey;
     
@@ -164,13 +171,14 @@ function checkNotification() {
     
     if (!isSubmitted) {
       // 未提出の場合、通知を送信
-      sendNotificationEmail(currentUser.email, currentUser.fullName, deadline);
+      sendNotificationEmail(currentUser.email, currentUser.fullName || `${currentUser.lastName} ${currentUser.firstName}`, deadline);
     }
   }
   
   // 通知情報を表示
-  if (daysUntilDeadline <= 3 && daysUntilDeadline > 0) {
-    document.getElementById('notificationInfo').style.display = 'block';
+  const notificationInfo = document.getElementById('notificationInfo');
+  if (notificationInfo && daysUntilDeadline <= 3 && daysUntilDeadline > 0) {
+    notificationInfo.style.display = 'block';
   }
 }
 
