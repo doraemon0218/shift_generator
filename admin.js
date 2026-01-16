@@ -652,7 +652,7 @@ function updateDeadlineDisplay() {
 
   const sageImg = document.getElementById('deadlineSageAdmin');
   if (sageImg) {
-    sageImg.src = getSageImageUri(diff);
+    sageImg.src = getSageImageUriAdmin(diff);
   }
   
   // 入力欄にも表示
