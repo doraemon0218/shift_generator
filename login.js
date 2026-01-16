@@ -7,19 +7,27 @@ const ENABLE_DEMO_ADMIN_FOR_ALL = true;
 const STORAGE_KEY_PREFIX = 'shift_request_';
 
 const SHIFT_CAPABILITIES = {
-  NIGHT: 'night',
-  LATE: 'late',
-  DAY: 'day'
+  DAY_ONLY: 'day-only',
+  DAY_LATE: 'day-late',
+  DAY_NIGHT: 'day-night',
+  ALL: 'all'
 };
 
 function normalizeShiftCapability(value) {
-  if (value === SHIFT_CAPABILITIES.NIGHT || value === SHIFT_CAPABILITIES.LATE || value === SHIFT_CAPABILITIES.DAY) {
-    return value;
-  }
-  if (value === 'on') return SHIFT_CAPABILITIES.NIGHT;
-  if (value === 'off') return SHIFT_CAPABILITIES.LATE;
-  if (value === true) return SHIFT_CAPABILITIES.NIGHT;
-  if (value === false) return SHIFT_CAPABILITIES.LATE;
+  const supported = [
+    SHIFT_CAPABILITIES.DAY_ONLY,
+    SHIFT_CAPABILITIES.DAY_LATE,
+    SHIFT_CAPABILITIES.DAY_NIGHT,
+    SHIFT_CAPABILITIES.ALL
+  ];
+  if (supported.includes(value)) return value;
+  if (value === 'night') return SHIFT_CAPABILITIES.ALL;
+  if (value === 'late') return SHIFT_CAPABILITIES.DAY_LATE;
+  if (value === 'day') return SHIFT_CAPABILITIES.DAY_ONLY;
+  if (value === 'on') return SHIFT_CAPABILITIES.ALL;
+  if (value === 'off') return SHIFT_CAPABILITIES.DAY_LATE;
+  if (value === true) return SHIFT_CAPABILITIES.ALL;
+  if (value === false) return SHIFT_CAPABILITIES.DAY_LATE;
   return null;
 }
 
@@ -82,7 +90,7 @@ function ensureShiftProfile(userKey, fullName, initialShiftCapability) {
         data.shiftCapability = resolvedShift;
       }
       if (resolvedShift && typeof data.doesNightShift !== 'boolean') {
-        data.doesNightShift = resolvedShift === SHIFT_CAPABILITIES.NIGHT;
+        data.doesNightShift = resolvedShift === SHIFT_CAPABILITIES.ALL || resolvedShift === SHIFT_CAPABILITIES.DAY_NIGHT;
       }
       localStorage.setItem(storageKey, JSON.stringify(data));
     } catch (error) {
@@ -100,7 +108,7 @@ function ensureShiftProfile(userKey, fullName, initialShiftCapability) {
     submitted: false,
     submittedAt: null,
     shiftCapability: resolvedShift,
-    doesNightShift: resolvedShift === SHIFT_CAPABILITIES.NIGHT,
+    doesNightShift: resolvedShift === SHIFT_CAPABILITIES.ALL || resolvedShift === SHIFT_CAPABILITIES.DAY_NIGHT,
     preferences: {
       valuePreference: null
     }

@@ -6,12 +6,14 @@ const ADMIN_REQUESTS_KEY = 'admin_requests';
 const MIXING_MATRIX_KEY = 'mixing_matrix';
 
 const SHIFT_CAPABILITIES = {
-  NIGHT: 'night',
-  LATE: 'late',
-  DAY: 'day'
+  DAY_ONLY: 'day-only',
+  DAY_LATE: 'day-late',
+  DAY_NIGHT: 'day-night',
+  ALL: 'all'
 };
 
 let isReadOnlyAdminView = false;
+let nightPairCandidates = [];
 
 const SAGE_SVGS = {
   calm: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 45 Q36 53 46 45" stroke="#333" stroke-width="3" fill="none"/></svg>',
@@ -130,18 +132,26 @@ function uploadMixingMatrix() {
 }
 
 function normalizeShiftCapability(value) {
-  if (value === SHIFT_CAPABILITIES.NIGHT || value === SHIFT_CAPABILITIES.LATE || value === SHIFT_CAPABILITIES.DAY) {
-    return value;
-  }
-  if (value === true) return SHIFT_CAPABILITIES.NIGHT;
-  if (value === false) return SHIFT_CAPABILITIES.LATE;
+  const supported = [
+    SHIFT_CAPABILITIES.DAY_ONLY,
+    SHIFT_CAPABILITIES.DAY_LATE,
+    SHIFT_CAPABILITIES.DAY_NIGHT,
+    SHIFT_CAPABILITIES.ALL
+  ];
+  if (supported.includes(value)) return value;
+  if (value === 'night') return SHIFT_CAPABILITIES.ALL;
+  if (value === 'late') return SHIFT_CAPABILITIES.DAY_LATE;
+  if (value === 'day') return SHIFT_CAPABILITIES.DAY_ONLY;
+  if (value === true) return SHIFT_CAPABILITIES.ALL;
+  if (value === false) return SHIFT_CAPABILITIES.DAY_LATE;
   return null;
 }
 
 function getShiftCapabilityLabel(capability) {
-  if (capability === SHIFT_CAPABILITIES.NIGHT) return '夜勤をする';
-  if (capability === SHIFT_CAPABILITIES.LATE) return '夜勤はしない（遅出まで）';
-  if (capability === SHIFT_CAPABILITIES.DAY) return '遅出も夜勤もしない';
+  if (capability === SHIFT_CAPABILITIES.DAY_ONLY) return '日勤のみ';
+  if (capability === SHIFT_CAPABILITIES.DAY_LATE) return '日勤＋遅出';
+  if (capability === SHIFT_CAPABILITIES.DAY_NIGHT) return '日勤＋夜勤（遅出なし）';
+  if (capability === SHIFT_CAPABILITIES.ALL) return '全部する';
   return '未設定（管理者）';
 }
 
@@ -397,7 +407,7 @@ function loadNurseNightShiftSettings() {
 
     if (!storedCapability && initialShiftCapability) {
       data.shiftCapability = initialShiftCapability;
-      data.doesNightShift = initialShiftCapability === SHIFT_CAPABILITIES.NIGHT;
+      data.doesNightShift = initialShiftCapability === SHIFT_CAPABILITIES.ALL || initialShiftCapability === SHIFT_CAPABILITIES.DAY_NIGHT;
       localStorage.setItem(key, JSON.stringify(data));
     }
 
@@ -493,17 +503,21 @@ function loadNurseNightShiftSettings() {
                 <td style="padding: 12px;">
                   ${isReadOnlyAdminView ? '<span style="color: #999;">閲覧のみ</span>' : `
                   <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                    <button onclick="setNurseShiftCapability('${nurse.userKey}', '${SHIFT_CAPABILITIES.NIGHT}')" 
+                    <button onclick="setNurseShiftCapability('${nurse.userKey}', '${SHIFT_CAPABILITIES.DAY_ONLY}')" 
                             style="padding: 6px 12px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                      夜勤可
+                      日勤のみ
                     </button>
-                    <button onclick="setNurseShiftCapability('${nurse.userKey}', '${SHIFT_CAPABILITIES.LATE}')" 
+                    <button onclick="setNurseShiftCapability('${nurse.userKey}', '${SHIFT_CAPABILITIES.DAY_LATE}')" 
                             style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                      夜勤不可（遅出まで）
+                      日勤＋遅出
                     </button>
-                    <button onclick="setNurseShiftCapability('${nurse.userKey}', '${SHIFT_CAPABILITIES.DAY}')" 
+                    <button onclick="setNurseShiftCapability('${nurse.userKey}', '${SHIFT_CAPABILITIES.DAY_NIGHT}')" 
                             style="padding: 6px 12px; background: #5e35b1; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                      遅出・夜勤不可
+                      日勤＋夜勤（遅出なし）
+                    </button>
+                    <button onclick="setNurseShiftCapability('${nurse.userKey}', '${SHIFT_CAPABILITIES.ALL}')" 
+                            style="padding: 6px 12px; background: #2e7d32; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                      全部する
                     </button>
                     <button onclick="setNurseShiftCapability('${nurse.userKey}', null)" 
                             style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
@@ -640,7 +654,7 @@ function setNurseShiftCapability(userKey, shiftCapability) {
 
   const resolvedCapability = normalizeShiftCapability(shiftCapability);
   data.shiftCapability = resolvedCapability;
-  data.doesNightShift = resolvedCapability === SHIFT_CAPABILITIES.NIGHT;
+  data.doesNightShift = resolvedCapability === SHIFT_CAPABILITIES.ALL || resolvedCapability === SHIFT_CAPABILITIES.DAY_NIGHT;
   localStorage.setItem(storageKey, JSON.stringify(data));
   
   // 表示を更新

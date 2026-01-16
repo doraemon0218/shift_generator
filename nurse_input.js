@@ -7,9 +7,10 @@ const DEADLINE_KEY = 'shift_deadline';
 const SUBMITTED_KEY_PREFIX = 'shift_submitted_';
 
 const SHIFT_CAPABILITIES = {
-  NIGHT: 'night',
-  LATE: 'late',
-  DAY: 'day'
+  DAY_ONLY: 'day-only',
+  DAY_LATE: 'day-late',
+  DAY_NIGHT: 'day-night',
+  ALL: 'all'
 };
 
 // 希望の種類
@@ -117,18 +118,26 @@ function getCurrentUserKey() {
 }
 
 function normalizeShiftCapability(value) {
-  if (value === SHIFT_CAPABILITIES.NIGHT || value === SHIFT_CAPABILITIES.LATE || value === SHIFT_CAPABILITIES.DAY) {
-    return value;
-  }
-  if (value === true) return SHIFT_CAPABILITIES.NIGHT;
-  if (value === false) return SHIFT_CAPABILITIES.LATE;
+  const supported = [
+    SHIFT_CAPABILITIES.DAY_ONLY,
+    SHIFT_CAPABILITIES.DAY_LATE,
+    SHIFT_CAPABILITIES.DAY_NIGHT,
+    SHIFT_CAPABILITIES.ALL
+  ];
+  if (supported.includes(value)) return value;
+  if (value === 'night') return SHIFT_CAPABILITIES.ALL;
+  if (value === 'late') return SHIFT_CAPABILITIES.DAY_LATE;
+  if (value === 'day') return SHIFT_CAPABILITIES.DAY_ONLY;
+  if (value === true) return SHIFT_CAPABILITIES.ALL;
+  if (value === false) return SHIFT_CAPABILITIES.DAY_LATE;
   return null;
 }
 
 function getShiftCapabilityLabel(capability) {
-  if (capability === SHIFT_CAPABILITIES.NIGHT) return '夜勤をする';
-  if (capability === SHIFT_CAPABILITIES.LATE) return '夜勤はしない（遅出まで）';
-  if (capability === SHIFT_CAPABILITIES.DAY) return '遅出も夜勤もしない';
+  if (capability === SHIFT_CAPABILITIES.DAY_ONLY) return '日勤のみ';
+  if (capability === SHIFT_CAPABILITIES.DAY_LATE) return '日勤＋遅出';
+  if (capability === SHIFT_CAPABILITIES.DAY_NIGHT) return '日勤＋夜勤（遅出なし）';
+  if (capability === SHIFT_CAPABILITIES.ALL) return '全部する';
   return '未設定（管理者に連絡してください）';
 }
 
@@ -271,10 +280,10 @@ function showCalendarPage() {
   const legendNightOnly = document.getElementById('legendNightOnly');
   const capability = resolveShiftCapability(currentData, null);
   if (legendDayLate) {
-    legendDayLate.style.display = capability === SHIFT_CAPABILITIES.DAY ? 'none' : 'flex';
+    legendDayLate.style.display = capability === SHIFT_CAPABILITIES.DAY_LATE || capability === SHIFT_CAPABILITIES.ALL ? 'flex' : 'none';
   }
   if (legendNightOnly) {
-    legendNightOnly.style.display = capability ? (capability === SHIFT_CAPABILITIES.NIGHT ? 'flex' : 'none') : 'flex';
+    legendNightOnly.style.display = capability === SHIFT_CAPABILITIES.DAY_NIGHT || capability === SHIFT_CAPABILITIES.ALL ? 'flex' : 'none';
   }
   
   // カレンダーを初期化
@@ -326,7 +335,7 @@ function loadData() {
   const resolvedCapability = resolveShiftCapability(currentData, currentUserInfo);
   if (!currentData.shiftCapability && resolvedCapability) {
     currentData.shiftCapability = resolvedCapability;
-    currentData.doesNightShift = resolvedCapability === SHIFT_CAPABILITIES.NIGHT;
+    currentData.doesNightShift = resolvedCapability === SHIFT_CAPABILITIES.ALL || resolvedCapability === SHIFT_CAPABILITIES.DAY_NIGHT;
     saveData();
   }
 
@@ -575,8 +584,12 @@ function getRequestOptions() {
   if (!currentData) return [];
   const capability = resolveShiftCapability(currentData, null);
   let keys = ['day-only', 'paid-leave'];
-  if (!capability || capability === SHIFT_CAPABILITIES.NIGHT) {
+  if (!capability || capability === SHIFT_CAPABILITIES.ALL) {
     keys = ['available', 'day-only', 'day-late', 'night-only', 'paid-leave'];
+  } else if (capability === SHIFT_CAPABILITIES.DAY_LATE) {
+    keys = ['day-only', 'day-late', 'paid-leave'];
+  } else if (capability === SHIFT_CAPABILITIES.DAY_NIGHT) {
+    keys = ['available', 'day-only', 'night-only', 'paid-leave'];
   }
 
   return keys.map(key => {
@@ -584,9 +597,9 @@ function getRequestOptions() {
     let desc = preset.desc;
 
     if (key === 'available') {
-      if (capability === SHIFT_CAPABILITIES.DAY) {
+      if (capability === SHIFT_CAPABILITIES.DAY_ONLY) {
         desc = '日勤のみ対応できます';
-      } else if (capability === SHIFT_CAPABILITIES.LATE) {
+      } else if (capability === SHIFT_CAPABILITIES.DAY_LATE) {
         desc = '日勤・遅出は対応できます';
       }
     }
@@ -602,8 +615,14 @@ function getRequestOptions() {
 
 function getAllowedRequestKeys() {
   const capability = resolveShiftCapability(currentData, null);
-  if (!capability || capability === SHIFT_CAPABILITIES.NIGHT) {
+  if (!capability || capability === SHIFT_CAPABILITIES.ALL) {
     return ['available', 'day-only', 'day-late', 'night-only', 'paid-leave'];
+  }
+  if (capability === SHIFT_CAPABILITIES.DAY_LATE) {
+    return ['day-only', 'day-late', 'paid-leave'];
+  }
+  if (capability === SHIFT_CAPABILITIES.DAY_NIGHT) {
+    return ['available', 'day-only', 'night-only', 'paid-leave'];
   }
   return ['day-only', 'paid-leave'];
 }

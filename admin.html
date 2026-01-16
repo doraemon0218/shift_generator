@@ -245,6 +245,45 @@
       opacity: 0.6;
       cursor: not-allowed;
     }
+    .pair-matrix {
+      overflow-x: auto;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .pair-matrix table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 720px;
+    }
+    .pair-matrix th,
+    .pair-matrix td {
+      border: 1px solid #eee;
+      padding: 8px;
+      text-align: center;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .pair-matrix th {
+      background: #f8f9fa;
+      font-weight: 600;
+    }
+    .pair-matrix .name-cell {
+      text-align: left;
+      min-width: 180px;
+    }
+    .pair-matrix .pair-select {
+      width: 100%;
+      min-width: 140px;
+      font-size: 12px;
+      padding: 4px 6px;
+    }
+    .pair-matrix .pair-diagonal {
+      background: #f0f0f0;
+      color: #999;
+      font-weight: 600;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -283,7 +322,7 @@
     <!-- 夜勤設定セクション -->
     <div class="section">
       <div class="section-title">🌙 看護師の勤務対応設定</div>
-      <p style="color: #666; margin-bottom: 16px;">各看護師の夜勤・遅出の対応状況を確認できます</p>
+      <p style="color: #666; margin-bottom: 16px;">各看護師の働き方（日勤/遅出/夜勤）を確認できます</p>
       <button onclick="loadNurseNightShiftSettings()">勤務対応設定一覧を表示</button>
       <div id="nightShiftSettings" style="margin-top: 16px;"></div>
     </div>
@@ -309,6 +348,21 @@
         <button onclick="uploadMixingMatrix()" class="admin-action" style="margin-left: 8px;">アップロード</button>
       </div>
       <div id="mixingMatrixStatus" style="color: #666; font-size: 13px;"></div>
+    </div>
+
+    <!-- 夜勤ペア相性表セクション -->
+    <div class="section">
+      <div class="section-title">🤝 夜勤ペア相性表</div>
+      <p style="color: #666; margin-bottom: 12px;">
+        勤務希望を提出した「夜勤可」のメンバーを入職年順で表示し、相性を設定します。<br>
+        ○：問題なし、△：極力避けたい、×：禁忌
+      </p>
+      <div class="form-group">
+        <button onclick="loadNightPairMatrix()" class="admin-action">提出済みの夜勤者で作成</button>
+        <button onclick="saveNightPairMatrix()" class="btn-success admin-action" style="margin-left: 8px;">保存</button>
+        <button onclick="clearNightPairMatrix()" class="btn-danger admin-action" style="margin-left: 8px;">全クリア</button>
+      </div>
+      <div id="nightPairMatrix" class="pair-matrix"></div>
     </div>
 
     <!-- 管理者設定セクション -->

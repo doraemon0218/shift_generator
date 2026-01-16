@@ -197,11 +197,12 @@
       </div>
 
       <div class="form-group">
-        <label>現在の夜勤・遅出の対応状況</label>
+        <label>働き方の対応状況</label>
         <div class="nightshift-options">
-          <label><input type="radio" name="initialShiftCapability" value="night" /> 夜勤をする</label>
-          <label><input type="radio" name="initialShiftCapability" value="late" /> 夜勤はしない（遅出まで）</label>
-          <label><input type="radio" name="initialShiftCapability" value="day" /> 遅出も夜勤もしない</label>
+          <label><input type="radio" name="initialShiftCapability" value="day-only" /> 日勤のみ</label>
+          <label><input type="radio" name="initialShiftCapability" value="day-late" /> 日勤＋遅出</label>
+          <label><input type="radio" name="initialShiftCapability" value="day-night" /> 日勤＋夜勤（遅出なし）</label>
+          <label><input type="radio" name="initialShiftCapability" value="all" /> 全部する</label>
         </div>
         <div class="form-note">※初回登録時の申告です。以降の管理は管理者が行います。</div>
       </div>
