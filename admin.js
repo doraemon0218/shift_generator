@@ -268,9 +268,6 @@ function loadNurseNightShiftSettings() {
   });
   
   const nurseList = Array.from(nurseMap.values()).sort((a, b) => {
-    const yearA = a.hireYear ?? Number.MAX_SAFE_INTEGER;
-    const yearB = b.hireYear ?? Number.MAX_SAFE_INTEGER;
-    if (yearA !== yearB) return yearA - yearB;
     return a.name.localeCompare(b.name, 'ja');
   });
   
