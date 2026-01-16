@@ -9,7 +9,7 @@ const STORAGE_KEY_PREFIX = 'shift_request_';
 const DEADLINE_KEY = 'shift_deadline';
 const SUBMITTED_KEY_PREFIX = 'shift_submitted_';
 const MIXING_MATRIX_KEY = 'mixing_matrix';
-const PAID_LEAVE_LIMIT = 10;
+const PAID_LEAVE_LIMIT = 8;
 
 // シフト対応状況
 const SHIFT_CAPABILITIES = {
