@@ -2,6 +2,7 @@
 const USER_STORAGE_KEY = 'shift_system_users';
 const CURRENT_USER_KEY = 'current_user';
 const ADMIN_USERS_KEY = 'admin_users';
+const ADMIN_REQUESTS_KEY = 'admin_requests';
 
 // ユーザーデータを取得
 function getUsers() {
@@ -23,6 +24,17 @@ function getAdminUsers() {
 // 管理者ユーザーを保存
 function saveAdminUsers(admins) {
   localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(admins));
+}
+
+// 管理者申請一覧を取得
+function getAdminRequests() {
+  const stored = localStorage.getItem(ADMIN_REQUESTS_KEY);
+  return stored ? JSON.parse(stored) : [];
+}
+
+// 管理者申請一覧を保存
+function saveAdminRequests(requests) {
+  localStorage.setItem(ADMIN_REQUESTS_KEY, JSON.stringify(requests));
 }
 
 // パスワードのハッシュ（簡易版）
@@ -110,6 +122,8 @@ function handleRegister(event) {
   const hireYearInput = document.getElementById('hireYear');
   const hireYearRaw = hireYearInput ? hireYearInput.value.trim() : '';
   const shiftCapabilityChoice = document.querySelector('input[name="shiftCapability"]:checked');
+  const adminRequestInput = document.getElementById('adminRequest');
+  const wantsAdminRequest = adminRequestInput ? adminRequestInput.checked : false;
   
   const errorMsg = document.getElementById('errorMessage');
   errorMsg.classList.remove('show');
@@ -206,6 +220,24 @@ function handleRegister(event) {
     saveAdminUsers(adminUsers);
     isAdmin = true;
   }
+
+  const adminRequests = getAdminRequests();
+  if (isAdmin) {
+    const filtered = adminRequests.filter(request => request.email !== email);
+    if (filtered.length !== adminRequests.length) {
+      saveAdminRequests(filtered);
+    }
+  } else if (wantsAdminRequest) {
+    if (!adminRequests.some(request => request.email === email)) {
+      adminRequests.push({
+        email,
+        fullName,
+        userKey,
+        requestedAt: new Date().toISOString()
+      });
+      saveAdminRequests(adminRequests);
+    }
+  }
   
   // 現在のユーザー情報を保存してログイン状態にする
   const currentUser = {
@@ -221,7 +253,11 @@ function handleRegister(event) {
   localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
   
   // トップページにリダイレクト
-  alert('登録が完了しました。次回からログイン画面でメールアドレスとパスワードでログインできます。');
+  if (wantsAdminRequest && !isAdmin) {
+    alert('管理者申請を受け付けました。既存の管理者が承認すると権限が付与されます。');
+  } else {
+    alert('登録が完了しました。次回からログイン画面でメールアドレスとパスワードでログインできます。');
+  }
   window.location.href = 'top.html';
 }
 
