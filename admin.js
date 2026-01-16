@@ -772,7 +772,6 @@ function loadSubmissionStatus() {
   const total = nurseList.length;
   const notSubmitted = total - submitted;
 
-  const statusGrid = document.getElementById('statusGrid');
   if (statusGrid) {
     statusGrid.style.display = 'grid';
     statusGrid.innerHTML = `
@@ -795,7 +794,6 @@ function loadSubmissionStatus() {
     `;
   }
 
-  const nurseListContainer = document.getElementById('nurseList');
   if (nurseListContainer) {
     if (nurseList.length > 0) {
       nurseListContainer.style.display = 'block';
