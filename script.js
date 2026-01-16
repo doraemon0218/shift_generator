@@ -73,7 +73,7 @@ function parseNurseData(rows) {
         nurse.requests[date] = REQUEST_TYPES.DAY_LATE;
       } else if (request.includes('日勤のみ可能') || request.includes('日勤のみ可')) {
         nurse.requests[date] = REQUEST_TYPES.DAY_ONLY;
-      } else if (request.includes('休み希望なし') || request.includes('勤務可能')) {
+      } else if (request.includes('終日勤務可能') || request.includes('休み希望なし') || request.includes('勤務可能')) {
         nurse.requests[date] = REQUEST_TYPES.AVAILABLE;
       } else if (request.includes('夜勤明けならOK') || request.includes('夜勤明けの休みならば歓迎') || request.includes('当直明けなら可')) {
         nurse.requests[date] = REQUEST_TYPES.NIGHT_ONLY;

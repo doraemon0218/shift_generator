@@ -2,6 +2,7 @@ const DEADLINE_KEY = 'shift_deadline';
 const STORAGE_KEY_PREFIX = 'shift_request_';
 const SUBMITTED_KEY_PREFIX = 'shift_submitted_';
 const ADMIN_USERS_KEY = 'admin_users';
+const ADMIN_REQUESTS_KEY = 'admin_requests';
 const MIXING_MATRIX_KEY = 'mixing_matrix';
 
 const SHIFT_CAPABILITIES = {
@@ -167,6 +168,109 @@ function saveAdminUsers(admins) {
   localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(admins));
 }
 
+// 管理者申請一覧を取得
+function getAdminRequests() {
+  const stored = localStorage.getItem(ADMIN_REQUESTS_KEY);
+  return stored ? JSON.parse(stored) : [];
+}
+
+// 管理者申請一覧を保存
+function saveAdminRequests(requests) {
+  localStorage.setItem(ADMIN_REQUESTS_KEY, JSON.stringify(requests));
+}
+
+function formatRequestedAt(value) {
+  if (!value) return '日時不明';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '日時不明';
+  return date.toLocaleString('ja-JP');
+}
+
+// 管理者申請一覧を表示
+function loadAdminRequestList() {
+  const container = document.getElementById('adminRequestList');
+  if (!container) return;
+
+  const requests = getAdminRequests()
+    .filter(request => request && request.email)
+    .sort((a, b) => new Date(b.requestedAt || 0) - new Date(a.requestedAt || 0));
+
+  if (requests.length === 0) {
+    container.innerHTML = '<p style="color: #666;">管理者申請はありません</p>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="background: white; border: 1px solid #ddd; border-radius: 6px; padding: 12px;">
+      ${requests.map(request => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee;">
+          <div>
+            <div style="font-weight: 600;">${request.fullName || '名前未登録'}</div>
+            <div style="font-size: 12px; color: #666;">${request.email}</div>
+            <div style="font-size: 12px; color: #666;">申請日時: ${formatRequestedAt(request.requestedAt)}</div>
+          </div>
+          ${isReadOnlyAdminView ? '<span style="color: #999;">閲覧のみ</span>' : `
+            <div style="display: flex; gap: 6px;">
+              <button onclick="approveAdminRequest('${request.email}')" style="padding: 4px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">承認</button>
+              <button onclick="rejectAdminRequest('${request.email}')" style="padding: 4px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">却下</button>
+            </div>
+          `}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// 管理者申請を承認
+function approveAdminRequest(email) {
+  if (!confirm(`管理者として承認しますか？\n${email}`)) {
+    return;
+  }
+
+  const requests = getAdminRequests();
+  const filtered = requests.filter(request => request.email !== email);
+  if (filtered.length === requests.length) {
+    alert('該当する申請が見つかりません');
+    return;
+  }
+
+  const admins = getAdminUsers();
+  if (!admins.includes(email)) {
+    admins.push(email);
+    saveAdminUsers(admins);
+  }
+
+  saveAdminRequests(filtered);
+
+  const currentUser = JSON.parse(localStorage.getItem('current_user'));
+  if (currentUser && currentUser.email === email) {
+    currentUser.isAdmin = true;
+    localStorage.setItem('current_user', JSON.stringify(currentUser));
+  }
+
+  loadAdminRequestList();
+  loadAdminList();
+  alert('管理者として承認しました');
+}
+
+// 管理者申請を却下
+function rejectAdminRequest(email) {
+  if (!confirm(`管理者申請を却下しますか？\n${email}`)) {
+    return;
+  }
+
+  const requests = getAdminRequests();
+  const filtered = requests.filter(request => request.email !== email);
+  if (filtered.length === requests.length) {
+    alert('該当する申請が見つかりません');
+    return;
+  }
+
+  saveAdminRequests(filtered);
+  loadAdminRequestList();
+  alert('管理者申請を却下しました');
+}
+
 // 管理者を追加
 function addAdmin() {
   const emailInput = document.getElementById('adminEmailInput');
@@ -190,8 +294,14 @@ function addAdmin() {
   
   admins.push(email);
   saveAdminUsers(admins);
+  const requests = getAdminRequests();
+  const filtered = requests.filter(request => request.email !== email);
+  if (filtered.length !== requests.length) {
+    saveAdminRequests(filtered);
+  }
   emailInput.value = '';
   loadAdminList();
+  loadAdminRequestList();
   alert('管理者を追加しました');
 }
 
@@ -578,6 +688,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   updateDeadlineDisplay();
   loadSubmissionStatus();
+  loadAdminRequestList();
   loadAdminList();
   loadNurseNightShiftSettings();
   loadValuePreferences();
@@ -816,7 +927,7 @@ function exportAllRequests() {
       let value = '';
 
       if (request === 'available') {
-        value = '休み希望なし（勤務可能）';
+        value = '終日勤務可能';
       } else if (request === 'day-only') {
         value = '日勤のみ可能（遅出・夜勤不可）';
       } else if (request === 'day-late') {

@@ -121,6 +121,22 @@
       gap: 6px;
       margin-bottom: 0;
     }
+    .admin-request {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      color: #333;
+    }
+    .admin-request input {
+      transform: translateY(1px);
+    }
+    .admin-request-note {
+      font-size: 12px;
+      color: #666;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
     .global-top-button {
       position: fixed;
       top: 16px;
@@ -187,6 +203,15 @@
           <label><input type="radio" name="initialShiftCapability" value="day" /> 遅出も夜勤もしない</label>
         </div>
         <div class="form-note">※初回登録時の申告です。以降の管理は管理者が行います。</div>
+      </div>
+
+      <div class="form-group">
+        <label>管理者申請</label>
+        <label class="admin-request">
+          <input type="checkbox" id="adminRequest" />
+          管理者として申請する
+        </label>
+        <div class="admin-request-note">※ 既存の管理者が承認すると、管理者権限が付与されます。</div>
       </div>
       
       <div class="error-message" id="errorMessage"></div>

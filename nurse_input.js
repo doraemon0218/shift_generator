@@ -46,7 +46,7 @@ const VALUE_PREFERENCE_OPTIONS = {
 
 const REQUEST_OPTION_PRESETS = {
   'available': {
-    label: '休み希望なし（勤務可能）',
+    label: '終日勤務可能',
     icon: '✅',
     desc: '日勤・遅出・夜勤どれも対応できます'
   },
@@ -269,10 +269,14 @@ function loadData() {
     currentData = JSON.parse(stored);
   } else {
     // 新規データ
+    const defaultRequests = {};
+    dates.forEach(date => {
+      defaultRequests[date] = REQUEST_TYPES.AVAILABLE;
+    });
     currentData = {
       nurseName: currentNurse,
       userKey: userKey,
-      requests: {},
+      requests: defaultRequests,
       note: '',
       submitted: false,
       submittedAt: null,
@@ -299,6 +303,12 @@ function loadData() {
       const updated = normalizeRequestType(currentData.requests[date]);
       if (updated !== currentData.requests[date]) {
         currentData.requests[date] = updated;
+        normalized = true;
+      }
+    });
+    dates.forEach(date => {
+      if (!currentData.requests[date]) {
+        currentData.requests[date] = REQUEST_TYPES.AVAILABLE;
         normalized = true;
       }
     });
@@ -493,7 +503,7 @@ function getRequestTypeLabelShort(requestType) {
 
 function getRequestTypeLabelCompact(requestType) {
   const labels = {
-    'available': '勤務OK',
+    'available': '終日勤務可能',
     'day-only': '日勤のみ',
     'day-late': '日勤+遅出',
     'night-only': '夜勤のみ',
