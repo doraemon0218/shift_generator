@@ -320,14 +320,26 @@ function isNightPairAvoid(candidateName, selectedNames) {
 }
 
 // 看護師のスコアを計算（公平性の指標）
-function calculateNurseScore(nurse, schedule, targetWorkDays) {
+function calculateNurseScore(nurse, schedule, targetWorkDays, targetPublicHolidays = null) {
   const stats = getNurseStats(nurse.name, schedule);
   
   // 勤務日数の偏差（目標値からの差）
   const workDayDiff = Math.abs(stats.workDays - targetWorkDays);
   
-  // 希望違反の回数
+  // 希望違反の回数（特に夜勤者は重要）
   const violationCount = stats.violations;
+  const violationWeight = doesNightShift(nurse) ? 150 : 100; // 夜勤者の希望違反は重い
+  
+  // 公休日数の偏差（標準公休日数からの差）
+  let publicHolidayDiff = 0;
+  if (targetPublicHolidays !== null) {
+    publicHolidayDiff = Math.abs(stats.publicHolidays - targetPublicHolidays);
+  } else {
+    // 全看護師の公休日数の平均を計算
+    const allNurseStats = nurses.map(n => getNurseStats(n.name, schedule));
+    const avgPublicHolidays = allNurseStats.reduce((sum, s) => sum + s.publicHolidays, 0) / allNurseStats.length;
+    publicHolidayDiff = Math.abs(stats.publicHolidays - avgPublicHolidays);
+  }
   
   // 全看護師の週末休日の平均を計算
   const allNurseStats = nurses.map(n => getNurseStats(n.name, schedule));
@@ -335,18 +347,16 @@ function calculateNurseScore(nurse, schedule, targetWorkDays) {
   const weekendOffDiff = Math.abs(stats.weekendOffDays - avgWeekendOff);
   
   // 夜勤回数の偏差（夜勤可能な人の中で）
-  const nightEligible = nurses.filter(n => 
-    Object.values(n.requests).some(r => r !== REQUEST_TYPES.DAY_ONLY && r !== REQUEST_TYPES.DAY_LATE && r !== REQUEST_TYPES.PAID_LEAVE)
-  );
+  const nightEligible = nurses.filter(n => doesNightShift(n));
   if (nightEligible.length > 0) {
     const nightEligibleStats = nightEligible.map(n => getNurseStats(n.name, schedule));
     const avgNightShifts = nightEligibleStats.reduce((sum, s) => sum + s.nightShifts, 0) / nightEligibleStats.length;
     const nightDiff = Math.abs(stats.nightShifts - avgNightShifts);
     
-    return workDayDiff * 10 + violationCount * 100 + weekendOffDiff * 5 + nightDiff * 3;
+    return workDayDiff * 10 + violationCount * violationWeight + publicHolidayDiff * 8 + weekendOffDiff * 5 + nightDiff * 3;
   }
   
-  return workDayDiff * 10 + violationCount * 100 + weekendOffDiff * 5;
+  return workDayDiff * 10 + violationCount * violationWeight + publicHolidayDiff * 8 + weekendOffDiff * 5;
 }
 
 // 看護師の統計を取得
@@ -354,9 +364,10 @@ function getNurseStats(nurseName, schedule) {
   let workDays = 0;
   let nightShifts = 0;
   let weekendOffDays = 0;
+  let publicHolidays = 0; // 公休日数（明け休みを除く）
   let violations = 0;
 
-  schedule.forEach(day => {
+  schedule.forEach((day, dayIndex) => {
     const assignment = day.nurses.find(n => n.name === nurseName);
     if (assignment) {
       if (assignment.shift !== SHIFT_TYPES.OFF) {
@@ -364,9 +375,20 @@ function getNurseStats(nurseName, schedule) {
         if (assignment.shift === SHIFT_TYPES.NIGHT) {
           nightShifts++;
         }
-      } else if (isWeekend(day.date) && !assignment.isDayOffAfterNight) {
-        // 明け休みは週末休日にカウントしない
-        weekendOffDays++;
+      } else {
+        // 休みの場合
+        // 明け休みは公休にカウントしない
+        if (!assignment.isDayOffAfterNight) {
+          // 平日の休みは公休にカウント
+          if (!isWeekend(day.date)) {
+            publicHolidays++;
+          }
+          // 週末の休みも公休にカウント（明け休みでない場合のみ）
+          if (isWeekend(day.date)) {
+            weekendOffDays++;
+            publicHolidays++;
+          }
+        }
       }
       
       if (assignment.violation) {
@@ -375,7 +397,7 @@ function getNurseStats(nurseName, schedule) {
     }
   });
 
-  return { workDays, nightShifts, weekendOffDays, violations };
+  return { workDays, nightShifts, weekendOffDays, publicHolidays, violations };
 }
 
 // 希望に違反しているかチェック（希望データがない場合は全てOK）
@@ -439,9 +461,10 @@ function doesNightShift(nurse) {
 }
 
 // シフト表を生成
-function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, targetWorkDays, options = {}) {
+function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, targetWorkDays, standardHolidayDays, options = {}) {
   const schedule = [];
   const random = options.randomFn || Math.random;
+  const targetPublicHolidays = standardHolidayDays || null; // 標準公休日数
   
   // 初期化：各日のスケジュール
   dateColumns.forEach(date => {
@@ -671,7 +694,7 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
         if (!nurse) return;
 
         // 現在のスコア
-        const currentScore = calculateNurseScore(nurse, schedule, targetWorkDays);
+        const currentScore = calculateNurseScore(nurse, schedule, targetWorkDays, targetPublicHolidays);
         
         // 他の看護師と交換可能かチェック
         day.nurses.forEach((other, otherIdx) => {
@@ -690,9 +713,9 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
             assignment.shift = other.shift;
             other.shift = temp;
 
-            const newScore = calculateNurseScore(nurse, schedule, targetWorkDays);
-            const otherNewScore = calculateNurseScore(otherNurse, schedule, targetWorkDays);
-            const otherCurrentScore = calculateNurseScore(otherNurse, schedule, targetWorkDays);
+            const newScore = calculateNurseScore(nurse, schedule, targetWorkDays, targetPublicHolidays);
+            const otherNewScore = calculateNurseScore(otherNurse, schedule, targetWorkDays, targetPublicHolidays);
+            const otherCurrentScore = calculateNurseScore(otherNurse, schedule, targetWorkDays, targetPublicHolidays);
 
             // スコアが改善しない場合は戻す
             if (newScore + otherNewScore >= currentScore + otherCurrentScore) {
@@ -852,12 +875,12 @@ function renderStats(schedule, targetWorkDays, container) {
   statsContainer.appendChild(detailDiv);
 }
 
-function generateScheduleDrafts(count, dayShiftRequired, nightShiftRequired, targetWorkDays) {
+function generateScheduleDrafts(count, dayShiftRequired, nightShiftRequired, targetWorkDays, standardHolidayDays) {
   const drafts = [];
   const baseSeed = Date.now();
   for (let i = 0; i < count; i += 1) {
     const randomFn = createSeededRandom(baseSeed + (i + 1) * 9973);
-    drafts.push(generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, targetWorkDays, { randomFn }));
+    drafts.push(generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, targetWorkDays, standardHolidayDays, { randomFn }));
   }
   return drafts;
 }
