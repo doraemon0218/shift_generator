@@ -551,6 +551,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 毎月15日23:59に設定
 function setDeadlineMonthly() {
+  if (isReadOnlyAdminView) {
+    alert('閲覧モードでは編集できません');
+    return;
+  }
+  
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -563,33 +568,71 @@ function setDeadlineMonthly() {
     deadline = new Date(year, month + 1, 15, 23, 59, 59);
   }
   
-  document.getElementById('deadlineInput').value = formatDateTimeLocal(deadline);
-  setDeadline();
+  const input = document.getElementById('deadlineInput');
+  if (input) {
+    input.value = formatDateTimeLocal(deadline);
+    // 直接設定も実行
+    localStorage.setItem(DEADLINE_KEY, deadline.toISOString());
+    updateDeadlineDisplay();
+    alert('締め切りを毎月15日23:59に設定しました');
+  } else {
+    console.error('deadlineInput element not found');
+    alert('エラー: 入力欄が見つかりません');
+  }
 }
 
 // 締め切りを設定
 function setDeadline() {
-  const input = document.getElementById('deadlineInput');
-  const deadlineStr = input.value;
+  if (isReadOnlyAdminView) {
+    alert('閲覧モードでは編集できません');
+    return;
+  }
   
+  const input = document.getElementById('deadlineInput');
+  if (!input) {
+    console.error('deadlineInput element not found');
+    alert('エラー: 入力欄が見つかりません');
+    return;
+  }
+  
+  const deadlineStr = input.value;
   if (!deadlineStr) {
     alert('日時を入力してください');
     return;
   }
   
-  const deadline = new Date(deadlineStr);
-  localStorage.setItem(DEADLINE_KEY, deadline.toISOString());
-  updateDeadlineDisplay();
-  alert('締め切りを設定しました');
+  try {
+    const deadline = new Date(deadlineStr);
+    if (isNaN(deadline.getTime())) {
+      alert('無効な日時です。正しい日時を入力してください。');
+      return;
+    }
+    
+    localStorage.setItem(DEADLINE_KEY, deadline.toISOString());
+    updateDeadlineDisplay();
+    alert('締め切りを設定しました: ' + deadline.toLocaleString('ja-JP'));
+  } catch (error) {
+    console.error('Error setting deadline:', error);
+    alert('エラーが発生しました: ' + error.message);
+  }
 }
 
 // 締め切りをクリア
 function clearDeadline() {
+  if (isReadOnlyAdminView) {
+    alert('閲覧モードでは編集できません');
+    return;
+  }
+  
   if (!confirm('締め切りをクリアしますか？')) {
     return;
   }
+  
   localStorage.removeItem(DEADLINE_KEY);
-  document.getElementById('deadlineInput').value = '';
+  const input = document.getElementById('deadlineInput');
+  if (input) {
+    input.value = '';
+  }
   updateDeadlineDisplay();
   alert('締め切りをクリアしました');
 }
