@@ -4,6 +4,7 @@ let shiftSchedule = [];
 let scheduleDrafts = [];
 let selectedDraftIndex = null;
 let lastTargetWorkDays = null;
+let pairMatrixCandidates = [];
 let nurses = [];
 let dateColumns = [];
 let mixingMatrix = null;
@@ -149,6 +150,140 @@ function getMixingStatus(nameA, nameB) {
   const direct = mixingMatrix.pairs[a]?.[b];
   const reverse = mixingMatrix.pairs[b]?.[a];
   return direct || reverse || 'ok';
+}
+
+function getStoredMixingMatrix() {
+  const stored = localStorage.getItem(MIXING_MATRIX_KEY);
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored);
+  } catch (error) {
+    console.error('Failed to parse mixing matrix', error);
+    return null;
+  }
+}
+
+function getMixingStatusForPair(pairs, nameA, nameB) {
+  if (!pairs) return '';
+  return pairs[nameA]?.[nameB] || pairs[nameB]?.[nameA] || '';
+}
+
+function getPairMatrixCandidatesFromNurses() {
+  if (!nurses || nurses.length === 0) return [];
+  const candidates = nurses.filter(nurse => isNightShiftEligible(nurse));
+  return candidates
+    .map(nurse => nurse.name)
+    .filter(name => name)
+    .sort((a, b) => a.localeCompare(b, 'ja'));
+}
+
+function renderNightPairMatrix() {
+  const container = document.getElementById('nightPairMatrix');
+  if (!container) return;
+
+  if (!pairMatrixCandidates || pairMatrixCandidates.length === 0) {
+    container.innerHTML = '<p style="color: #666; margin: 0;">夜勤可のメンバーがいません。</p>';
+    return;
+  }
+
+  if (pairMatrixCandidates.length === 1) {
+    container.innerHTML = '<p style="color: #666; margin: 0;">夜勤可のメンバーが1名のみのため、相性表は作成できません。</p>';
+    return;
+  }
+
+  const storedMatrix = getStoredMixingMatrix();
+  const pairs = storedMatrix?.pairs || {};
+
+  const headerCells = pairMatrixCandidates.map(name => `<th>${name}</th>`).join('');
+
+  const rows = pairMatrixCandidates.map((rowName, rowIndex) => {
+    const cells = pairMatrixCandidates.map((colName, colIndex) => {
+      if (rowIndex === colIndex) {
+        return '<td class="pair-diagonal">-</td>';
+      }
+      const status = getMixingStatusForPair(pairs, rowName, colName) || 'ok';
+      return `
+        <td>
+          <select class="pair-select" data-a="${rowName}" data-b="${colName}">
+            <option value="">未設定</option>
+            <option value="ok" ${status === 'ok' ? 'selected' : ''}>○ 問題なし</option>
+            <option value="avoid" ${status === 'avoid' ? 'selected' : ''}>△ 極力避けたい</option>
+            <option value="block" ${status === 'block' ? 'selected' : ''}>× 禁忌</option>
+          </select>
+        </td>
+      `;
+    }).join('');
+
+    return `
+      <tr>
+        <th class="name-cell">${rowName}</th>
+        ${cells}
+      </tr>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th class="name-cell">氏名</th>
+          ${headerCells}
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+  `;
+
+  container.querySelectorAll('select.pair-select').forEach(select => {
+    select.addEventListener('change', () => {
+      const a = select.dataset.a;
+      const b = select.dataset.b;
+      const value = select.value;
+      container.querySelectorAll(`select.pair-select[data-a="${b}"][data-b="${a}"]`).forEach(target => {
+        if (target.value !== value) {
+          target.value = value;
+        }
+      });
+    });
+  });
+}
+
+function loadNightPairMatrix() {
+  pairMatrixCandidates = getPairMatrixCandidatesFromNurses();
+  renderNightPairMatrix();
+}
+
+function saveNightPairMatrix() {
+  const container = document.getElementById('nightPairMatrix');
+  if (!container || !pairMatrixCandidates || pairMatrixCandidates.length < 2) {
+    alert('夜勤可のメンバーが2名以上いないため、保存できません。');
+    return;
+  }
+
+  const pairs = {};
+  container.querySelectorAll('select.pair-select').forEach(select => {
+    const value = select.value || 'ok';
+    const a = select.dataset.a;
+    const b = select.dataset.b;
+    if (!pairs[a]) pairs[a] = {};
+    if (!pairs[b]) pairs[b] = {};
+    pairs[a][b] = value;
+    pairs[b][a] = value;
+  });
+
+  const names = [...pairMatrixCandidates];
+  localStorage.setItem(MIXING_MATRIX_KEY, JSON.stringify({ names, pairs }));
+  alert('相性表を保存しました');
+}
+
+function clearNightPairMatrix() {
+  if (!confirm('相性表の設定を全てクリアしますか？')) {
+    return;
+  }
+  localStorage.removeItem(MIXING_MATRIX_KEY);
+  renderNightPairMatrix();
 }
 
 function isNightPairBlocked(candidateName, selectedNames) {
@@ -724,7 +859,7 @@ function renderDrafts(drafts, targetWorkDays) {
 }
 
 // CSVでエクスポート
-function exportToCSV(schedule) {
+function exportToCSV(schedule, filenameSuffix = '') {
   const rows = [];
   
   // ヘッダー
@@ -751,8 +886,19 @@ function exportToCSV(schedule) {
   const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `shift_schedule_2025_08.csv`;
+  const suffix = filenameSuffix ? `_${filenameSuffix}` : '';
+  link.download = `shift_schedule_2025_08${suffix}.csv`;
   link.click();
+}
+
+function exportAllDrafts() {
+  if (!scheduleDrafts || scheduleDrafts.length === 0) {
+    showError('まず下書きを作成してください');
+    return;
+  }
+  scheduleDrafts.forEach((draft, index) => {
+    exportToCSV(draft, `draft${index + 1}`);
+  });
 }
 
 // エラーメッセージを表示
@@ -777,6 +923,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadBtn = document.getElementById('loadBtn');
   const generateBtn = document.getElementById('generateBtn');
   const exportBtn = document.getElementById('exportBtn');
+  const pairReloadBtn = document.getElementById('pairMatrixReload');
+  const pairSaveBtn = document.getElementById('pairMatrixSave');
+  const pairClearBtn = document.getElementById('pairMatrixClear');
 
   // デフォルトファイルを読み込む（data/shift_requests.csv）
   loadBtn.addEventListener('click', async () => {
@@ -811,6 +960,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     generateBtn.disabled = false;
+    if (pairReloadBtn) pairReloadBtn.disabled = false;
+    if (pairSaveBtn) pairSaveBtn.disabled = false;
+    if (pairClearBtn) pairClearBtn.disabled = false;
+    loadNightPairMatrix();
     alert(`データを読み込みました。看護師数: ${nurses.length}名、期間: ${dateColumns.length}日`);
   });
 
@@ -819,13 +972,14 @@ document.addEventListener('DOMContentLoaded', () => {
     clearError();
     const dayShiftRequired = parseInt(document.getElementById('dayShiftRequired').value) || 3;
     const nightShiftRequired = parseInt(document.getElementById('nightShiftRequired').value) || 2;
-    const targetWorkDays = parseInt(document.getElementById('targetWorkDays').value) || 20;
+    const standardHolidayDays = parseInt(document.getElementById('standardHolidayDays').value) || 0;
 
     if (nurses.length === 0) {
       showError('まずデータを読み込んでください');
       return;
     }
 
+    const targetWorkDays = Math.max(0, dateColumns.length - standardHolidayDays);
     loadMixingMatrix();
     document.getElementById('loadingContainer').style.display = 'block';
     document.getElementById('tableContainer').style.display = 'none';
@@ -847,6 +1001,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('draftContainer').style.display = 'grid';
         document.getElementById('selectionNotice').style.display = 'block';
         document.getElementById('loadingContainer').style.display = 'none';
+        exportBtn.disabled = false;
       } catch (error) {
         showError(`シフト表の生成に失敗しました: ${error.message}`);
         document.getElementById('loadingContainer').style.display = 'none';
@@ -854,12 +1009,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 100);
   });
 
+  if (pairReloadBtn) {
+    pairReloadBtn.addEventListener('click', () => {
+      loadNightPairMatrix();
+    });
+  }
+  if (pairSaveBtn) {
+    pairSaveBtn.addEventListener('click', () => {
+      saveNightPairMatrix();
+    });
+  }
+  if (pairClearBtn) {
+    pairClearBtn.addEventListener('click', () => {
+      clearNightPairMatrix();
+    });
+  }
+
   // CSVでエクスポート
   exportBtn.addEventListener('click', () => {
-    if (!shiftSchedule || shiftSchedule.length === 0) {
-      showError('まず下書き案から1つを採用してください');
-      return;
-    }
-    exportToCSV(shiftSchedule);
+    exportAllDrafts();
   });
 });

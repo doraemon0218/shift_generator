@@ -120,6 +120,46 @@
     .stats {
       margin-top: 24px;
     }
+    .pair-matrix {
+      margin-top: 16px;
+      overflow-x: auto;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .pair-matrix table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 720px;
+    }
+    .pair-matrix th,
+    .pair-matrix td {
+      border: 1px solid #eee;
+      padding: 8px;
+      text-align: center;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .pair-matrix th {
+      background: #f8f9fa;
+      font-weight: 600;
+    }
+    .pair-matrix .name-cell {
+      text-align: left;
+      min-width: 180px;
+    }
+    .pair-matrix .pair-select {
+      width: 100%;
+      min-width: 140px;
+      font-size: 12px;
+      padding: 4px 6px;
+    }
+    .pair-matrix .pair-diagonal {
+      background: #f0f0f0;
+      color: #999;
+      font-weight: 600;
+    }
     .drafts {
       margin-top: 24px;
       display: grid;
@@ -219,14 +259,28 @@
           <input type="number" id="nightShiftRequired" value="2" min="1" />
         </div>
         <div>
-          <label for="targetWorkDays" style="display: inline; margin-right: 8px;">1ヶ月の目標勤務日数:</label>
-          <input type="number" id="targetWorkDays" value="20" min="1" />
+          <label for="standardHolidayDays" style="display: inline; margin-right: 8px;">標準公休日数:</label>
+          <input type="number" id="standardHolidayDays" value="9" min="0" />
         </div>
       </div>
     </div>
 
     <button id="generateBtn" class="btn-success" disabled>シフト表を生成</button>
     <div class="draft-note">※ 土日の日勤人数は「平日の夜勤人数」と同じに設定されます。</div>
+
+    <div style="margin-top: 24px;">
+      <h2 style="margin: 0 0 12px; font-size: 20px; color: #333;">🤝 夜勤相性表</h2>
+      <p style="color: #666; margin-bottom: 12px;">
+        CSV内の夜勤可メンバーを対象に、○/△/×で相性を設定します。<br>
+        ○：問題なし、△：極力避けたい、×：禁忌
+      </p>
+      <div class="form-group">
+        <button id="pairMatrixReload" class="btn-primary" disabled>CSVから再作成</button>
+        <button id="pairMatrixSave" class="btn-success" disabled style="margin-left: 8px;">保存</button>
+        <button id="pairMatrixClear" class="btn-danger" disabled style="margin-left: 8px;">全クリア</button>
+      </div>
+      <div id="nightPairMatrix" class="pair-matrix"></div>
+    </div>
 
     <div id="loadingContainer" style="display: none;">
       <div class="loading">シフト表を生成中...</div>
@@ -250,7 +304,7 @@
     </div>
 
     <div style="margin-top: 24px;">
-      <button id="exportBtn" class="btn-primary" disabled>CSVでエクスポート</button>
+      <button id="exportBtn" class="btn-primary" disabled>3案を一括ダウンロード</button>
     </div>
   </div>
 </body>
