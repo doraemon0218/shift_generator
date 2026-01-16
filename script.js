@@ -55,16 +55,41 @@ function getDateColumns(rows) {
   return cols.filter(col => /^8\/\d+$/.test(col));
 }
 
+// LocalStorageから看護師の標準勤務形態を取得
+function getNurseShiftCapabilityFromStorage(nurseName) {
+  const STORAGE_KEY_PREFIX = 'shift_request_';
+  const allKeys = Object.keys(localStorage);
+  const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
+  
+  for (const key of requestKeys) {
+    try {
+      const data = JSON.parse(localStorage.getItem(key));
+      if (data.nurseName === nurseName) {
+        // shiftCapabilityを正規化
+        const cap = data.shiftCapability;
+        if (cap === 'day-only' || cap === 'day-late' || cap === 'day-night' || cap === 'all') {
+          return cap;
+        }
+      }
+    } catch (error) {
+      // パースエラーは無視
+    }
+  }
+  return null;
+}
+
 // 看護師データを解析
 function parseNurseData(rows) {
   const nurses = [];
   dateColumns = getDateColumns(rows);
 
   rows.forEach(row => {
+    const nurseName = row['氏名'] || '';
     const nurse = {
-      name: row['氏名'] || '',
+      name: nurseName,
       note: row['備考'] || '',
-      requests: {}
+      requests: {},
+      shiftCapability: getNurseShiftCapabilityFromStorage(nurseName) // LocalStorageから標準勤務形態を取得
     };
 
     dateColumns.forEach(date => {
@@ -201,11 +226,11 @@ function renderNightPairMatrix() {
       if (rowIndex === colIndex) {
         return '<td class="pair-diagonal">-</td>';
       }
+      // デフォルトは○（ok）、保存済みの値がある場合はそれを使用
       const status = getMixingStatusForPair(pairs, rowName, colName) || 'ok';
       return `
         <td>
           <select class="pair-select" data-a="${rowName}" data-b="${colName}">
-            <option value="">未設定</option>
             <option value="ok" ${status === 'ok' ? 'selected' : ''}>○ 問題なし</option>
             <option value="avoid" ${status === 'avoid' ? 'selected' : ''}>△ 極力避けたい</option>
             <option value="block" ${status === 'block' ? 'selected' : ''}>× 禁忌</option>
@@ -379,8 +404,19 @@ function getPreviousDayShift(schedule, dateIndex) {
   return prevDay;
 }
 
-// 夜勤をしない人かどうか判定（希望データから判断）
+// 夜勤をしない人かどうか判定（標準勤務形態と希望データから判断）
 function isNightShiftEligible(nurse) {
+  // 標準勤務形態を優先的に確認
+  if (nurse.shiftCapability) {
+    // day-onlyは夜勤不可、day-late/day-night/allは夜勤可
+    if (nurse.shiftCapability === 'day-only') {
+      return false;
+    }
+    if (nurse.shiftCapability === 'day-late' || nurse.shiftCapability === 'day-night' || nurse.shiftCapability === 'all') {
+      return true;
+    }
+  }
+  
   // 希望データがない場合は夜勤可能とみなす
   const hasRequests = Object.keys(nurse.requests).length > 0;
   if (!hasRequests) return true;
@@ -392,6 +428,14 @@ function isNightShiftEligible(nurse) {
   ).length;
   // 半分以上が夜勤不可の場合は夜勤をしない人と判定
   return (noNightCount / totalDays) < 0.5;
+}
+
+// 夜勤をする人かどうか判定（夜勤者の希望を最優先にするため）
+function doesNightShift(nurse) {
+  if (nurse.shiftCapability === 'day-night' || nurse.shiftCapability === 'all') {
+    return true;
+  }
+  return isNightShiftEligible(nurse);
 }
 
 // シフト表を生成
@@ -470,6 +514,21 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
       , random).sort((a, b) => {
         const aStats = getNurseStats(a.name, currentSchedule);
         const bStats = getNurseStats(b.name, currentSchedule);
+        
+        // 夜勤をする人の希望を最優先（希望違反の少ない夜勤者を優先）
+        const aIsNight = doesNightShift(a);
+        const bIsNight = doesNightShift(b);
+        if (aIsNight !== bIsNight) {
+          return bIsNight ? -1 : 1; // 夜勤者を優先
+        }
+        
+        // 夜勤者の場合、希望違反が少ない人を優先
+        if (aIsNight && bIsNight) {
+          if (aStats.violations !== bStats.violations) {
+            return aStats.violations - bStats.violations;
+          }
+        }
+        
         // 勤務日数が少ない人、希望違反が少ない人を優先
         if (aStats.workDays !== bStats.workDays) {
           return aStats.workDays - bStats.workDays;
@@ -509,6 +568,18 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
       , random).sort((a, b) => {
         const aStats = getNurseStats(a.name, currentSchedule);
         const bStats = getNurseStats(b.name, currentSchedule);
+        
+        // 夜勤をする人の希望を最優先（希望違反の少ない夜勤者を優先）
+        const aIsNight = doesNightShift(a);
+        const bIsNight = doesNightShift(b);
+        if (aIsNight && !bIsNight) return -1;
+        if (!aIsNight && bIsNight) return 1;
+        
+        // 希望違反が少ない人を優先（特に夜勤者）
+        if (aIsNight && bIsNight && aStats.violations !== bStats.violations) {
+          return aStats.violations - bStats.violations;
+        }
+        
         // 夜勤回数が少ない人、勤務日数が少ない人を優先
         if (aStats.nightShifts !== bStats.nightShifts) {
           return aStats.nightShifts - bStats.nightShifts;
