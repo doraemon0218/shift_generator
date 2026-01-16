@@ -314,7 +314,7 @@
     <!-- 提出状況確認セクション -->
     <div class="section">
       <div class="section-title">📊 提出状況確認</div>
-      <button onclick="loadSubmissionStatus()">提出状況を更新</button>
+      <button onclick="loadSubmissionStatus()" id="submissionStatusBtn">提出状況を表示</button>
       <div class="status-grid" id="statusGrid" style="display: none;"></div>
       <div id="nurseList" class="nurse-list" style="display: none; margin-top: 16px;"></div>
     </div>
@@ -323,7 +323,7 @@
     <div class="section">
       <div class="section-title">🌙 看護師の勤務対応設定</div>
       <p style="color: #666; margin-bottom: 16px;">各看護師の働き方（日勤/遅出/夜勤）を確認できます</p>
-      <button onclick="loadNurseNightShiftSettings()">勤務対応設定一覧を表示</button>
+      <button onclick="loadNurseNightShiftSettings()" id="nightShiftSettingsBtn">勤務対応設定一覧を表示</button>
       <div id="nightShiftSettings" style="margin-top: 16px;"></div>
     </div>
 
@@ -331,7 +331,7 @@
     <div class="section">
       <div class="section-title">🧭 看護師の価値観</div>
       <p style="color: #666; margin-bottom: 16px;">夜勤明けの過ごし方に関する個人の価値観を一覧で確認できます</p>
-      <button onclick="loadValuePreferences()" class="btn-secondary">最新の価値観を更新</button>
+      <button onclick="loadValuePreferences()" class="btn-secondary" id="valuePreferencesBtn">価値観を表示</button>
       <div id="valuePreferenceList" class="value-list"></div>
     </div>
 

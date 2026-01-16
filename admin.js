@@ -203,6 +203,18 @@ function loadAdminList() {
 
 // 看護師の夜勤設定を読み込み
 function loadNurseNightShiftSettings() {
+  const container = document.getElementById('nightShiftSettings');
+  if (!container) return;
+  
+  // トグル機能：既に表示されている場合は非表示にする
+  if (container.innerHTML.trim() !== '' && container.style.display !== 'none') {
+    container.innerHTML = '';
+    container.style.display = 'none';
+    return;
+  }
+  
+  container.style.display = 'block';
+  
   const allKeys = Object.keys(localStorage);
   const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
   const users = getUserDirectory();
@@ -270,9 +282,6 @@ function loadNurseNightShiftSettings() {
   const nurseList = Array.from(nurseMap.values()).sort((a, b) => {
     return a.name.localeCompare(b.name, 'ja');
   });
-  
-  const container = document.getElementById('nightShiftSettings');
-  if (!container) return;
   
   if (nurseList.length === 0) {
     container.innerHTML = '<p style="color: #666;">看護師データがありません</p>';
@@ -361,6 +370,18 @@ function loadNurseNightShiftSettings() {
 function loadValuePreferences() {
   const container = document.getElementById('valuePreferenceList');
   if (!container) return;
+
+  // トグル機能：既に表示されている場合は非表示にする
+  const btn = document.getElementById('valuePreferencesBtn');
+  if (container.innerHTML.trim() !== '' && container.style.display !== 'none') {
+    container.innerHTML = '';
+    container.style.display = 'none';
+    if (btn) btn.textContent = '価値観を表示';
+    return;
+  }
+  
+  container.style.display = 'block';
+  if (btn) btn.textContent = '価値観を非表示';
 
   const users = getUserDirectory();
   const allKeys = Object.keys(localStorage);
@@ -693,6 +714,21 @@ function formatDateTimeLocal(date) {
 
 // 提出状況を読み込み
 function loadSubmissionStatus() {
+  const statusGrid = document.getElementById('statusGrid');
+  const nurseListContainer = document.getElementById('nurseList');
+  
+  // トグル機能：既に表示されている場合は非表示にする
+  const btn = document.getElementById('submissionStatusBtn');
+  const isVisible = statusGrid && statusGrid.style.display !== 'none' && statusGrid.innerHTML.trim() !== '';
+  if (isVisible) {
+    if (statusGrid) statusGrid.style.display = 'none';
+    if (nurseListContainer) nurseListContainer.style.display = 'none';
+    if (btn) btn.textContent = '提出状況を表示';
+    return;
+  }
+  
+  if (btn) btn.textContent = '提出状況を非表示';
+  
   const allKeys = Object.keys(localStorage);
   const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
   const users = getUserDirectory();
@@ -729,9 +765,6 @@ function loadSubmissionStatus() {
   });
 
   const nurseList = Array.from(nurseMap.values()).sort((a, b) => {
-    const yearA = a.hireYear ?? Number.MAX_SAFE_INTEGER;
-    const yearB = b.hireYear ?? Number.MAX_SAFE_INTEGER;
-    if (yearA !== yearB) return yearA - yearB;
     return a.name.localeCompare(b.name, 'ja');
   });
 
