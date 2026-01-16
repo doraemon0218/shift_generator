@@ -169,14 +169,15 @@
       <div class="form-group">
         <div class="form-row">
           <div>
-            <label for="lastName">姓</label>
-            <input type="text" id="lastName" placeholder="山田" required />
+            <label for="lastName">姓（新規登録時のみ）</label>
+            <input type="text" id="lastName" placeholder="山田" />
           </div>
           <div>
-            <label for="firstName">名</label>
-            <input type="text" id="firstName" placeholder="太郎" required />
+            <label for="firstName">名（新規登録時のみ）</label>
+            <input type="text" id="firstName" placeholder="太郎" />
           </div>
         </div>
+        <div class="form-note">※既に登録済みの方はメールアドレスとパスワードのみでログインできます</div>
       </div>
       
       <div class="form-group">
@@ -220,7 +221,7 @@
     </form>
     
     <div class="register-link">
-      初めての方は <a href="#" onclick="alert('新規登録機能は準備中です'); return false;">新規登録</a>
+      初めての方は <a href="register.html">新規登録</a>
     </div>
   </div>
 </body>
