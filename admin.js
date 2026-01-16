@@ -1,20 +1,21 @@
 // 定数は common.js から継承
-const SUBMITTED_KEY_PREFIX = 'shift_submitted_';
+// SUBMITTED_KEY_PREFIX, STORAGE_KEY_PREFIX, DEADLINE_KEY は common.js から継承
 
 let isReadOnlyAdminView = false;
 
-const SAGE_SVGS = {
-  calm: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 45 Q36 53 46 45" stroke="#333" stroke-width="3" fill="none"/></svg>',
-  sweat: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 48 Q36 42 46 48" stroke="#333" stroke-width="3" fill="none"/><path d="M54 38 Q60 42 56 50 Q50 46 54 38" fill="#6ec6ff" stroke="#2c7fb8" stroke-width="1"/></svg>',
-  angry: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><path d="M22 30 L30 26" stroke="#333" stroke-width="3"/><path d="M50 30 L42 26" stroke="#333" stroke-width="3"/><circle cx="27" cy="36" r="3" fill="#333"/><circle cx="45" cy="36" r="3" fill="#333"/><path d="M26 50 Q36 42 46 50" stroke="#333" stroke-width="3" fill="none"/></svg>'
-};
+// getSageImageUri, normalizeShiftCapability, getCurrentUser, getUsers, saveUsers, getAdminUsers, saveAdminUsers, getAdminRequests, saveAdminRequests は common.js から継承
 
-// getSageImageUri, normalizeShiftCapability は common.js から継承（admin.jsではSVGを使用）
+// SVG版のgetSageImageUri（admin.js用）
 function getSageImageUriAdmin(diffMs) {
   const hoursLeft = diffMs / (1000 * 60 * 60);
   let state = 'calm';
   if (hoursLeft <= 24) state = 'angry';
   else if (hoursLeft <= 72) state = 'sweat';
+  const SAGE_SVGS = {
+    calm: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 45 Q36 53 46 45" stroke="#333" stroke-width="3" fill="none"/></svg>',
+    sweat: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 48 Q36 42 46 48" stroke="#333" stroke-width="3" fill="none"/><path d="M54 38 Q60 42 56 50 Q50 46 54 38" fill="#6ec6ff" stroke="#2c7fb8" stroke-width="1"/></svg>',
+    angry: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><path d="M22 30 L30 26" stroke="#333" stroke-width="3"/><path d="M50 30 L42 26" stroke="#333" stroke-width="3"/><circle cx="27" cy="36" r="3" fill="#333"/><circle cx="45" cy="36" r="3" fill="#333"/><path d="M26 50 Q36 42 46 50" stroke="#333" stroke-width="3" fill="none"/></svg>'
+  };
   return `data:image/svg+xml;utf8,${encodeURIComponent(SAGE_SVGS[state])}`;
 }
 
@@ -28,16 +29,7 @@ function getShiftCapabilityLabel(capability) {
 
 // VALUE_PREFERENCE_OPTIONS, getUserDirectory, getAdminUsers, saveAdminUsers は common.js から継承
 
-// 管理者申請一覧を取得
-function getAdminRequests() {
-  const stored = localStorage.getItem(ADMIN_REQUESTS_KEY);
-  return stored ? JSON.parse(stored) : [];
-}
-
-// 管理者申請一覧を保存
-function saveAdminRequests(requests) {
-  localStorage.setItem(ADMIN_REQUESTS_KEY, JSON.stringify(requests));
-}
+// getAdminRequests, saveAdminRequests は common.js から継承
 
 function formatRequestedAt(value) {
   if (!value) return '日時不明';
@@ -102,10 +94,10 @@ function approveAdminRequest(email) {
 
   saveAdminRequests(filtered);
 
-  const currentUser = JSON.parse(localStorage.getItem('current_user'));
+  const currentUser = getCurrentUser();
   if (currentUser && currentUser.email === email) {
     currentUser.isAdmin = true;
-    localStorage.setItem('current_user', JSON.stringify(currentUser));
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
   }
 
   loadAdminRequestList();
@@ -177,10 +169,10 @@ function removeAdmin(email) {
   loadAdminList();
   
   // 現在のユーザーが削除された場合、管理者権限を更新
-  const currentUser = JSON.parse(localStorage.getItem('current_user'));
+  const currentUser = getCurrentUser();
   if (currentUser && currentUser.email === email) {
     currentUser.isAdmin = false;
-    localStorage.setItem('current_user', JSON.stringify(currentUser));
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
   }
 }
 
@@ -532,13 +524,12 @@ function deleteNurseData(userKey) {
 // ページ読み込み時に実行
 document.addEventListener('DOMContentLoaded', () => {
   // ログイン状態と管理者権限を確認
-  const currentUser = localStorage.getItem('current_user');
-  if (!currentUser) {
+  const user = getCurrentUser();
+  if (!user) {
     window.location.href = 'index.html';
     return;
   }
   
-  const user = JSON.parse(currentUser);
   isReadOnlyAdminView = !user.isAdmin;
   if (isReadOnlyAdminView) {
     const notice = document.getElementById('readOnlyNotice');
