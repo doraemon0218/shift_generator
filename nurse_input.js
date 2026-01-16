@@ -146,14 +146,26 @@ function autoLogin() {
   
   if (page === 'settings') {
     // 個人設定ページ
+    // カレンダーは非表示にする
     const mainCalendar = document.getElementById('mainCalendar');
-    if (mainCalendar) mainCalendar.style.display = 'block';
+    if (mainCalendar) mainCalendar.style.display = 'none';
     
+    // 設定ボタンは非表示にする（モーダルで直接開くため）
     const settingsBtn = document.getElementById('settingsBtn');
-    if (settingsBtn) settingsBtn.style.display = 'inline-block';
+    if (settingsBtn) settingsBtn.style.display = 'none';
     
+    // データ読み込み完了後に設定モーダルを開く
     setTimeout(() => {
-      openSettingsPage();
+      if (currentData) {
+        openSettingsPage();
+      } else {
+        // データがまだ読み込まれていない場合は再試行
+        setTimeout(() => {
+          if (currentData) {
+            openSettingsPage();
+          }
+        }, 200);
+      }
     }, 100);
   } else {
     // 通常の希望入力ページ
@@ -1274,6 +1286,14 @@ function closeSettingsPage() {
   const settingsModal = document.getElementById('settingsModal');
   if (settingsModal) {
     settingsModal.classList.remove('active');
+    document.body.style.overflow = ''; // 背景スクロールを再有効化
+  }
+  
+  // 設定ページから来た場合はトップページに戻る
+  const urlParams = new URLSearchParams(window.location.search);
+  const page = urlParams.get('page');
+  if (page === 'settings') {
+    window.location.href = 'top.html';
   }
 }
 
