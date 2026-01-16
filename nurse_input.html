@@ -191,6 +191,34 @@
       color: #666;
       font-weight: 500;
     }
+    .shared-badges {
+      display: flex;
+      gap: 4px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+    .shared-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #1a1a1a;
+      background: #f1f4f8;
+      border: 1px solid #d7dde5;
+    }
+    .shared-badge.leave {
+      background: #ffe3e3;
+      border-color: #f5b5b5;
+      color: #8a1f1f;
+    }
+    .shared-badge.night-off {
+      background: #e3f2ff;
+      border-color: #b3d5ff;
+      color: #1f4c8a;
+    }
     .day-cell.weekend .day-number {
       color: #1565c0;
     }
@@ -678,6 +706,10 @@
       <div class="status-item">
         <strong>入力済み:</strong>
         <span id="inputProgress">0/31</span>
+      </div>
+      <div class="status-item">
+        <strong>公休希望:</strong>
+        <span id="paidLeaveCount">0/8</span>
       </div>
       <div class="status-item" id="valuePreferenceStatus" style="display: none;">
         <strong>価値観:</strong>

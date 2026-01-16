@@ -78,6 +78,8 @@ let quickOptionsHideTimeout = null;
 let quickOptionsInitialized = false;
 let quickPointer = { x: null, y: null };
 
+const PAID_LEAVE_LIMIT = 8;
+
 const SAGE_SVGS = {
   calm: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 45 Q36 53 46 45" stroke="#333" stroke-width="3" fill="none"/></svg>',
   sweat: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 48 Q36 42 46 48" stroke="#333" stroke-width="3" fill="none"/><path d="M54 38 Q60 42 56 50 Q50 46 54 38" fill="#6ec6ff" stroke="#2c7fb8" stroke-width="1"/></svg>',
@@ -99,6 +101,19 @@ function getUserDirectory() {
   const USER_STORAGE_KEY = 'shift_system_users';
   const stored = localStorage.getItem(USER_STORAGE_KEY);
   return stored ? JSON.parse(stored) : {};
+}
+
+function getCurrentUserKey() {
+  const currentUserStr = localStorage.getItem('current_user');
+  if (currentUserStr) {
+    try {
+      const user = JSON.parse(currentUserStr);
+      return user.userKey || `${user.lastName}_${user.firstName}_${user.email}`;
+    } catch (error) {
+      return currentNurse;
+    }
+  }
+  return currentNurse;
 }
 
 function normalizeShiftCapability(value) {
@@ -265,6 +280,7 @@ function showCalendarPage() {
   // カレンダーを初期化
   initCalendar();
   updateStatus();
+  updatePaidLeaveCounter();
   loadSharedRequestsTable();
 }
 
@@ -433,6 +449,7 @@ function initCalendar() {
   }
   
   // 各日のセルを追加
+  const sharedSummary = getSharedRequestSummary();
   dates.forEach(date => {
     const dayCell = document.createElement('div');
     dayCell.className = 'day-cell';
@@ -467,6 +484,25 @@ function initCalendar() {
     }
     
     dayCell.appendChild(dayLabel);
+
+    const summary = sharedSummary[date];
+    if (summary && (summary.paidLeave > 0 || summary.nightOff > 0)) {
+      const badgeWrap = document.createElement('div');
+      badgeWrap.className = 'shared-badges';
+      if (summary.paidLeave > 0) {
+        const leaveBadge = document.createElement('span');
+        leaveBadge.className = 'shared-badge leave';
+        leaveBadge.textContent = `公休${summary.paidLeave}`;
+        badgeWrap.appendChild(leaveBadge);
+      }
+      if (summary.nightOff > 0) {
+        const nightBadge = document.createElement('span');
+        nightBadge.className = 'shared-badge night-off';
+        nightBadge.textContent = `夜勤不可${summary.nightOff}`;
+        badgeWrap.appendChild(nightBadge);
+      }
+      dayCell.appendChild(badgeWrap);
+    }
     
     // 編集可能かどうか
     if (isEditable) {
@@ -570,6 +606,52 @@ function getAllowedRequestKeys() {
     return ['available', 'day-only', 'day-late', 'night-only', 'paid-leave'];
   }
   return ['day-only', 'paid-leave'];
+}
+
+function isNightUnavailableRequest(requestType) {
+  return requestType === REQUEST_TYPES.DAY_ONLY || requestType === REQUEST_TYPES.DAY_LATE;
+}
+
+function getSharedRequestSummary() {
+  const allKeys = Object.keys(localStorage);
+  const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
+  const summary = {};
+  const currentUserKey = getCurrentUserKey();
+
+  requestKeys.forEach(key => {
+    const userKey = key.replace(STORAGE_KEY_PREFIX, '');
+    if (userKey === currentUserKey) return;
+    const dataStr = localStorage.getItem(key);
+    if (!dataStr) return;
+    try {
+      const data = JSON.parse(dataStr);
+      const requests = data.requests || {};
+      dates.forEach(date => {
+        const request = normalizeRequestType(requests[date]);
+        if (!request) return;
+        if (!summary[date]) {
+          summary[date] = { paidLeave: 0, nightOff: 0 };
+        }
+        if (request === REQUEST_TYPES.PAID_LEAVE) {
+          summary[date].paidLeave += 1;
+        } else if (isNightUnavailableRequest(request)) {
+          summary[date].nightOff += 1;
+        }
+      });
+    } catch (error) {
+      console.error('Failed to parse shared request data', error);
+    }
+  });
+
+  return summary;
+}
+
+function updatePaidLeaveCounter() {
+  if (!currentData) return;
+  const counter = document.getElementById('paidLeaveCount');
+  if (!counter) return;
+  const count = Object.values(currentData.requests || {}).filter(value => value === REQUEST_TYPES.PAID_LEAVE).length;
+  counter.textContent = `${count}/${PAID_LEAVE_LIMIT}`;
 }
 
 function loadSharedRequestsTable() {
@@ -939,6 +1021,14 @@ function setRequest(date, requestType) {
     alert('現在の夜勤・遅出の対応状況では選択できない希望です。');
     return;
   }
+  if (requestType === REQUEST_TYPES.PAID_LEAVE) {
+    const currentCount = Object.values(currentData.requests || {}).filter(value => value === REQUEST_TYPES.PAID_LEAVE).length;
+    const alreadySelected = currentData.requests[date] === REQUEST_TYPES.PAID_LEAVE;
+    if (!alreadySelected && currentCount >= PAID_LEAVE_LIMIT) {
+      alert(`公休希望は月${PAID_LEAVE_LIMIT}日までです。`);
+      return;
+    }
+  }
   
   // 締め切りチェック
   const deadlineStr = localStorage.getItem(DEADLINE_KEY);
@@ -991,6 +1081,7 @@ function updateProgress() {
   if (progressEl) {
     progressEl.textContent = `${filled}/31`;
   }
+  updatePaidLeaveCounter();
 }
 
 // ステータスを更新
