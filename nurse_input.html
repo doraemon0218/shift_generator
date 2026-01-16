@@ -265,6 +265,17 @@
       left: 0;
       z-index: 2;
     }
+    .deadline-banner-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      justify-content: center;
+    }
+    .deadline-sage {
+      width: 64px;
+      height: 64px;
+      flex: 0 0 auto;
+    }
     .note-section {
       margin-top: 24px;
       padding: 20px;
@@ -676,9 +687,14 @@
 
     <!-- 締め切り表示（大きく表示） -->
     <div id="deadlineBanner" class="deadline-banner" style="display: none; background: #dc3545; color: white; padding: 24px; border-radius: 12px; margin-bottom: 24px; text-align: center; box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);">
-      <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">📅 シフト希望調査 締め切り</div>
-      <div id="deadlineDate" style="font-size: 32px; font-weight: 700; margin-bottom: 8px;"></div>
-      <div id="deadlineCountdown" style="font-size: 16px; opacity: 0.9;"></div>
+      <div class="deadline-banner-row">
+        <img id="deadlineSage" class="deadline-sage" alt="仙人" />
+        <div>
+          <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">📅 シフト希望調査 締め切り</div>
+          <div id="deadlineDate" style="font-size: 32px; font-weight: 700; margin-bottom: 8px;"></div>
+          <div id="deadlineCountdown" style="font-size: 16px; opacity: 0.9;"></div>
+        </div>
+      </div>
     </div>
     
     <div id="deadlineInfo" class="deadline-info" style="display: none;">
@@ -749,8 +765,8 @@
           <input type="radio" name="valuePreference" value="go-out" id="value_go_out" />
           <div class="value-inner">
             <div class="value-illustration">🎢</div>
-            <div class="value-title">夜勤明けは、遊びに行きたい</div>
-            <div class="value-desc">夜勤明けでもアクティブに過ごしたい。イベントやお出かけの予定を入れたいタイプです。</div>
+            <div class="value-title">夜勤明けは、アクティブに過ごしたい</div>
+            <div class="value-desc">夜勤明けでも外出やイベントを楽しみたい。活発に活動したいタイプです。</div>
           </div>
         </label>
 
@@ -758,8 +774,8 @@
           <input type="radio" name="valuePreference" value="relax-home" id="value_relax_home" />
           <div class="value-inner">
             <div class="value-illustration">🛋️</div>
-            <div class="value-title">夜勤明けは、家でゆっくりしたい</div>
-            <div class="value-desc">夜勤明けは自宅でゆっくり休みたい。無理せず体力回復を優先するスタイルです。</div>
+            <div class="value-title">夜勤明けは、自宅でゆっくり休みたい</div>
+            <div class="value-desc">夜勤明けは自宅でゆっくり過ごしたい。無理せず体力回復を優先します。</div>
           </div>
         </label>
 
@@ -767,8 +783,8 @@
           <input type="radio" name="valuePreference" value="chain-holiday" id="value_chain_holiday" />
           <div class="value-inner">
             <div class="value-illustration">🌙➡️🛌</div>
-            <div class="value-title">夜勤明けの翌日は、公休で休みをつなぎたい</div>
-            <div class="value-desc">夜勤明けから連続して休みがあると嬉しい。しっかりと体力を回復させたい派です。</div>
+            <div class="value-title">夜勤明けから連続して休みが欲しい</div>
+            <div class="value-desc">夜勤明けから公休をつなげて連続休みにしたい。しっかりと体力を回復したいです。</div>
           </div>
         </label>
 
@@ -776,8 +792,8 @@
           <input type="radio" name="valuePreference" value="no-holiday" id="value_no_holiday" />
           <div class="value-inner">
             <div class="value-illustration">💪</div>
-            <div class="value-title">夜勤明けの翌日は、むしろ公休を入れないでほしい</div>
-            <div class="value-desc">夜勤明け後は通常勤務に戻したい。連続休みよりリズムを崩さず働きたいタイプです。</div>
+            <div class="value-title">夜勤明け後は、すぐ通常勤務に戻りたい</div>
+            <div class="value-desc">夜勤明け後は連続休みより通常勤務に戻したい。働くリズムを崩したくないタイプです。</div>
           </div>
         </label>
       </div>

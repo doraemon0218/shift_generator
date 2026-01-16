@@ -23,24 +23,24 @@ const REQUEST_TYPES = {
 
 const VALUE_PREFERENCE_OPTIONS = {
   'go-out': {
-    label: '夜勤明けは、遊びに行きたい',
+    label: '夜勤明けは、アクティブに過ごしたい',
     icon: '🎢',
-    description: '夜勤明けでもアクティブに過ごしたい。イベントやお出かけの予定を入れたいタイプです。'
+    description: '夜勤明けでも外出やイベントを楽しみたい。活発に活動したいタイプです。'
   },
   'relax-home': {
-    label: '夜勤明けは、家でゆっくりしたい',
+    label: '夜勤明けは、自宅でゆっくり休みたい',
     icon: '🛋️',
-    description: '夜勤明けは自宅でゆっくり休みたい。無理せず体力回復を優先するスタイルです。'
+    description: '夜勤明けは自宅でゆっくり過ごしたい。無理せず体力回復を優先します。'
   },
   'chain-holiday': {
-    label: '夜勤明けの翌日は、公休で休みをつなぎたい',
+    label: '夜勤明けから連続して休みが欲しい',
     icon: '🌙➡️🛌',
-    description: '夜勤明けから連続して休みがあると嬉しい。しっかりと体力を回復させたい派です。'
+    description: '夜勤明けから公休をつなげて連続休みにしたい。しっかりと体力を回復したいです。'
   },
   'no-holiday': {
-    label: '夜勤明けの翌日は、むしろ公休を入れないでほしい',
+    label: '夜勤明け後は、すぐ通常勤務に戻りたい',
     icon: '💪',
-    description: '夜勤明け後は通常勤務に戻したい。連続休みよりリズムを崩さず働きたいタイプです。'
+    description: '夜勤明け後は連続休みより通常勤務に戻したい。働くリズムを崩したくないタイプです。'
   }
 };
 
@@ -77,6 +77,23 @@ let quickOptionsDate = null;
 let quickOptionsHideTimeout = null;
 let quickOptionsInitialized = false;
 let quickPointer = { x: null, y: null };
+
+const SAGE_SVGS = {
+  calm: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 45 Q36 53 46 45" stroke="#333" stroke-width="3" fill="none"/></svg>',
+  sweat: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><circle cx="27" cy="34" r="3" fill="#333"/><circle cx="45" cy="34" r="3" fill="#333"/><path d="M26 48 Q36 42 46 48" stroke="#333" stroke-width="3" fill="none"/><path d="M54 38 Q60 42 56 50 Q50 46 54 38" fill="#6ec6ff" stroke="#2c7fb8" stroke-width="1"/></svg>',
+  angry: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><path d="M22 30 L30 26" stroke="#333" stroke-width="3"/><path d="M50 30 L42 26" stroke="#333" stroke-width="3"/><circle cx="27" cy="36" r="3" fill="#333"/><circle cx="45" cy="36" r="3" fill="#333"/><path d="M26 50 Q36 42 46 50" stroke="#333" stroke-width="3" fill="none"/></svg>'
+};
+
+function getSageImageUri(diffMs) {
+  const hoursLeft = diffMs / (1000 * 60 * 60);
+  let state = 'calm';
+  if (hoursLeft <= 24) {
+    state = 'angry';
+  } else if (hoursLeft <= 72) {
+    state = 'sweat';
+  }
+  return `data:image/svg+xml;utf8,${encodeURIComponent(SAGE_SVGS[state])}`;
+}
 
 function getUserDirectory() {
   const USER_STORAGE_KEY = 'shift_system_users';
@@ -1031,6 +1048,7 @@ function updateDeadlineInfo() {
     const deadline = new Date(deadlineStr);
     const now = new Date();
     const diff = deadline - now;
+    const sageImg = document.getElementById('deadlineSage');
     
     deadlineBanner.style.display = 'block';
     
@@ -1078,6 +1096,10 @@ function updateDeadlineInfo() {
       }
       deadlineBanner.style.background = '#6c757d';
       deadlineBanner.style.color = 'white';
+    }
+
+    if (sageImg) {
+      sageImg.src = getSageImageUri(diff);
     }
   } else {
     deadlineBanner.style.display = 'none';

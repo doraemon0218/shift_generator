@@ -85,6 +85,17 @@
       font-size: 14px;
       margin-top: 8px;
     }
+    .deadline-banner-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      justify-content: center;
+    }
+    .deadline-sage {
+      width: 64px;
+      height: 64px;
+      flex: 0 0 auto;
+    }
     .menu-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -198,9 +209,14 @@
 
     <!-- 締め切り表示 -->
     <div id="deadlineBanner" class="deadline-banner" style="display: none;">
-      <div class="deadline-title">シフト希望調査 締め切り</div>
-      <div class="deadline-date" id="deadlineDate"></div>
-      <div class="deadline-countdown" id="deadlineCountdown"></div>
+      <div class="deadline-banner-row">
+        <img id="deadlineSage" class="deadline-sage" alt="仙人" />
+        <div>
+          <div class="deadline-title">シフト希望調査 締め切り</div>
+          <div class="deadline-date" id="deadlineDate"></div>
+          <div class="deadline-countdown" id="deadlineCountdown"></div>
+        </div>
+      </div>
     </div>
 
     <!-- 通知情報 -->
