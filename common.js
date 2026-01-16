@@ -117,6 +117,11 @@ function getCurrentUser() {
 // 現在のユーザーのキーを取得
 function getCurrentUserKey() {
   const user = getCurrentUser();
-  return user ? (user.userKey || user.email) : null;
+  return user ? (user.userKey || `${user.lastName || ''}_${user.firstName || ''}_${user.email || ''}`.replace(/^_+|_+$/g, '') || user.email) : null;
+}
+
+// ユーザーディレクトリを取得
+function getUserDirectory() {
+  return getUsers();
 }
 

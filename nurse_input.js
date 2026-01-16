@@ -117,12 +117,9 @@ for (let i = 1; i <= 31; i++) {
 
 // ログイン状態を確認
 function checkLoginStatus() {
-  const CURRENT_USER_KEY = 'current_user';
-  const currentUser = localStorage.getItem(CURRENT_USER_KEY);
-  
+  const currentUser = getCurrentUser();
   if (currentUser) {
-    const user = JSON.parse(currentUser);
-    currentNurse = user.fullName || `${user.lastName} ${user.firstName}`;
+    currentNurse = currentUser.fullName || `${currentUser.lastName} ${currentUser.firstName}`;
     return true;
   }
   return false;
@@ -211,13 +208,11 @@ function showCalendarPage() {
 
 // データの読み込み
 function loadData() {
-  const CURRENT_USER_KEY = 'current_user';
-  const currentUser = localStorage.getItem(CURRENT_USER_KEY);
+  const currentUser = getCurrentUser();
   let userKey = currentNurse;
   
   if (currentUser) {
-    const user = JSON.parse(currentUser);
-    userKey = user.userKey || currentNurse;
+    userKey = currentUser.userKey || currentNurse;
   }
   
   const storageKey = STORAGE_KEY_PREFIX + userKey;
@@ -247,7 +242,7 @@ function loadData() {
     saveData();
   }
 
-  const currentUserInfo = currentUser ? JSON.parse(currentUser) : null;
+  const currentUserInfo = currentUser;
   const resolvedCapability = resolveShiftCapability(currentData, currentUserInfo);
   if (!currentData.shiftCapability && resolvedCapability) {
     currentData.shiftCapability = resolvedCapability;
