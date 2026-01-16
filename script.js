@@ -1110,7 +1110,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const generateBtn = document.getElementById('generateBtn');
   const exportBtn = document.getElementById('exportBtn');
   const pairReloadBtn = document.getElementById('pairMatrixReload');
-  const pairSaveBtn = document.getElementById('pairMatrixSave');
+  const pairUpdateBtn = document.getElementById('pairMatrixUpdate');
   const pairClearBtn = document.getElementById('pairMatrixClear');
 
   // デフォルトファイルを読み込む（data/shift_requests.csv）
@@ -1145,10 +1145,19 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    generateBtn.disabled = false;
+    // 読み込み後に相性表セクションを表示
+    const pairMatrixSection = document.getElementById('pairMatrixSection');
+    const shiftConditionsSection = document.getElementById('shiftConditionsSection');
+    const generateSection = document.getElementById('generateSection');
+    
+    if (pairMatrixSection) pairMatrixSection.style.display = 'block';
+    if (shiftConditionsSection) shiftConditionsSection.style.display = 'block';
+    if (generateSection) generateSection.style.display = 'block';
+    
     if (pairReloadBtn) pairReloadBtn.disabled = false;
-    if (pairSaveBtn) pairSaveBtn.disabled = false;
+    if (pairUpdateBtn) pairUpdateBtn.disabled = false;
     if (pairClearBtn) pairClearBtn.disabled = false;
+    
     loadNightPairMatrix();
     alert(`データを読み込みました。看護師数: ${nurses.length}名、期間: ${dateColumns.length}日`);
   });
@@ -1200,8 +1209,8 @@ document.addEventListener('DOMContentLoaded', () => {
       loadNightPairMatrix();
     });
   }
-  if (pairSaveBtn) {
-    pairSaveBtn.addEventListener('click', () => {
+  if (pairUpdateBtn) {
+    pairUpdateBtn.addEventListener('click', () => {
       saveNightPairMatrix();
     });
   }

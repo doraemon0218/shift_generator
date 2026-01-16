@@ -255,6 +255,7 @@
       ※ 夜勤明けの翌日は、基本的に休みとして自動付与されます（生成ルール）。
     </p>
 
+    <!-- ステップ1: CSVファイル読み込み -->
     <div class="form-group">
       <label for="fileInput">CSVファイルを選択（またはデフォルトファイルを使用）</label>
       <input type="file" id="fileInput" accept=".csv" />
@@ -263,39 +264,50 @@
 
     <div id="errorContainer"></div>
 
-    <div class="form-group">
-      <label>シフト設定</label>
-      <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
-        <div>
-          <label for="dayShiftRequired" style="display: inline; margin-right: 8px;">平日日勤の出勤人数:</label>
-          <input type="number" id="dayShiftRequired" value="3" min="1" />
-        </div>
-        <div>
-          <label for="nightShiftRequired" style="display: inline; margin-right: 8px;">平日夜勤の出勤人数:</label>
-          <input type="number" id="nightShiftRequired" value="2" min="1" />
-        </div>
-        <div>
-          <label for="standardHolidayDays" style="display: inline; margin-right: 8px;">標準公休日数:</label>
-          <input type="number" id="standardHolidayDays" value="9" min="0" />
+    <!-- ステップ2: 夜勤相性表（読み込み後に表示） -->
+    <div id="pairMatrixSection" style="display: none; margin-top: 32px;">
+      <h2 style="margin: 0 0 12px; font-size: 20px; color: #333;">🤝 夜勤相性表</h2>
+      <p style="color: #666; margin-bottom: 12px;">
+        CSV内の夜勤可メンバーを対象に、○/△/×で相性を設定します。<br>
+        ○：問題なし、△：極力避けたい、×：禁忌（デフォルトは○）
+      </p>
+      <div class="form-group">
+        <button id="pairMatrixUpdate" class="btn-success" disabled style="margin-right: 8px;">更新</button>
+        <button id="pairMatrixReload" class="btn-primary" disabled style="margin-right: 8px;">CSVから再作成</button>
+        <button id="pairMatrixClear" class="btn-danger" disabled>全クリア</button>
+      </div>
+      <div id="nightPairMatrix" class="pair-matrix"></div>
+    </div>
+
+    <!-- ステップ3: シフト条件入力 -->
+    <div id="shiftConditionsSection" style="display: none; margin-top: 32px;">
+      <h2 style="margin: 0 0 12px; font-size: 20px; color: #333;">⚙️ シフト条件</h2>
+      <div class="form-group">
+        <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+          <div>
+            <label for="dayShiftRequired" style="display: block; margin-bottom: 4px;">平日日勤の配置人数:</label>
+            <input type="number" id="dayShiftRequired" value="3" min="1" />
+          </div>
+          <div>
+            <label for="lateShiftRequired" style="display: block; margin-bottom: 4px;">平日遅出の配置人数:</label>
+            <input type="number" id="lateShiftRequired" value="0" min="0" />
+          </div>
+          <div>
+            <label for="nightShiftRequired" style="display: block; margin-bottom: 4px;">平日夜勤の配置人数:</label>
+            <input type="number" id="nightShiftRequired" value="2" min="1" />
+          </div>
+          <div>
+            <label for="standardHolidayDays" style="display: block; margin-bottom: 4px;">公休の日数:</label>
+            <input type="number" id="standardHolidayDays" value="9" min="0" />
+          </div>
         </div>
       </div>
     </div>
 
-    <button id="generateBtn" class="btn-success" disabled>シフト表を生成</button>
-    <div class="draft-note">※ 土日の日勤人数は「平日の夜勤人数」と同じに設定されます。</div>
-
-    <div style="margin-top: 24px;">
-      <h2 style="margin: 0 0 12px; font-size: 20px; color: #333;">🤝 夜勤相性表</h2>
-      <p style="color: #666; margin-bottom: 12px;">
-        CSV内の夜勤可メンバーを対象に、○/△/×で相性を設定します。<br>
-        ○：問題なし、△：極力避けたい、×：禁忌
-      </p>
-      <div class="form-group">
-        <button id="pairMatrixReload" class="btn-primary" disabled>CSVから再作成</button>
-        <button id="pairMatrixSave" class="btn-success" disabled style="margin-left: 8px;">保存</button>
-        <button id="pairMatrixClear" class="btn-danger" disabled style="margin-left: 8px;">全クリア</button>
-      </div>
-      <div id="nightPairMatrix" class="pair-matrix"></div>
+    <!-- ステップ4: 出力ボタン -->
+    <div id="generateSection" style="display: none; margin-top: 24px;">
+      <button id="generateBtn" class="btn-success">シフト表を出力</button>
+      <div class="draft-note" style="margin-top: 8px;">※ 土日の日勤人数は「平日の夜勤人数」と同じに設定されます。</div>
     </div>
 
     <div id="loadingContainer" style="display: none;">
