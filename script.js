@@ -1086,7 +1086,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 非同期で処理（UIブロックを防ぐ）
     setTimeout(() => {
       try {
-        scheduleDrafts = generateScheduleDrafts(3, dayShiftRequired, nightShiftRequired, targetWorkDays);
+        scheduleDrafts = generateScheduleDrafts(3, dayShiftRequired, nightShiftRequired, targetWorkDays, standardHolidayDays);
         selectedDraftIndex = null;
         shiftSchedule = [];
         lastTargetWorkDays = targetWorkDays;
