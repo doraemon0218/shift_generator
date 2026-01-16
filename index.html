@@ -167,53 +167,13 @@
     
     <form id="loginForm">
       <div class="form-group">
-        <div class="form-row">
-          <div>
-            <label for="lastName">姓（新規登録時のみ）</label>
-            <input type="text" id="lastName" placeholder="山田" />
-          </div>
-          <div>
-            <label for="firstName">名（新規登録時のみ）</label>
-            <input type="text" id="firstName" placeholder="太郎" />
-          </div>
-        </div>
-        <div class="form-note">※既に登録済みの方はメールアドレスとパスワードのみでログインできます</div>
-      </div>
-      
-      <div class="form-group">
-        <label for="email">Gmailアドレス</label>
+        <label for="email">メールアドレス</label>
         <input type="email" id="email" placeholder="example@gmail.com" required />
       </div>
       
       <div class="form-group">
         <label for="password">パスワード</label>
         <input type="password" id="password" placeholder="パスワードを入力" required />
-      </div>
-
-      <div class="form-group">
-        <label for="hireYear">入職年（西暦）</label>
-        <input type="number" id="hireYear" placeholder="2020" min="1970" max="2100" />
-        <div class="form-note">※初回登録時に入力してください。既存アカウントの方は入力済みの値が優先されます。</div>
-      </div>
-
-      <div class="form-group">
-        <label>働き方の対応状況</label>
-        <div class="nightshift-options">
-          <label><input type="radio" name="initialShiftCapability" value="day-only" /> 日勤のみ</label>
-          <label><input type="radio" name="initialShiftCapability" value="day-late" /> 日勤＋遅出</label>
-          <label><input type="radio" name="initialShiftCapability" value="day-night" /> 日勤＋夜勤（遅出なし）</label>
-          <label><input type="radio" name="initialShiftCapability" value="all" /> 全部する</label>
-        </div>
-        <div class="form-note">※初回登録時の申告です。以降の管理は管理者が行います。</div>
-      </div>
-
-      <div class="form-group">
-        <label>管理者申請</label>
-        <label class="admin-request">
-          <input type="checkbox" id="adminRequest" />
-          管理者として申請する
-        </label>
-        <div class="admin-request-note">※ 既存の管理者が承認すると、管理者権限が付与されます。</div>
       </div>
       
       <div class="error-message" id="errorMessage"></div>

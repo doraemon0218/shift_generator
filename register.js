@@ -38,18 +38,83 @@ function hashPassword(password) {
   return hash.toString();
 }
 
+// 入職年をパース
+function parseHireYear(value) {
+  if (!value) return null;
+  const parsed = parseInt(value, 10);
+  if (Number.isNaN(parsed)) return null;
+  const currentYear = new Date().getFullYear();
+  if (parsed < 1970 || parsed > currentYear + 1) {
+    return null;
+  }
+  return parsed;
+}
+
+// シフト対応状況を正規化
+function normalizeShiftCapability(value) {
+  if (!value) return null;
+  const validValues = ['day-only', 'day-late', 'day-night', 'all'];
+  if (validValues.includes(value)) {
+    return value;
+  }
+  return null;
+}
+
+const STORAGE_KEY_PREFIX = 'shift_request_';
+
+// シフトプロファイルを確保
+function ensureShiftProfile(userKey, fullName, initialShiftCapability) {
+  const storageKey = STORAGE_KEY_PREFIX + userKey;
+  const stored = localStorage.getItem(storageKey);
+
+  if (stored) {
+    try {
+      const data = JSON.parse(stored);
+      if (!data.shiftCapability && initialShiftCapability) {
+        data.shiftCapability = initialShiftCapability;
+        data.doesNightShift = initialShiftCapability === 'day-night' || initialShiftCapability === 'all';
+        localStorage.setItem(storageKey, JSON.stringify(data));
+      }
+    } catch (error) {
+      console.error('Failed to parse existing shift data', error);
+    }
+    return;
+  }
+
+  const baseData = {
+    nurseName: fullName,
+    userKey,
+    requests: {},
+    note: '',
+    submitted: false,
+    submittedAt: null,
+    shiftCapability: initialShiftCapability,
+    doesNightShift: initialShiftCapability === 'day-night' || initialShiftCapability === 'all',
+    preferences: {
+      valuePreference: null
+    }
+  };
+
+  localStorage.setItem(storageKey, JSON.stringify(baseData));
+}
+
 // 登録処理
 function handleRegister(event) {
   event.preventDefault();
   
+  const lastName = document.getElementById('lastName').value.trim();
+  const firstName = document.getElementById('firstName').value.trim();
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
   const passwordConfirm = document.getElementById('passwordConfirm').value;
+  const hireYearInput = document.getElementById('hireYear');
+  const hireYearRaw = hireYearInput ? hireYearInput.value.trim() : '';
+  const shiftCapabilityChoice = document.querySelector('input[name="shiftCapability"]:checked');
   
   const errorMsg = document.getElementById('errorMessage');
   errorMsg.classList.remove('show');
   
-  if (!email || !password || !passwordConfirm) {
+  if (!lastName || !firstName || !email || !password || !passwordConfirm || !hireYearRaw || !shiftCapabilityChoice) {
     errorMsg.textContent = 'すべての項目を入力してください';
     errorMsg.classList.add('show');
     return;
@@ -69,6 +134,20 @@ function handleRegister(event) {
   
   if (password !== passwordConfirm) {
     errorMsg.textContent = 'パスワードが一致しません';
+    errorMsg.classList.add('show');
+    return;
+  }
+  
+  const hireYear = parseHireYear(hireYearRaw);
+  if (!hireYear) {
+    errorMsg.textContent = '入職年（西暦）を正しく入力してください（1970年〜現在+1年まで）';
+    errorMsg.classList.add('show');
+    return;
+  }
+  
+  const shiftCapability = normalizeShiftCapability(shiftCapabilityChoice.value);
+  if (!shiftCapability) {
+    errorMsg.textContent = '夜勤・遅出の対応状況を選択してください';
     errorMsg.classList.add('show');
     return;
   }
@@ -99,26 +178,24 @@ function handleRegister(event) {
   }
   
   // 新規ユーザー登録
-  // メールアドレスをベースにしたユーザーキーを生成（一時的）
-  const tempUserKey = `user_${email.replace(/[@.]/g, '_')}`;
+  const userKey = `${lastName}_${firstName}_${email}`;
   const hashedPassword = hashPassword(password);
+  const fullName = `${lastName} ${firstName}`;
   
-  // メールアドレスのローカル部分から名前を推定（初期値）
-  const emailLocal = email.split('@')[0];
-  const tempName = emailLocal.charAt(0).toUpperCase() + emailLocal.slice(1);
-  
-  users[tempUserKey] = {
+  users[userKey] = {
+    lastName,
+    firstName,
     email,
     password: hashedPassword,
-    fullName: tempName,
-    lastName: '',
-    firstName: '',
+    fullName,
     createdAt: new Date().toISOString(),
-    hireYear: null,
-    initialShiftCapability: null,
-    registeredFrom: 'register'
+    hireYear,
+    initialShiftCapability: shiftCapability
   };
   saveUsers(users);
+  
+  // シフトプロファイルを初期化
+  ensureShiftProfile(userKey, fullName, shiftCapability);
   
   // 管理者が設定されていない場合は最初のユーザーを管理者にする
   let adminUsers = getAdminUsers();
@@ -132,15 +209,14 @@ function handleRegister(event) {
   
   // 現在のユーザー情報を保存してログイン状態にする
   const currentUser = {
+    lastName,
+    firstName,
     email,
-    fullName: tempName,
-    lastName: '',
-    firstName: '',
+    fullName,
     isAdmin,
-    userKey: tempUserKey,
-    hireYear: null,
-    initialShiftCapability: null,
-    isNewUser: true
+    userKey,
+    hireYear,
+    initialShiftCapability: shiftCapability
   };
   localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
   

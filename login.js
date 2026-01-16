@@ -132,18 +132,8 @@ function parseHireYear(value) {
 function handleLogin(event) {
   event.preventDefault();
   
-  const lastNameEl = document.getElementById('lastName');
-  const firstNameEl = document.getElementById('firstName');
-  const lastName = lastNameEl ? lastNameEl.value.trim() : '';
-  const firstName = firstNameEl ? firstNameEl.value.trim() : '';
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
-  const hireYearInput = document.getElementById('hireYear');
-  const hireYearRaw = hireYearInput ? hireYearInput.value.trim() : '';
-  const nightShiftChoice = document.querySelector('input[name="initialShiftCapability"]:checked')
-    || document.querySelector('input[name="initialNightShift"]:checked');
-  const adminRequestInput = document.getElementById('adminRequest');
-  const wantsAdminRequest = adminRequestInput ? adminRequestInput.checked : false;
   
   const errorMsg = document.getElementById('errorMessage');
   errorMsg.classList.remove('show');
@@ -169,125 +159,25 @@ function handleLogin(event) {
     }
   }
   
-  const isNewUser = !existingUser;
-
-  let hireYear = existingUser ? existingUser.hireYear ?? null : null;
-  let initialShiftCapability = existingUser
-    ? (normalizeShiftCapability(existingUser.initialShiftCapability)
-      ?? normalizeShiftCapability(existingUser.shiftCapability)
-      ?? normalizeShiftCapability(existingUser.initialNightShift))
-    : null;
-
-  if (isNewUser) {
-    const parsedYear = parseHireYear(hireYearRaw);
-    if (!parsedYear) {
-      errorMsg.textContent = '入職年（西暦）を正しく入力してください（1970年〜現在+1年まで）';
-      errorMsg.classList.add('show');
-      return;
-    }
-    if (!nightShiftChoice) {
-      errorMsg.textContent = '夜勤・遅出の対応状況を選択してください';
-      errorMsg.classList.add('show');
-      return;
-    }
-
-    hireYear = parsedYear;
-    initialShiftCapability = normalizeShiftCapability(nightShiftChoice.value);
-  }
-
-  // ユーザーが存在するか確認
-  if (existingUser) {
-    // パスワード確認
-    if (existingUser.password !== hashedPassword) {
-      errorMsg.textContent = 'パスワードが正しくありません';
-      errorMsg.classList.add('show');
-      return;
-    }
-
-    let userDataUpdated = false;
+  // ユーザーが存在しない場合は新規登録画面へ誘導
+  if (!existingUser) {
+    errorMsg.textContent = 'このメールアドレスは登録されていません。新規登録画面から登録してください。';
+    errorMsg.classList.add('show');
     
-    // 名前が未設定で入力されていた場合は更新
-    if ((!existingUser.lastName || !existingUser.firstName) && lastName && firstName) {
-      existingUser.lastName = lastName;
-      existingUser.firstName = firstName;
-      existingUser.fullName = `${lastName} ${firstName}`;
-      userDataUpdated = true;
-    }
-
-    const parsedYear = parseHireYear(hireYearRaw);
-    if (parsedYear && parsedYear !== existingUser.hireYear) {
-      existingUser.hireYear = parsedYear;
-      hireYear = parsedYear;
-      userDataUpdated = true;
-    }
-
-    if (nightShiftChoice) {
-      const choiceValue = normalizeShiftCapability(nightShiftChoice.value);
-      if (choiceValue && existingUser.initialShiftCapability !== choiceValue) {
-        existingUser.initialShiftCapability = choiceValue;
-        initialShiftCapability = choiceValue;
-        userDataUpdated = true;
-      }
-    } else if (!existingUser.initialShiftCapability && initialShiftCapability) {
-      existingUser.initialShiftCapability = initialShiftCapability;
-      userDataUpdated = true;
-    }
-
-    if (userDataUpdated) {
-      users[existingUserKey] = existingUser;
-      saveUsers(users);
-    }
-    
-    // 既存ユーザーのデータを使用
-    hireYear = existingUser.hireYear ?? hireYear;
-    initialShiftCapability = normalizeShiftCapability(existingUser.initialShiftCapability)
-      ?? normalizeShiftCapability(existingUser.shiftCapability)
-      ?? normalizeShiftCapability(existingUser.initialNightShift)
-      ?? initialShiftCapability;
-  } else {
-    // 新規ユーザー登録（ログイン画面から）
-    // 姓・名が入力されている場合のみ新規登録
-    if (!lastName || !firstName) {
-      errorMsg.textContent = '未登録のメールアドレスです。新規登録画面から登録してください。';
-      errorMsg.classList.add('show');
-      
-      setTimeout(() => {
-        window.location.href = 'register.html';
-      }, 2000);
-      return;
-    }
-    
-    const parsedYear = parseHireYear(hireYearRaw);
-    if (!parsedYear) {
-      errorMsg.textContent = '入職年（西暦）を正しく入力してください（1970年〜現在+1年まで）';
-      errorMsg.classList.add('show');
-      return;
-    }
-    if (!nightShiftChoice) {
-      errorMsg.textContent = '夜勤・遅出の対応状況を選択してください';
-      errorMsg.classList.add('show');
-      return;
-    }
-
-    hireYear = parsedYear;
-    initialShiftCapability = normalizeShiftCapability(nightShiftChoice.value);
-    
-    const userKey = `${lastName}_${firstName}_${email}`;
-    users[userKey] = {
-      lastName,
-      firstName,
-      email,
-      password: hashedPassword,
-      fullName: `${lastName} ${firstName}`,
-      createdAt: new Date().toISOString(),
-      hireYear,
-      initialShiftCapability
-    };
-    saveUsers(users);
-    existingUserKey = userKey;
+    setTimeout(() => {
+      window.location.href = 'register.html';
+    }, 2000);
+    return;
   }
   
-  // 管理者かどうか確認（テスト環境では全員管理者）
+  // パスワード確認
+  if (existingUser.password !== hashedPassword) {
+    errorMsg.textContent = 'パスワードが正しくありません';
+    errorMsg.classList.add('show');
+    return;
+  }
+  
+  // 管理者かどうか確認
   let adminUsers = getAdminUsers();
   let isAdmin = adminUsers.includes(email);
   
@@ -298,53 +188,28 @@ function handleLogin(event) {
     isAdmin = true;
   }
   
-  const adminRequests = getAdminRequests();
-  if (ENABLE_DEMO_ADMIN_FOR_ALL) {
-    isAdmin = true;
-  } else if (isAdmin) {
-    const filtered = adminRequests.filter(request => request.email !== email);
-    if (filtered.length !== adminRequests.length) {
-      saveAdminRequests(filtered);
-    }
-  } else if (wantsAdminRequest) {
-    if (!adminRequests.some(request => request.email === email)) {
-      adminRequests.push({
-        email,
-        fullName: `${lastName} ${firstName}`,
-        userKey,
-        requestedAt: new Date().toISOString()
-      });
-      saveAdminRequests(adminRequests);
-    }
-  }
+  // 既存ユーザーのデータを使用
+  const fullName = existingUser.fullName || `${existingUser.lastName || ''} ${existingUser.firstName || ''}`.trim() || email.split('@')[0];
+  const hireYear = existingUser.hireYear ?? null;
+  const initialShiftCapability = normalizeShiftCapability(existingUser.initialShiftCapability)
+    ?? normalizeShiftCapability(existingUser.shiftCapability)
+    ?? normalizeShiftCapability(existingUser.initialNightShift)
+    ?? null;
 
-  const fullName = existingUser 
-    ? (existingUser.fullName || `${existingUser.lastName || ''} ${existingUser.firstName || ''}`.trim() || email.split('@')[0])
-    : `${lastName} ${firstName}`;
-  const finalLastName = existingUser ? (existingUser.lastName || lastName || '') : lastName;
-  const finalFirstName = existingUser ? (existingUser.firstName || firstName || '') : firstName;
-  const resolvedHireYear = hireYear ?? parseHireYear(hireYearRaw);
-  const resolvedShiftCapability = normalizeShiftCapability(initialShiftCapability)
-    ?? normalizeShiftCapability(nightShiftChoice ? nightShiftChoice.value : null);
-
-  ensureShiftProfile(existingUserKey, fullName, resolvedShiftCapability);
+  ensureShiftProfile(existingUserKey, fullName, initialShiftCapability);
   
   // 現在のユーザー情報を保存
   const currentUser = {
-    lastName: finalLastName,
-    firstName: finalFirstName,
+    lastName: existingUser.lastName || '',
+    firstName: existingUser.firstName || '',
     email,
     fullName,
     isAdmin,
     userKey: existingUserKey,
-    hireYear: resolvedHireYear ?? null,
-    initialShiftCapability: resolvedShiftCapability
+    hireYear,
+    initialShiftCapability
   };
   localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
-
-  if (wantsAdminRequest && !isAdmin) {
-    alert('管理者申請を受け付けました。既存の管理者が承認すると権限が付与されます。');
-  }
   
   // トップページにリダイレクト
   window.location.href = 'top.html';
