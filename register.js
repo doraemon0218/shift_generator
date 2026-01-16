@@ -1,8 +1,4 @@
-// ユーザー管理のキー
-const USER_STORAGE_KEY = 'shift_system_users';
-const CURRENT_USER_KEY = 'current_user';
-const ADMIN_USERS_KEY = 'admin_users';
-const ADMIN_REQUESTS_KEY = 'admin_requests';
+// 定数とユーティリティは common.js から継承
 const ENABLE_DEMO_ADMIN_FOR_ALL = true; // デモ環境：全ユーザーを管理者にする
 
 // ユーザーデータを取得
@@ -63,17 +59,7 @@ function parseHireYear(value) {
   return parsed;
 }
 
-// シフト対応状況を正規化
-function normalizeShiftCapability(value) {
-  if (!value) return null;
-  const validValues = ['day-only', 'day-late', 'day-night', 'all'];
-  if (validValues.includes(value)) {
-    return value;
-  }
-  return null;
-}
-
-const STORAGE_KEY_PREFIX = 'shift_request_';
+// normalizeShiftCapability は common.js から継承
 
 // シフトプロファイルを確保
 function ensureShiftProfile(userKey, fullName, initialShiftCapability) {

@@ -9,23 +9,7 @@ let nurses = [];
 let dateColumns = [];
 let mixingMatrix = null;
 
-const MIXING_MATRIX_KEY = 'mixing_matrix';
-
-// 希望の種類を表す定数
-const REQUEST_TYPES = {
-  AVAILABLE: 'available',
-  DAY_ONLY: 'day-only',
-  DAY_LATE: 'day-late',
-  NIGHT_ONLY: 'night-only',
-  PAID_LEAVE: 'paid-leave'
-};
-
-// シフトの種類
-const SHIFT_TYPES = {
-  DAY: '日勤',
-  NIGHT: '夜勤',
-  OFF: '休'
-};
+// 定数は common.js から継承
 
 // CSVを読み込む
 async function loadCSV(file) {

@@ -2,48 +2,7 @@
 let currentNurse = null;
 let currentData = null;
 let selectedDate = null;
-const STORAGE_KEY_PREFIX = 'shift_request_';
-const DEADLINE_KEY = 'shift_deadline';
-const SUBMITTED_KEY_PREFIX = 'shift_submitted_';
-
-const SHIFT_CAPABILITIES = {
-  DAY_ONLY: 'day-only',
-  DAY_LATE: 'day-late',
-  DAY_NIGHT: 'day-night',
-  ALL: 'all'
-};
-
-// 希望の種類
-const REQUEST_TYPES = {
-  AVAILABLE: 'available',
-  DAY_ONLY: 'day-only',
-  DAY_LATE: 'day-late',
-  NIGHT_ONLY: 'night-only',
-  PAID_LEAVE: 'paid-leave'
-};
-
-const VALUE_PREFERENCE_OPTIONS = {
-  'go-out': {
-    label: '夜勤明けは、アクティブに過ごしたい',
-    icon: '🎢',
-    description: '夜勤明けでも外出やイベントを楽しみたい。活発に活動したいタイプです。'
-  },
-  'relax-home': {
-    label: '夜勤明けは、自宅でゆっくり休みたい',
-    icon: '🛋️',
-    description: '夜勤明けは自宅でゆっくり過ごしたい。無理せず体力回復を優先します。'
-  },
-  'chain-holiday': {
-    label: '夜勤明けから連続して休みが欲しい',
-    icon: '🌙➡️🛌',
-    description: '夜勤明けから公休をつなげて連続休みにしたい。しっかりと体力を回復したいです。'
-  },
-  'no-holiday': {
-    label: '夜勤明け後は、すぐ通常勤務に戻りたい',
-    icon: '💪',
-    description: '夜勤明け後は連続休みより通常勤務に戻したい。働くリズムを崩したくないタイプです。'
-  }
-};
+// 定数は common.js から継承
 
 const REQUEST_OPTION_PRESETS = {
   'available': {
@@ -87,7 +46,11 @@ const SAGE_SVGS = {
   angry: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><path d="M22 30 L30 26" stroke="#333" stroke-width="3"/><path d="M50 30 L42 26" stroke="#333" stroke-width="3"/><circle cx="27" cy="36" r="3" fill="#333"/><circle cx="45" cy="36" r="3" fill="#333"/><path d="M26 50 Q36 42 46 50" stroke="#333" stroke-width="3" fill="none"/></svg>'
 };
 
-function getSageImageUri(diffMs) {
+// getSageImageUri は共通版を使用（nurse_input.jsでは独自のSVGを使用する必要がある場合は上書き）
+// getUserDirectory, getCurrentUserKey は common.js から継承（必要に応じて拡張可能）
+
+// nurse_input.js用のgetSageImageUri（SVG使用版）
+function getSageImageUriNurse(diffMs) {
   const hoursLeft = diffMs / (1000 * 60 * 60);
   let state = 'calm';
   if (hoursLeft <= 24) {
@@ -98,40 +61,7 @@ function getSageImageUri(diffMs) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(SAGE_SVGS[state])}`;
 }
 
-function getUserDirectory() {
-  const USER_STORAGE_KEY = 'shift_system_users';
-  const stored = localStorage.getItem(USER_STORAGE_KEY);
-  return stored ? JSON.parse(stored) : {};
-}
-
-function getCurrentUserKey() {
-  const currentUserStr = localStorage.getItem('current_user');
-  if (currentUserStr) {
-    try {
-      const user = JSON.parse(currentUserStr);
-      return user.userKey || `${user.lastName}_${user.firstName}_${user.email}`;
-    } catch (error) {
-      return currentNurse;
-    }
-  }
-  return currentNurse;
-}
-
-function normalizeShiftCapability(value) {
-  const supported = [
-    SHIFT_CAPABILITIES.DAY_ONLY,
-    SHIFT_CAPABILITIES.DAY_LATE,
-    SHIFT_CAPABILITIES.DAY_NIGHT,
-    SHIFT_CAPABILITIES.ALL
-  ];
-  if (supported.includes(value)) return value;
-  if (value === 'night') return SHIFT_CAPABILITIES.ALL;
-  if (value === 'late') return SHIFT_CAPABILITIES.DAY_LATE;
-  if (value === 'day') return SHIFT_CAPABILITIES.DAY_ONLY;
-  if (value === true) return SHIFT_CAPABILITIES.ALL;
-  if (value === false) return SHIFT_CAPABILITIES.DAY_LATE;
-  return null;
-}
+// normalizeShiftCapability は common.js から継承
 
 function getShiftCapabilityLabel(capability) {
   if (capability === SHIFT_CAPABILITIES.DAY_ONLY) return '日勤のみ';
@@ -183,21 +113,7 @@ for (let i = 1; i <= 31; i++) {
   dates.push(`8/${i}`);
 }
 
-// 日付が週末かどうか判定
-function isWeekend(dateStr) {
-  const [month, day] = dateStr.split('/').map(Number);
-  const date = new Date(2025, month - 1, day);
-  const dayOfWeek = date.getDay();
-  return dayOfWeek === 0 || dayOfWeek === 6;
-}
-
-// 曜日を取得
-function getDayOfWeek(dateStr) {
-  const [month, day] = dateStr.split('/').map(Number);
-  const date = new Date(2025, month - 1, day);
-  const days = ['日', '月', '火', '水', '木', '金', '土'];
-  return days[date.getDay()];
-}
+// isWeekend, getDayOfWeek は common.js から継承
 
 // ログイン状態を確認
 function checkLoginStatus() {

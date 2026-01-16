@@ -1,16 +1,5 @@
-const DEADLINE_KEY = 'shift_deadline';
-const STORAGE_KEY_PREFIX = 'shift_request_';
+// 定数は common.js から継承
 const SUBMITTED_KEY_PREFIX = 'shift_submitted_';
-const ADMIN_USERS_KEY = 'admin_users';
-const ADMIN_REQUESTS_KEY = 'admin_requests';
-const MIXING_MATRIX_KEY = 'mixing_matrix';
-
-const SHIFT_CAPABILITIES = {
-  DAY_ONLY: 'day-only',
-  DAY_LATE: 'day-late',
-  DAY_NIGHT: 'day-night',
-  ALL: 'all'
-};
 
 let isReadOnlyAdminView = false;
 
@@ -20,31 +9,13 @@ const SAGE_SVGS = {
   angry: '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="28" fill="#f5deb3" stroke="#6b4f2a" stroke-width="2"/><path d="M16 28 Q36 8 56 28" fill="#e0e0e0" stroke="#6b4f2a" stroke-width="2"/><path d="M22 30 L30 26" stroke="#333" stroke-width="3"/><path d="M50 30 L42 26" stroke="#333" stroke-width="3"/><circle cx="27" cy="36" r="3" fill="#333"/><circle cx="45" cy="36" r="3" fill="#333"/><path d="M26 50 Q36 42 46 50" stroke="#333" stroke-width="3" fill="none"/></svg>'
 };
 
-function getSageImageUri(diffMs) {
+// getSageImageUri, normalizeShiftCapability は common.js から継承（admin.jsではSVGを使用）
+function getSageImageUriAdmin(diffMs) {
   const hoursLeft = diffMs / (1000 * 60 * 60);
   let state = 'calm';
-  if (hoursLeft <= 24) {
-    state = 'angry';
-  } else if (hoursLeft <= 72) {
-    state = 'sweat';
-  }
+  if (hoursLeft <= 24) state = 'angry';
+  else if (hoursLeft <= 72) state = 'sweat';
   return `data:image/svg+xml;utf8,${encodeURIComponent(SAGE_SVGS[state])}`;
-}
-
-function normalizeShiftCapability(value) {
-  const supported = [
-    SHIFT_CAPABILITIES.DAY_ONLY,
-    SHIFT_CAPABILITIES.DAY_LATE,
-    SHIFT_CAPABILITIES.DAY_NIGHT,
-    SHIFT_CAPABILITIES.ALL
-  ];
-  if (supported.includes(value)) return value;
-  if (value === 'night') return SHIFT_CAPABILITIES.ALL;
-  if (value === 'late') return SHIFT_CAPABILITIES.DAY_LATE;
-  if (value === 'day') return SHIFT_CAPABILITIES.DAY_ONLY;
-  if (value === true) return SHIFT_CAPABILITIES.ALL;
-  if (value === false) return SHIFT_CAPABILITIES.DAY_LATE;
-  return null;
 }
 
 function getShiftCapabilityLabel(capability) {
@@ -55,45 +26,7 @@ function getShiftCapabilityLabel(capability) {
   return '未設定（管理者）';
 }
 
-const VALUE_PREFERENCE_OPTIONS = {
-  'go-out': {
-    label: '夜勤明けは、アクティブに過ごしたい',
-    icon: '🎢',
-    description: '夜勤明けでも外出やイベントを楽しみたい。活発に活動したいタイプです。'
-  },
-  'relax-home': {
-    label: '夜勤明けは、自宅でゆっくり休みたい',
-    icon: '🛋️',
-    description: '夜勤明けは自宅でゆっくり過ごしたい。無理せず体力回復を優先します。'
-  },
-  'chain-holiday': {
-    label: '夜勤明けから連続して休みが欲しい',
-    icon: '🌙➡️🛌',
-    description: '夜勤明けから公休をつなげて連続休みにしたい。しっかりと体力を回復したいです。'
-  },
-  'no-holiday': {
-    label: '夜勤明け後は、すぐ通常勤務に戻りたい',
-    icon: '💪',
-    description: '夜勤明け後は連続休みより通常勤務に戻したい。働くリズムを崩したくないタイプです。'
-  }
-};
-
-function getUserDirectory() {
-  const USER_STORAGE_KEY = 'shift_system_users';
-  const stored = localStorage.getItem(USER_STORAGE_KEY);
-  return stored ? JSON.parse(stored) : {};
-}
-
-// 管理者ユーザーを取得
-function getAdminUsers() {
-  const stored = localStorage.getItem(ADMIN_USERS_KEY);
-  return stored ? JSON.parse(stored) : [];
-}
-
-// 管理者ユーザーを保存
-function saveAdminUsers(admins) {
-  localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(admins));
-}
+// VALUE_PREFERENCE_OPTIONS, getUserDirectory, getAdminUsers, saveAdminUsers は common.js から継承
 
 // 管理者申請一覧を取得
 function getAdminRequests() {

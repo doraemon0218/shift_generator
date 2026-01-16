@@ -1,57 +1,5 @@
-// ユーザー管理のキー
-const USER_STORAGE_KEY = 'shift_system_users';
-const CURRENT_USER_KEY = 'current_user';
-const ADMIN_USERS_KEY = 'admin_users';
-const ADMIN_REQUESTS_KEY = 'admin_requests';
+// 定数とユーティリティは common.js から継承
 const ENABLE_DEMO_ADMIN_FOR_ALL = true;
-const STORAGE_KEY_PREFIX = 'shift_request_';
-
-const SHIFT_CAPABILITIES = {
-  DAY_ONLY: 'day-only',
-  DAY_LATE: 'day-late',
-  DAY_NIGHT: 'day-night',
-  ALL: 'all'
-};
-
-function normalizeShiftCapability(value) {
-  const supported = [
-    SHIFT_CAPABILITIES.DAY_ONLY,
-    SHIFT_CAPABILITIES.DAY_LATE,
-    SHIFT_CAPABILITIES.DAY_NIGHT,
-    SHIFT_CAPABILITIES.ALL
-  ];
-  if (supported.includes(value)) return value;
-  if (value === 'night') return SHIFT_CAPABILITIES.ALL;
-  if (value === 'late') return SHIFT_CAPABILITIES.DAY_LATE;
-  if (value === 'day') return SHIFT_CAPABILITIES.DAY_ONLY;
-  if (value === 'on') return SHIFT_CAPABILITIES.ALL;
-  if (value === 'off') return SHIFT_CAPABILITIES.DAY_LATE;
-  if (value === true) return SHIFT_CAPABILITIES.ALL;
-  if (value === false) return SHIFT_CAPABILITIES.DAY_LATE;
-  return null;
-}
-
-// ユーザーデータを取得
-function getUsers() {
-  const stored = localStorage.getItem(USER_STORAGE_KEY);
-  return stored ? JSON.parse(stored) : {};
-}
-
-// ユーザーを保存
-function saveUsers(users) {
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(users));
-}
-
-// 管理者ユーザーを取得
-function getAdminUsers() {
-  const stored = localStorage.getItem(ADMIN_USERS_KEY);
-  return stored ? JSON.parse(stored) : [];
-}
-
-// 管理者ユーザーを保存
-function saveAdminUsers(admins) {
-  localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(admins));
-}
 
 // 管理者申請一覧を取得
 function getAdminRequests() {
