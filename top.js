@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // ユーザー名を表示
   document.getElementById('userName').textContent = user.fullName;
+  renderAdminToggle(user);
   
   // 管理者カードは閲覧可能（非管理者は閲覧モード）
   const adminCard = document.getElementById('adminCard');
@@ -62,6 +63,29 @@ document.addEventListener('DOMContentLoaded', () => {
   // 締め切り情報を定期的に更新（1分ごと）
   setInterval(updateDeadlineDisplay, 60000);
 });
+
+function renderAdminToggle(user) {
+  const statusEl = document.getElementById('adminToggleStatus');
+  const toggleBtn = document.getElementById('adminToggleBtn');
+  if (!statusEl || !toggleBtn) return;
+
+  const updateLabel = (isAdmin) => {
+    statusEl.textContent = isAdmin ? 'ON（管理者）' : 'OFF（一般）';
+    statusEl.style.color = isAdmin ? '#28a745' : '#dc3545';
+  };
+
+  updateLabel(Boolean(user.isAdmin));
+
+  toggleBtn.addEventListener('click', () => {
+    const nextValue = !Boolean(user.isAdmin);
+    if (!confirm(`管理者権限を${nextValue ? 'ON' : 'OFF'}に切り替えますか？`)) {
+      return;
+    }
+    user.isAdmin = nextValue;
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    updateLabel(nextValue);
+  });
+}
 
 // 締め切り表示を更新
 function updateDeadlineDisplay() {

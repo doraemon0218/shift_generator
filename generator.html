@@ -120,6 +120,46 @@
     .stats {
       margin-top: 24px;
     }
+    .drafts {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 16px;
+    }
+    .draft-card {
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 12px;
+      background: #fafafa;
+    }
+    .draft-card.selected {
+      border-color: #4a90e2;
+      box-shadow: 0 6px 16px rgba(74, 144, 226, 0.2);
+      background: #ffffff;
+    }
+    .draft-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .draft-table {
+      max-height: 360px;
+      overflow: auto;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #fff;
+    }
+    .draft-table table {
+      margin-top: 0;
+      font-size: 11px;
+    }
+    .draft-note {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #666;
+    }
     .stats-table {
       width: 100%;
       margin-top: 12px;
@@ -186,11 +226,16 @@
     </div>
 
     <button id="generateBtn" class="btn-success" disabled>シフト表を生成</button>
+    <div class="draft-note">※ 土日の日勤人数は「平日の夜勤人数」と同じに設定されます。</div>
 
     <div id="loadingContainer" style="display: none;">
       <div class="loading">シフト表を生成中...</div>
     </div>
 
+    <div id="draftContainer" class="drafts" style="display: none;"></div>
+    <div id="selectionNotice" class="draft-note" style="display: none;">
+      3つの下書きから1つを選択してください（採用ボタンで確定）。
+    </div>
     <div id="tableContainer" style="display: none;"></div>
     <div id="statsContainer" style="display: none;" class="stats"></div>
     <div id="legendContainer" style="display: none; margin-top: 24px;">

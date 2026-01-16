@@ -1,6 +1,9 @@
 // グローバル変数
 let requestData = [];
 let shiftSchedule = [];
+let scheduleDrafts = [];
+let selectedDraftIndex = null;
+let lastTargetWorkDays = null;
 let nurses = [];
 let dateColumns = [];
 let mixingMatrix = null;
@@ -104,6 +107,24 @@ function isWeekend(dateStr) {
 
 function normalizeName(value) {
   return String(value || '').trim();
+}
+
+function shuffleArray(items, randomFn = Math.random) {
+  const array = [...items];
+  for (let i = array.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(randomFn() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+function createSeededRandom(seed) {
+  let value = seed % 2147483647;
+  if (value <= 0) value += 2147483646;
+  return () => {
+    value = (value * 16807) % 2147483647;
+    return (value - 1) / 2147483646;
+  };
 }
 
 function loadMixingMatrix() {
@@ -239,8 +260,9 @@ function isNightShiftEligible(nurse) {
 }
 
 // シフト表を生成
-function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, targetWorkDays) {
+function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, targetWorkDays, options = {}) {
   const schedule = [];
+  const random = options.randomFn || Math.random;
   
   // 初期化：各日のスケジュール
   dateColumns.forEach(date => {
@@ -262,7 +284,7 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
   });
 
   // 優先度の高い看護師から割り当て（有給希望など）
-  const sortedNurses = [...nurses].sort((a, b) => {
+  const sortedNurses = shuffleArray(nurses, random).sort((a, b) => {
     // 備考に有給や希望がある場合を優先
     const aPriority = (a.note.includes('有給') || a.note.includes('旅行') || a.note.includes('通院')) ? 1 : 0;
     const bPriority = (b.note.includes('有給') || b.note.includes('旅行') || b.note.includes('通院')) ? 1 : 0;
@@ -297,7 +319,7 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
     const currentSchedule = schedule.slice(0, dayIndex + 1);
     
     // 日勤を割り当て
-    const dayShiftCandidates = available
+    const dayShiftCandidates = shuffleArray(available
       .filter(n => {
         // 希望チェック（希望データがない場合はOK）
         const request = n.requests[day.date];
@@ -310,7 +332,7 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
         }
         return true;
       })
-      .sort((a, b) => {
+      , random).sort((a, b) => {
         const aStats = getNurseStats(a.name, currentSchedule);
         const bStats = getNurseStats(b.name, currentSchedule);
         // 勤務日数が少ない人、希望違反が少ない人を優先
@@ -320,7 +342,8 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
         return aStats.violations - bStats.violations;
       });
     
-    for (let i = 0; i < dayShiftRequired && i < dayShiftCandidates.length; i++) {
+    const requiredDayShift = isWeekend(day.date) ? nightShiftRequired : dayShiftRequired;
+    for (let i = 0; i < requiredDayShift && i < dayShiftCandidates.length; i++) {
       const nurse = dayShiftCandidates[i];
       const violation = checkViolation(nurse, day.date, SHIFT_TYPES.DAY, schedule, dayIndex);
       day.nurses.push({
@@ -335,7 +358,7 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
     // 夜勤を割り当て
     const assignedForDay = new Set(day.nurses.map(n => n.name));
     const availableForNight = available.filter(n => !assignedForDay.has(n.name));
-    const nightShiftCandidates = availableForNight
+    const nightShiftCandidates = shuffleArray(availableForNight
       .filter(n => {
         // 希望チェック
         const request = n.requests[day.date];
@@ -348,7 +371,7 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
         }
         return true;
       })
-      .sort((a, b) => {
+      , random).sort((a, b) => {
         const aStats = getNurseStats(a.name, currentSchedule);
         const bStats = getNurseStats(b.name, currentSchedule);
         // 夜勤回数が少ない人、勤務日数が少ない人を優先
@@ -480,13 +503,15 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
 }
 
 // シフト表を表示
-function renderShiftTable(schedule) {
-  const table = document.getElementById('shiftTable');
-  const thead = table.querySelector('thead');
-  const tbody = table.querySelector('tbody');
+function renderShiftTable(schedule, container) {
+  const target = container || document.getElementById('tableContainer');
+  if (!target) return;
 
-  thead.innerHTML = '';
-  tbody.innerHTML = '';
+  target.innerHTML = '';
+
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const tbody = document.createElement('tbody');
 
   // ヘッダー作成
   const headerRow = document.createElement('tr');
@@ -519,7 +544,7 @@ function renderShiftTable(schedule) {
       const day = schedule.find(d => d.date === date);
       const assignment = day?.nurses.find(n => n.name === nurse.name);
       const td = document.createElement('td');
-      
+
       if (assignment) {
         td.textContent = assignment.shift;
         if (assignment.shift === SHIFT_TYPES.DAY) {
@@ -536,21 +561,26 @@ function renderShiftTable(schedule) {
       } else {
         td.textContent = '?';
       }
-      
+
       if (isWeekend(date)) {
         td.classList.add('weekend');
       }
-      
+
       row.appendChild(td);
     });
 
     tbody.appendChild(row);
   });
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
+  target.appendChild(table);
 }
 
 // 統計情報を表示
-function renderStats(schedule, targetWorkDays) {
-  const statsContainer = document.getElementById('stats');
+function renderStats(schedule, targetWorkDays, container) {
+  const statsContainer = container || document.getElementById('statsContainer');
+  if (!statsContainer) return;
   statsContainer.innerHTML = '';
 
   const allStats = nurses.map(nurse => getNurseStats(nurse.name, schedule));
@@ -614,6 +644,83 @@ function renderStats(schedule, targetWorkDays) {
   `;
   detailDiv.appendChild(detailTable);
   statsContainer.appendChild(detailDiv);
+}
+
+function generateScheduleDrafts(count, dayShiftRequired, nightShiftRequired, targetWorkDays) {
+  const drafts = [];
+  const baseSeed = Date.now();
+  for (let i = 0; i < count; i += 1) {
+    const randomFn = createSeededRandom(baseSeed + (i + 1) * 9973);
+    drafts.push(generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, targetWorkDays, { randomFn }));
+  }
+  return drafts;
+}
+
+function updateDraftSelectionUI() {
+  document.querySelectorAll('.draft-card').forEach((card, index) => {
+    card.classList.toggle('selected', index === selectedDraftIndex);
+  });
+}
+
+function selectDraft(index, targetWorkDays) {
+  selectedDraftIndex = index;
+  shiftSchedule = scheduleDrafts[index];
+  lastTargetWorkDays = targetWorkDays;
+
+  renderShiftTable(shiftSchedule);
+  renderStats(shiftSchedule, lastTargetWorkDays);
+
+  const tableContainer = document.getElementById('tableContainer');
+  const statsContainer = document.getElementById('statsContainer');
+  const legendContainer = document.getElementById('legendContainer');
+  if (tableContainer) tableContainer.style.display = 'block';
+  if (statsContainer) statsContainer.style.display = 'block';
+  if (legendContainer) legendContainer.style.display = 'block';
+
+  const exportBtn = document.getElementById('exportBtn');
+  if (exportBtn) exportBtn.disabled = false;
+  updateDraftSelectionUI();
+}
+
+function renderDrafts(drafts, targetWorkDays) {
+  const container = document.getElementById('draftContainer');
+  const notice = document.getElementById('selectionNotice');
+  if (!container) return;
+
+  container.innerHTML = '';
+  if (!drafts || drafts.length === 0) {
+    container.style.display = 'none';
+    if (notice) notice.style.display = 'none';
+    return;
+  }
+
+  drafts.forEach((draft, index) => {
+    const card = document.createElement('div');
+    card.className = 'draft-card';
+
+    const selectBtn = document.createElement('button');
+    selectBtn.className = 'btn-primary';
+    selectBtn.type = 'button';
+    selectBtn.textContent = 'この案を採用';
+    selectBtn.addEventListener('click', () => selectDraft(index, targetWorkDays));
+
+    const headerWrap = document.createElement('div');
+    headerWrap.className = 'draft-header';
+    headerWrap.appendChild(document.createTextNode(`案 ${index + 1}`));
+    headerWrap.appendChild(selectBtn);
+
+    const tableWrap = document.createElement('div');
+    tableWrap.className = 'draft-table';
+    renderShiftTable(draft, tableWrap);
+
+    card.appendChild(headerWrap);
+    card.appendChild(tableWrap);
+    container.appendChild(card);
+  });
+
+  container.style.display = 'grid';
+  if (notice) notice.style.display = 'block';
+  updateDraftSelectionUI();
 }
 
 // CSVでエクスポート
@@ -724,19 +831,22 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('tableContainer').style.display = 'none';
     document.getElementById('statsContainer').style.display = 'none';
     document.getElementById('legendContainer').style.display = 'none';
+    document.getElementById('draftContainer').style.display = 'none';
+    document.getElementById('selectionNotice').style.display = 'none';
+    exportBtn.disabled = true;
 
     // 非同期で処理（UIブロックを防ぐ）
     setTimeout(() => {
       try {
-        shiftSchedule = generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, targetWorkDays);
-        renderShiftTable(shiftSchedule);
-        renderStats(shiftSchedule, targetWorkDays);
-        
-        document.getElementById('tableContainer').style.display = 'block';
-        document.getElementById('statsContainer').style.display = 'block';
-        document.getElementById('legendContainer').style.display = 'block';
+        scheduleDrafts = generateScheduleDrafts(3, dayShiftRequired, nightShiftRequired, targetWorkDays);
+        selectedDraftIndex = null;
+        shiftSchedule = [];
+        lastTargetWorkDays = targetWorkDays;
+        renderDrafts(scheduleDrafts, targetWorkDays);
+
+        document.getElementById('draftContainer').style.display = 'grid';
+        document.getElementById('selectionNotice').style.display = 'block';
         document.getElementById('loadingContainer').style.display = 'none';
-        exportBtn.disabled = false;
       } catch (error) {
         showError(`シフト表の生成に失敗しました: ${error.message}`);
         document.getElementById('loadingContainer').style.display = 'none';
@@ -746,8 +856,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // CSVでエクスポート
   exportBtn.addEventListener('click', () => {
-    if (shiftSchedule.length === 0) {
-      showError('シフト表が生成されていません');
+    if (!shiftSchedule || shiftSchedule.length === 0) {
+      showError('まず下書き案から1つを採用してください');
       return;
     }
     exportToCSV(shiftSchedule);

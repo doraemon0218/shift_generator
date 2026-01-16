@@ -1129,11 +1129,14 @@ function updateSubmitButtons() {
   const submitBtn = document.getElementById('submitBtn');
   const cancelBtn = document.getElementById('cancelSubmitBtn');
   const saveDraftBtn = document.getElementById('saveDraftBtn');
+  const deadlineStr = localStorage.getItem(DEADLINE_KEY);
+  const isDeadlinePassed = deadlineStr ? new Date(deadlineStr) < new Date() : false;
   
   if (currentData.submitted) {
     if (submitBtn) submitBtn.style.display = 'none';
     if (cancelBtn) cancelBtn.style.display = 'block';
     if (saveDraftBtn) saveDraftBtn.disabled = true;
+    if (cancelBtn) cancelBtn.disabled = isDeadlinePassed;
     
     document.querySelectorAll('.day-cell').forEach(cell => {
       if (!cell.classList.contains('empty')) {
@@ -1143,7 +1146,8 @@ function updateSubmitButtons() {
   } else {
     if (submitBtn) submitBtn.style.display = 'block';
     if (cancelBtn) cancelBtn.style.display = 'none';
-    if (saveDraftBtn) saveDraftBtn.disabled = false;
+    if (saveDraftBtn) saveDraftBtn.disabled = isDeadlinePassed;
+    if (submitBtn) submitBtn.disabled = isDeadlinePassed;
   }
 }
 
@@ -1243,6 +1247,13 @@ function saveDraft() {
 // 提出
 function submit() {
   if (!currentData) return;
+
+  const deadlineStr = localStorage.getItem(DEADLINE_KEY);
+  const isDeadlinePassed = deadlineStr ? new Date(deadlineStr) < new Date() : false;
+  if (isDeadlinePassed) {
+    alert('締め切りが過ぎているため、提出できません。');
+    return;
+  }
   
   if (!confirm('シフト希望を提出しますか？提出後は編集できなくなります。')) {
     return;

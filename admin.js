@@ -32,74 +32,6 @@ function getSageImageUri(diffMs) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(SAGE_SVGS[state])}`;
 }
 
-function normalizeMixingSymbol(value) {
-  const text = String(value || '').trim();
-  if (!text) return null;
-  if (['○', '◯', 'o', 'O'].includes(text)) return 'ok';
-  if (['△', '▲'].includes(text)) return 'avoid';
-  if (['×', 'x', 'X'].includes(text)) return 'block';
-  return null;
-}
-
-function mergeMixingStatus(current, next) {
-  const rank = { ok: 1, avoid: 2, block: 3 };
-  if (!current) return next;
-  if (!next) return current;
-  return rank[next] > rank[current] ? next : current;
-}
-
-function parseMixingMatrix(table) {
-  if (!Array.isArray(table) || table.length < 2) {
-    throw new Error('シートにデータがありません');
-  }
-
-  const headerRow = table[0].map(cell => String(cell || '').trim());
-  const pairs = {};
-  const names = [];
-
-  for (let i = 1; i < table.length; i++) {
-    const row = table[i];
-    const rowName = String(row?.[0] || '').trim();
-    if (!rowName) continue;
-    if (!pairs[rowName]) pairs[rowName] = {};
-    names.push(rowName);
-
-    for (let j = 1; j < headerRow.length; j++) {
-      const colName = String(headerRow[j] || '').trim();
-      if (!colName) continue;
-      const status = normalizeMixingSymbol(row?.[j]);
-      if (!status) continue;
-
-      pairs[rowName][colName] = mergeMixingStatus(pairs[rowName][colName], status);
-      if (!pairs[colName]) pairs[colName] = {};
-      pairs[colName][rowName] = mergeMixingStatus(pairs[colName][rowName], status);
-    }
-  }
-
-  if (names.length === 0) {
-    throw new Error('職員名が読み取れません');
-  }
-
-  return { names, pairs };
-}
-
-function updateMixingMatrixStatus() {
-  const statusEl = document.getElementById('mixingMatrixStatus');
-  if (!statusEl) return;
-  const stored = localStorage.getItem(MIXING_MATRIX_KEY);
-  if (!stored) {
-    statusEl.textContent = '未登録';
-    return;
-  }
-  try {
-    const data = JSON.parse(stored);
-    const count = data?.names?.length || 0;
-    statusEl.textContent = count > 0 ? `登録済み（${count}名）` : '登録済み';
-  } catch (error) {
-    statusEl.textContent = '登録データの読み込みに失敗しました';
-  }
-}
-
 function formatHireYearLabel(year) {
   return year ? `${year}年入職` : '入職年未登録';
 }
@@ -213,7 +145,7 @@ function renderNightPairMatrix() {
         return '<td class="pair-diagonal">-</td>';
       }
 
-      const status = getMixingStatusForPair(pairs, rowCandidate.name, colCandidate.name);
+      const status = getMixingStatusForPair(pairs, rowCandidate.name, colCandidate.name) || 'ok';
       const disabled = isReadOnlyAdminView ? 'disabled' : '';
       return `
         <td>
@@ -283,8 +215,7 @@ function saveNightPairMatrix() {
 
   const pairs = {};
   container.querySelectorAll('select.pair-select').forEach(select => {
-    const value = select.value;
-    if (!value) return;
+    const value = select.value || 'ok';
     const a = select.dataset.a;
     const b = select.dataset.b;
     if (!pairs[a]) pairs[a] = {};
@@ -295,7 +226,6 @@ function saveNightPairMatrix() {
 
   const names = nightPairCandidates.map(candidate => candidate.name);
   localStorage.setItem(MIXING_MATRIX_KEY, JSON.stringify({ names, pairs }));
-  updateMixingMatrixStatus();
   alert('相性表を保存しました');
 }
 
@@ -306,38 +236,6 @@ function clearNightPairMatrix() {
   }
   localStorage.removeItem(MIXING_MATRIX_KEY);
   renderNightPairMatrix();
-  updateMixingMatrixStatus();
-}
-
-function uploadMixingMatrix() {
-  const input = document.getElementById('mixingMatrixInput');
-  if (!input || !input.files || input.files.length === 0) {
-    alert('Excelファイルを選択してください');
-    return;
-  }
-
-  const file = input.files[0];
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    try {
-      const data = new Uint8Array(event.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const firstSheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[firstSheetName];
-      const table = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
-      const parsed = parseMixingMatrix(table);
-      localStorage.setItem(MIXING_MATRIX_KEY, JSON.stringify(parsed));
-      updateMixingMatrixStatus();
-      alert(`混ぜるな危険の対戦表を保存しました（${parsed.names.length}名）`);
-    } catch (error) {
-      console.error(error);
-      alert(`対戦表の読み込みに失敗しました: ${error.message}`);
-    }
-  };
-  reader.onerror = () => {
-    alert('ファイルの読み込みに失敗しました');
-  };
-  reader.readAsArrayBuffer(file);
 }
 
 function normalizeShiftCapability(value) {
@@ -932,7 +830,6 @@ document.addEventListener('DOMContentLoaded', () => {
   loadAdminList();
   loadNurseNightShiftSettings();
   loadValuePreferences();
-  updateMixingMatrixStatus();
   loadNightPairMatrix();
 });
 
@@ -1010,8 +907,8 @@ function updateDeadlineDisplay() {
       <div class="deadline-display-row">
         <img class="deadline-sage" id="deadlineSageAdmin" alt="仙人" />
         <div>
-          <strong>現在の締め切り:</strong> ${deadline.toLocaleString('ja-JP')}<br>
-          <strong>残り時間:</strong> ${days}日${hours}時間
+      <strong>現在の締め切り:</strong> ${deadline.toLocaleString('ja-JP')}<br>
+      <strong>残り時間:</strong> ${days}日${hours}時間
         </div>
       </div>
     `;
@@ -1021,8 +918,8 @@ function updateDeadlineDisplay() {
       <div class="deadline-display-row">
         <img class="deadline-sage" id="deadlineSageAdmin" alt="仙人" />
         <div>
-          <strong>締め切り:</strong> ${deadline.toLocaleString('ja-JP')}<br>
-          <strong>ステータス:</strong> 締め切り済み
+      <strong>締め切り:</strong> ${deadline.toLocaleString('ja-JP')}<br>
+      <strong>ステータス:</strong> 締め切り済み
         </div>
       </div>
     `;
