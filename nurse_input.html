@@ -215,6 +215,56 @@
       border-radius: 4px;
       border: 1px solid #ddd;
     }
+    .shared-requests {
+      margin-top: 32px;
+      background: #f9f9f9;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .shared-requests h3 {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+      color: #333;
+    }
+    .shared-requests p {
+      margin: 0 0 12px 0;
+      color: #666;
+      font-size: 13px;
+    }
+    .shared-requests-table-wrapper {
+      overflow-x: auto;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    .shared-requests-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 900px;
+    }
+    .shared-requests-table th,
+    .shared-requests-table td {
+      border: 1px solid #eee;
+      padding: 6px 8px;
+      text-align: center;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .shared-requests-table th {
+      background: #f1f4f8;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .shared-requests-table .name-cell {
+      text-align: left;
+      font-weight: 600;
+      background: #fafafa;
+      position: sticky;
+      left: 0;
+      z-index: 2;
+    }
     .note-section {
       margin-top: 24px;
       padding: 20px;
@@ -662,6 +712,14 @@
       <div class="calendar-month-header">2025年8月</div>
       <div class="calendar-grid" id="calendarGrid">
         <!-- カレンダーは動的に生成されます -->
+      </div>
+    </div>
+
+    <div class="shared-requests">
+      <h3>👀 みんなの勤務希望</h3>
+      <p>登録ユーザー同士で勤務希望を共有して、希望の重なりを抑えやすくします。</p>
+      <div class="shared-requests-table-wrapper">
+        <div id="sharedRequestsTable"></div>
       </div>
     </div>
 

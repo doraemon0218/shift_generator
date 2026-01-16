@@ -78,6 +78,12 @@ let quickOptionsHideTimeout = null;
 let quickOptionsInitialized = false;
 let quickPointer = { x: null, y: null };
 
+function getUserDirectory() {
+  const USER_STORAGE_KEY = 'shift_system_users';
+  const stored = localStorage.getItem(USER_STORAGE_KEY);
+  return stored ? JSON.parse(stored) : {};
+}
+
 function normalizeShiftCapability(value) {
   if (value === SHIFT_CAPABILITIES.NIGHT || value === SHIFT_CAPABILITIES.LATE || value === SHIFT_CAPABILITIES.DAY) {
     return value;
@@ -242,6 +248,7 @@ function showCalendarPage() {
   // カレンダーを初期化
   initCalendar();
   updateStatus();
+  loadSharedRequestsTable();
 }
 
 // データの読み込み
@@ -484,6 +491,17 @@ function getRequestTypeLabelShort(requestType) {
   return preset ? preset.label : '未入力';
 }
 
+function getRequestTypeLabelCompact(requestType) {
+  const labels = {
+    'available': '勤務OK',
+    'day-only': '日勤のみ',
+    'day-late': '日勤+遅出',
+    'night-only': '夜勤のみ',
+    'paid-leave': '公休希望'
+  };
+  return labels[requestType] || '未入力';
+}
+
 // 希望タイプのラベルを取得
 function getRequestTypeLabel(requestType) {
   const preset = REQUEST_OPTION_PRESETS[requestType];
@@ -525,6 +543,76 @@ function getAllowedRequestKeys() {
     return ['available', 'day-only', 'day-late', 'night-only', 'paid-leave'];
   }
   return ['day-only', 'paid-leave'];
+}
+
+function loadSharedRequestsTable() {
+  const container = document.getElementById('sharedRequestsTable');
+  if (!container) return;
+
+  const users = getUserDirectory();
+  const allKeys = Object.keys(localStorage);
+  const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
+  const nurseMap = new Map();
+
+  requestKeys.forEach(key => {
+    const userKey = key.replace(STORAGE_KEY_PREFIX, '');
+    const dataStr = localStorage.getItem(key);
+    if (!dataStr) return;
+    try {
+      const data = JSON.parse(dataStr);
+      const userInfo = users[userKey] || {};
+      const name = data.nurseName || userInfo.fullName || userKey;
+      nurseMap.set(userKey, {
+        name,
+        requests: data.requests || {}
+      });
+    } catch (error) {
+      console.error('Failed to parse shift request data', error);
+    }
+  });
+
+  Object.keys(users).forEach(userKey => {
+    if (nurseMap.has(userKey)) return;
+    const user = users[userKey];
+    nurseMap.set(userKey, {
+      name: user.fullName || userKey,
+      requests: {}
+    });
+  });
+
+  const nurseList = Array.from(nurseMap.values()).sort((a, b) => {
+    return a.name.localeCompare(b.name, 'ja');
+  });
+
+  if (nurseList.length === 0) {
+    container.innerHTML = '<p style="color:#666; padding: 12px;">共有できる勤務希望がありません。</p>';
+    return;
+  }
+
+  const headerCells = dates.map(date => `<th>${date}</th>`).join('');
+  const rows = nurseList.map(nurse => {
+    const cells = dates.map(date => {
+      const request = normalizeRequestType(nurse.requests[date]);
+      const label = request ? getRequestTypeLabelCompact(request) : '未入力';
+      const fullLabel = request ? getRequestTypeLabel(request) : '未入力';
+      return `<td title="${fullLabel}">${label}</td>`;
+    }).join('');
+    return `<tr><td class="name-cell">${nurse.name}</td>${cells}</tr>`;
+  }).join('');
+
+  container.innerHTML = `
+    <table class="shared-requests-table">
+      <thead>
+        <tr>
+          <th class="name-cell">氏名</th>
+          ${headerCells}
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+  `;
 }
 
 function ensureQuickOptionsContainer() {
@@ -863,6 +951,7 @@ function setRequest(date, requestType) {
   // 自動保存
   saveData();
   updateProgress();
+  loadSharedRequestsTable();
   hideQuickOptions(true);
   closeSelectionModal();
 }
