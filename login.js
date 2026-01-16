@@ -179,13 +179,25 @@ function handleLogin(event) {
   
   // 管理者かどうか確認
   let adminUsers = getAdminUsers();
-  let isAdmin = adminUsers.includes(email);
+  let isAdmin = false;
   
-  // 初回ログイン時、管理者が設定されていない場合は最初のユーザーを管理者にする
-  if (adminUsers.length === 0) {
-    adminUsers.push(email);
-    saveAdminUsers(adminUsers);
+  // デモ環境：全ユーザーを管理者にする
+  if (ENABLE_DEMO_ADMIN_FOR_ALL) {
     isAdmin = true;
+    // 管理者リストに追加（まだ登録されていない場合）
+    if (!adminUsers.includes(email)) {
+      adminUsers.push(email);
+      saveAdminUsers(adminUsers);
+    }
+  } else {
+    // 通常環境：管理者リストを確認
+    isAdmin = adminUsers.includes(email);
+    // 初回ログイン時、管理者が設定されていない場合は最初のユーザーを管理者にする
+    if (adminUsers.length === 0) {
+      adminUsers.push(email);
+      saveAdminUsers(adminUsers);
+      isAdmin = true;
+    }
   }
   
   // 既存ユーザーのデータを使用

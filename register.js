@@ -3,6 +3,7 @@ const USER_STORAGE_KEY = 'shift_system_users';
 const CURRENT_USER_KEY = 'current_user';
 const ADMIN_USERS_KEY = 'admin_users';
 const ADMIN_REQUESTS_KEY = 'admin_requests';
+const ENABLE_DEMO_ADMIN_FOR_ALL = true; // デモ環境：全ユーザーを管理者にする
 
 // ユーザーデータを取得
 function getUsers() {
@@ -215,10 +216,22 @@ function handleRegister(event) {
   let adminUsers = getAdminUsers();
   let isAdmin = false;
   
-  if (adminUsers.length === 0) {
-    adminUsers.push(email);
-    saveAdminUsers(adminUsers);
+  // デモ環境：全ユーザーを管理者にする
+  if (ENABLE_DEMO_ADMIN_FOR_ALL) {
     isAdmin = true;
+    // 管理者リストに追加（まだ登録されていない場合）
+    if (!adminUsers.includes(email)) {
+      adminUsers.push(email);
+      saveAdminUsers(adminUsers);
+    }
+  } else {
+    if (adminUsers.length === 0) {
+      adminUsers.push(email);
+      saveAdminUsers(adminUsers);
+      isAdmin = true;
+    } else {
+      isAdmin = adminUsers.includes(email);
+    }
   }
 
   const adminRequests = getAdminRequests();
