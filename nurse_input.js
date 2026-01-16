@@ -1267,18 +1267,27 @@ function cancelSubmit() {
 
 // 設定ページを開く
 function openSettingsPage() {
-  if (!currentData) return;
+  if (!currentData) {
+    console.warn('currentData is not loaded yet');
+    return;
+  }
   
   const settingsModal = document.getElementById('settingsModal');
-  if (!settingsModal) return;
+  if (!settingsModal) {
+    console.error('settingsModal element not found');
+    return;
+  }
   
+  // 現在の価値観設定を反映
   const currentValue = currentData.preferences ? currentData.preferences.valuePreference : null;
   const radios = document.querySelectorAll('input[name="valuePreference"]');
   radios.forEach(radio => {
     radio.checked = radio.value === currentValue;
   });
   
+  // モーダルを表示
   settingsModal.classList.add('active');
+  document.body.style.overflow = 'hidden'; // 背景スクロールを無効化
 }
 
 // 設定ページを閉じる
