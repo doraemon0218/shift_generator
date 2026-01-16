@@ -271,8 +271,7 @@ function loadData() {
 
   // 提出状態を確認
   if (currentUser) {
-    const user = JSON.parse(currentUser);
-    const userKeyForSubmit = user.userKey || currentNurse;
+    const userKeyForSubmit = getCurrentUserKey() || currentNurse;
     const submittedKey = SUBMITTED_KEY_PREFIX + userKeyForSubmit;
     const isSubmitted = localStorage.getItem(submittedKey) === 'true';
     currentData.submitted = isSubmitted;
