@@ -287,7 +287,6 @@ function loadNurseNightShiftSettings() {
       <table style="width: 100%; border-collapse: collapse; min-width: 640px;">
         <thead>
           <tr style="background: #f8f9fa; border-bottom: 2px solid #ddd;">
-            <th style="padding: 12px; text-align: left;">入職年</th>
             <th style="padding: 12px; text-align: left;">看護師名</th>
             <th style="padding: 12px; text-align: left;">夜勤設定</th>
             <th style="padding: 12px; text-align: left;">操作</th>
@@ -295,7 +294,6 @@ function loadNurseNightShiftSettings() {
         </thead>
         <tbody>
           ${nurseList.map(nurse => {
-            const yearLabel = nurse.hireYear ? `${nurse.hireYear}年` : '未登録';
             const adminSetting = nurse.adminShiftCapability;
             let statusLabel;
             let statusColor;
@@ -315,7 +313,6 @@ function loadNurseNightShiftSettings() {
 
             return `
               <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 12px; white-space: nowrap;">${yearLabel}</td>
                 <td style="padding: 12px;">${nurse.name}</td>
                 <td style="padding: 12px;">
                   <span id="nightShiftStatus_${nurse.userKey}" style="color: ${statusColor}; font-weight: 600;">
@@ -408,9 +405,6 @@ function loadValuePreferences() {
     userKey,
     ...value
   })).sort((a, b) => {
-    const yearA = a.hireYear ?? Number.MAX_SAFE_INTEGER;
-    const yearB = b.hireYear ?? Number.MAX_SAFE_INTEGER;
-    if (yearA !== yearB) return yearA - yearB;
     return a.name.localeCompare(b.name, 'ja');
   });
 
@@ -421,7 +415,6 @@ function loadValuePreferences() {
 
   container.innerHTML = preferenceList.map(item => {
     const info = item.preference ? VALUE_PREFERENCE_OPTIONS[item.preference] : null;
-    const hireYearLabel = item.hireYear ? `${item.hireYear}年入職` : '入職年: 未登録';
     if (!info) {
       return `
         <div class="value-card value-empty">
@@ -429,7 +422,6 @@ function loadValuePreferences() {
           <div>
             <div class="value-name">${item.name}</div>
             <div class="value-desc">価値観はまだ設定されていません</div>
-            <div class="value-meta">${hireYearLabel}</div>
           </div>
         </div>
       `;
@@ -442,7 +434,6 @@ function loadValuePreferences() {
           <div class="value-name">${item.name}</div>
           <div class="value-label">${info.label}</div>
           <div class="value-desc">${info.description}</div>
-          <div class="value-meta">${hireYearLabel}</div>
         </div>
       </div>
     `;
@@ -779,10 +770,9 @@ function loadSubmissionStatus() {
     if (nurseList.length > 0) {
       nurseListContainer.style.display = 'block';
       nurseListContainer.innerHTML = nurseList.map(nurse => {
-        const hireYearLabel = nurse.hireYear ? `${nurse.hireYear}年入職` : '入職年未登録';
         return `
           <div class="nurse-item">
-            <span>${hireYearLabel}｜${nurse.name}</span>
+            <span>${nurse.name}</span>
             <span class="badge ${nurse.submitted ? 'badge-success' : 'badge-warning'}">
               ${nurse.submitted ? '提出済み' : '未提出'}
             </span>
