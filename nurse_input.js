@@ -690,9 +690,13 @@ function loadSharedRequestsTable() {
       const data = JSON.parse(dataStr);
       const userInfo = users[userKey] || {};
       const name = data.nurseName || userInfo.fullName || userKey;
+      const hireYear = typeof userInfo.hireYear === 'number' ? userInfo.hireYear : null;
+      const shiftCapability = resolveShiftCapability(data, userInfo);
       nurseMap.set(userKey, {
         name,
-        requests: data.requests || {}
+        requests: data.requests || {},
+        hireYear,
+        shiftCapability
       });
     } catch (error) {
       console.error('Failed to parse shift request data', error);
@@ -702,13 +706,23 @@ function loadSharedRequestsTable() {
   Object.keys(users).forEach(userKey => {
     if (nurseMap.has(userKey)) return;
     const user = users[userKey];
+    const hireYear = typeof user?.hireYear === 'number' ? user.hireYear : null;
+    const shiftCapability = resolveShiftCapability(null, user);
     nurseMap.set(userKey, {
       name: user.fullName || userKey,
-      requests: {}
+      requests: {},
+      hireYear,
+      shiftCapability
     });
   });
 
   const nurseList = Array.from(nurseMap.values()).sort((a, b) => {
+    const nightA = a.shiftCapability === SHIFT_CAPABILITIES.DAY_NIGHT || a.shiftCapability === SHIFT_CAPABILITIES.ALL;
+    const nightB = b.shiftCapability === SHIFT_CAPABILITIES.DAY_NIGHT || b.shiftCapability === SHIFT_CAPABILITIES.ALL;
+    if (nightA !== nightB) return nightA ? -1 : 1;
+    const yearA = a.hireYear ?? Number.MAX_SAFE_INTEGER;
+    const yearB = b.hireYear ?? Number.MAX_SAFE_INTEGER;
+    if (yearA !== yearB) return yearA - yearB;
     return a.name.localeCompare(b.name, 'ja');
   });
 
@@ -723,7 +737,14 @@ function loadSharedRequestsTable() {
       const request = normalizeRequestType(nurse.requests[date]);
       const label = request ? getRequestTypeLabelCompact(request) : '未入力';
       const fullLabel = request ? getRequestTypeLabel(request) : '未入力';
-      return `<td title="${fullLabel}">${label}</td>`;
+      const classes = [];
+      if (request === REQUEST_TYPES.PAID_LEAVE) {
+        classes.push('shared-leave');
+      } else if (isNightUnavailableRequest(request)) {
+        classes.push('shared-night-off');
+      }
+      const classAttr = classes.length ? ` class="${classes.join(' ')}"` : '';
+      return `<td${classAttr} title="${fullLabel}">${label}</td>`;
     }).join('');
     return `<tr><td class="name-cell">${nurse.name}</td>${cells}</tr>`;
   }).join('');
