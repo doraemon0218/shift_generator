@@ -783,7 +783,6 @@ function loadAllNurseRequests() {
     if (!isReadOnlyAdminView) {
       html += `<button onclick="editNurseRequest('${nurse.userKey}')" style="padding: 4px 8px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin: 2px;">編集</button>`;
       html += `<button onclick="deleteNurseData('${nurse.userKey}')" style="padding: 4px 8px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin: 2px;">希望削除</button>`;
-      html += `<button onclick="deleteNurseAccount('${nurse.userKey}')" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin: 2px;">アカウント削除</button>`;
     } else {
       html += '<span style="color: #999;">閲覧のみ</span>';
     }
@@ -1040,10 +1039,12 @@ function loadSubmissionStatus() {
   
   // トグル機能：既に表示されている場合は非表示にする
   const btn = document.getElementById('submissionStatusBtn');
+  const bulkDeleteSection = document.getElementById('bulkDeleteSection');
   const isVisible = statusGrid && statusGrid.style.display !== 'none' && statusGrid.innerHTML.trim() !== '';
   if (isVisible) {
     if (statusGrid) statusGrid.style.display = 'none';
     if (nurseListContainer) nurseListContainer.style.display = 'none';
+    if (bulkDeleteSection) bulkDeleteSection.style.display = 'none';
     if (btn) btn.textContent = '提出状況を表示';
     return;
   }
@@ -1118,20 +1119,232 @@ function loadSubmissionStatus() {
   if (nurseListContainer) {
     if (nurseList.length > 0) {
       nurseListContainer.style.display = 'block';
-      nurseListContainer.innerHTML = nurseList.map(nurse => {
-        return `
-          <div class="nurse-item">
-            <span>${nurse.name}</span>
-            <span class="badge ${nurse.submitted ? 'badge-success' : 'badge-warning'}">
-              ${nurse.submitted ? '提出済み' : '未提出'}
-            </span>
-          </div>
+      
+      // コンパクトなテーブル形式で表示（スクロールなし）
+      let html = `
+        <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 12px; max-height: 600px; overflow-y: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <thead>
+              <tr style="background: #f8f9fa; border-bottom: 2px solid #ddd; position: sticky; top: 0;">
+                <th style="padding: 8px; text-align: left; width: 40px;">
+                  <input type="checkbox" id="selectAllNurses" onchange="toggleAllNurses(this.checked)" style="cursor: pointer;" />
+                </th>
+                <th style="padding: 8px; text-align: left; width: 150px;">看護師名</th>
+                <th style="padding: 8px; text-align: center; width: 80px;">提出状況</th>
+                <th style="padding: 8px; text-align: left; width: 100px;">夜勤設定</th>
+                <th style="padding: 8px; text-align: left; width: 200px;">価値観</th>
+                <th style="padding: 8px; text-align: center; width: 80px;">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      
+      nurseList.forEach(nurse => {
+        // 夜勤設定を取得
+        const storageKey = STORAGE_KEY_PREFIX + nurse.userKey;
+        const dataStr = localStorage.getItem(storageKey);
+        let shiftCapability = null;
+        if (dataStr) {
+          try {
+            const data = JSON.parse(dataStr);
+            shiftCapability = data.shiftCapability;
+          } catch (error) {
+            // エラー無視
+          }
+        }
+        const userInfo = users[nurse.userKey] || {};
+        if (!shiftCapability) {
+          shiftCapability = userInfo.initialShiftCapability;
+        }
+        
+        let shiftCapabilityLabel = '未設定';
+        if (shiftCapability === SHIFT_CAPABILITIES.DAY_ONLY) {
+          shiftCapabilityLabel = '日勤のみ';
+        } else if (shiftCapability === SHIFT_CAPABILITIES.DAY_LATE) {
+          shiftCapabilityLabel = '日勤＋遅出';
+        } else if (shiftCapability === SHIFT_CAPABILITIES.DAY_NIGHT) {
+          shiftCapabilityLabel = '日勤＋夜勤';
+        } else if (shiftCapability === SHIFT_CAPABILITIES.ALL) {
+          shiftCapabilityLabel = '全部する';
+        }
+        
+        // 価値観を取得
+        let valuePreferenceLabel = '未設定';
+        if (dataStr) {
+          try {
+            const data = JSON.parse(dataStr);
+            if (data.preferences && data.preferences.valuePreference) {
+              const pref = VALUE_PREFERENCE_OPTIONS[data.preferences.valuePreference];
+              if (pref) {
+                valuePreferenceLabel = `${pref.icon} ${pref.label}`;
+              }
+            }
+          } catch (error) {
+            // エラー無視
+          }
+        }
+        
+        html += `
+          <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding: 8px; text-align: center;">
+              <input type="checkbox" class="nurse-checkbox" value="${nurse.userKey}" data-name="${nurse.name}" onchange="updateSelectedCount()" />
+            </td>
+            <td style="padding: 8px; font-weight: 600;">${nurse.name}</td>
+            <td style="padding: 8px; text-align: center;">
+              <span style="padding: 4px 8px; border-radius: 4px; font-size: 11px; ${nurse.submitted ? 'background: #28a745; color: white;' : 'background: #ffc107; color: #856404;'}">
+                ${nurse.submitted ? '提出済み' : '未提出'}
+              </span>
+            </td>
+            <td style="padding: 8px; font-size: 11px;">${shiftCapabilityLabel}</td>
+            <td style="padding: 8px; font-size: 11px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${valuePreferenceLabel}">${valuePreferenceLabel}</td>
+            <td style="padding: 8px; text-align: center;">
+              ${isReadOnlyAdminView ? '<span style="color: #999;">閲覧のみ</span>' : `
+                <button onclick="editNurseRequest('${nurse.userKey}')" style="padding: 4px 8px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">編集</button>
+              `}
+            </td>
+          </tr>
         `;
-      }).join('');
+      });
+      
+      html += `
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      nurseListContainer.innerHTML = html;
+      
+      // 一括削除セクションを表示
+      const bulkDeleteSection = document.getElementById('bulkDeleteSection');
+      if (bulkDeleteSection) {
+        bulkDeleteSection.style.display = 'block';
+      }
+      
+      updateSelectedCount();
     } else {
       nurseListContainer.style.display = 'none';
+      const bulkDeleteSection = document.getElementById('bulkDeleteSection');
+      if (bulkDeleteSection) {
+        bulkDeleteSection.style.display = 'none';
+      }
     }
   }
+}
+
+// 全選択/全解除
+function toggleAllNurses(checked) {
+  const checkboxes = document.querySelectorAll('.nurse-checkbox');
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = checked;
+  });
+  updateSelectedCount();
+}
+
+// 選択数を更新
+function updateSelectedCount() {
+  const checkboxes = document.querySelectorAll('.nurse-checkbox:checked');
+  const selectedCount = document.getElementById('selectedCount');
+  if (selectedCount) {
+    selectedCount.textContent = `選択中: ${checkboxes.length}名`;
+  }
+}
+
+// 選択したアカウントを一括削除
+function deleteSelectedAccounts() {
+  if (isReadOnlyAdminView) {
+    alert('閲覧モードでは編集できません');
+    return;
+  }
+
+  const checkboxes = document.querySelectorAll('.nurse-checkbox:checked');
+  if (checkboxes.length === 0) {
+    alert('削除するアカウントを選択してください');
+    return;
+  }
+
+  const selectedNames = Array.from(checkboxes).map(cb => cb.dataset.name);
+  const selectedUserKeys = Array.from(checkboxes).map(cb => cb.value);
+  
+  const message = `以下の${selectedUserKeys.length}名のアカウントを完全に削除しますか？\n\n${selectedNames.join('\n')}\n\n削除される内容：\n- アカウント情報\n- シフト希望データ\n- 提出状況\n- 価値観設定\n- 勤務対応設定\n- 管理者権限（該当する場合）\n- 通知データ\n\nこの操作は取り消せません。`;
+  
+  if (!confirm(message)) {
+    return;
+  }
+
+  const currentUser = getCurrentUser();
+  let loggedOutUser = false;
+
+  // 選択されたアカウントを削除
+  selectedUserKeys.forEach(userKey => {
+    const users = getUserDirectory();
+    const user = users[userKey];
+    if (!user) return;
+
+    const displayName = user.fullName || userKey;
+    const email = user.email || '';
+
+    // 現在ログイン中のユーザーを削除する場合
+    if (currentUser && (currentUser.userKey === userKey || currentUser.email === email)) {
+      loggedOutUser = true;
+    }
+
+    // シフト希望データを削除
+    const storageKey = STORAGE_KEY_PREFIX + userKey;
+    localStorage.removeItem(storageKey);
+
+    // 提出状況を削除
+    const submittedKey = SUBMITTED_KEY_PREFIX + userKey;
+    localStorage.removeItem(submittedKey);
+
+    // 通知データを削除
+    if (email) {
+      const notificationPrefix = `notification_sent_${email}_`;
+      const keysToDelete = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(notificationPrefix)) {
+          keysToDelete.push(key);
+        }
+      }
+      keysToDelete.forEach(key => localStorage.removeItem(key));
+    }
+
+    // 管理者リストから削除
+    if (email) {
+      const adminUsers = getAdminUsers();
+      const filteredAdmins = adminUsers.filter(adminEmail => adminEmail !== email);
+      if (filteredAdmins.length !== adminUsers.length) {
+        saveAdminUsers(filteredAdmins);
+      }
+
+      // 管理者申請からも削除
+      const adminRequests = getAdminRequests();
+      const filteredRequests = adminRequests.filter(request => request.email !== email);
+      if (filteredRequests.length !== adminRequests.length) {
+        saveAdminRequests(filteredRequests);
+      }
+    }
+
+    // ユーザー情報から削除
+    delete users[userKey];
+    saveUsers(users);
+  });
+
+  alert(`${selectedUserKeys.length}名のアカウントを削除しました`);
+
+  // 現在ログイン中のユーザーを削除した場合はログアウト
+  if (loggedOutUser) {
+    localStorage.removeItem(CURRENT_USER_KEY);
+    window.location.href = 'index.html';
+    return;
+  }
+
+  // 画面を更新（同じ位置を保持）
+  loadSubmissionStatus();
+  loadNurseNightShiftSettings();
+  loadValuePreferences();
+  loadAllNurseRequests();
+  loadAdminList();
 }
 
 // 全希望データをCSVでエクスポート

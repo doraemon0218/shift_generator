@@ -314,9 +314,16 @@
     <!-- 提出状況確認セクション -->
     <div class="section">
       <div class="section-title">📊 提出状況確認</div>
+      <p style="color: #666; margin-bottom: 16px;">全看護師の提出状況を一覧で確認できます。チェックボックスで選択してアカウントを一括削除できます。</p>
       <button onclick="loadSubmissionStatus()" id="submissionStatusBtn">提出状況を表示</button>
       <div class="status-grid" id="statusGrid" style="display: none;"></div>
-      <div id="nurseList" class="nurse-list" style="display: none; margin-top: 16px;"></div>
+      <div id="nurseList" style="display: none; margin-top: 16px;"></div>
+      <div id="bulkDeleteSection" style="display: none; margin-top: 16px; padding: 16px; background: #fff3cd; border-radius: 8px; border: 1px solid #ffc107;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <span id="selectedCount" style="font-weight: 600; color: #856404;">選択中: 0名</span>
+          <button onclick="deleteSelectedAccounts()" class="btn-danger" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">選択したアカウントを削除</button>
+        </div>
+      </div>
     </div>
 
     <!-- 夜勤設定セクション -->
