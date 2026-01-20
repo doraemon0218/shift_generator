@@ -180,21 +180,49 @@ function removeAdmin(email) {
 function loadAdminList() {
   const admins = getAdminUsers();
   const container = document.getElementById('adminList');
+  const users = getUserDirectory();
   
   if (admins.length === 0) {
     container.innerHTML = '<p style="color: #666;">管理者が設定されていません</p>';
     return;
   }
   
+  // 管理者のメールアドレスからユーザー情報を取得
+  const adminUserList = admins.map(email => {
+    // メールアドレスでユーザーを検索
+    let userInfo = null;
+    let userKey = null;
+    for (const [key, user] of Object.entries(users)) {
+      if (user.email === email) {
+        userInfo = user;
+        userKey = key;
+        break;
+      }
+    }
+    
+    return {
+      email,
+      userInfo,
+      userKey,
+      displayName: userInfo ? userInfo.fullName : email
+    };
+  });
+  
   container.innerHTML = `
     <div style="background: white; border: 1px solid #ddd; border-radius: 6px; padding: 12px;">
       <strong style="display: block; margin-bottom: 8px;">登録されている管理者:</strong>
-      ${admins.map(email => `
+      ${adminUserList.map(admin => `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee;">
-          <span>${email}</span>
-          ${isReadOnlyAdminView ? '' : `
-            <button onclick="removeAdmin('${email}')" style="padding: 4px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">削除</button>
-          `}
+          <div style="flex: 1;">
+            <div style="font-weight: 600;">${admin.displayName}</div>
+            <div style="font-size: 12px; color: #666;">${admin.email}</div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            ${isReadOnlyAdminView ? '' : `
+              <button onclick="removeAdmin('${admin.email}')" style="padding: 4px 12px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;" title="管理者権限を削除">管理者削除</button>
+              ${admin.userKey ? `<button onclick="deleteNurseAccount('${admin.userKey}')" style="padding: 4px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;" title="アカウントを完全に削除">アカウント削除</button>` : ''}
+            `}
+          </div>
         </div>
       `).join('')}
     </div>

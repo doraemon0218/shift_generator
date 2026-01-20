@@ -355,6 +355,7 @@ function updateNightShiftStatusInHeader() {
   const badge = document.getElementById('currentUserNightShiftStatus');
   if (!badge || !currentData) return;
   
+  const currentUser = getCurrentUser();
   const shiftCapability = resolveShiftCapability(currentData, currentUser);
   
   if (shiftCapability === SHIFT_CAPABILITIES.DAY_NIGHT || shiftCapability === SHIFT_CAPABILITIES.ALL) {
@@ -1402,7 +1403,11 @@ function goToTop() {
 document.addEventListener('DOMContentLoaded', () => {
   // ログイン状態を確認
   autoLogin();
-  initQuickOptions();
+  
+  // 少し遅延してからクイックオプションを初期化（カレンダーが表示された後）
+  setTimeout(() => {
+    initQuickOptions();
+  }, 200);
   
   // 下書き保存ボタン
   const saveDraftBtn = document.getElementById('saveDraftBtn');

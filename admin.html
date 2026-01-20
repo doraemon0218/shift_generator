@@ -355,7 +355,13 @@
         <input type="email" id="adminEmailInput" placeholder="admin@example.com" class="admin-action" style="width: 100%; max-width: 400px;" />
         <button onclick="addAdmin()" class="admin-action" style="margin-left: 8px;">管理者を追加</button>
       </div>
-      <div id="adminList" style="margin-top: 16px;"></div>
+      <div class="form-group" style="margin-top: 24px;">
+        <label style="font-weight: 600; margin-bottom: 12px; display: block;">登録されている管理者アカウント一覧</label>
+        <p style="color: #666; font-size: 13px; margin-bottom: 12px;">
+          管理者アカウントの一覧です。「管理者削除」で管理者権限のみを削除、「アカウント削除」でアカウントを完全に削除します。
+        </p>
+        <div id="adminList" style="margin-top: 8px;"></div>
+      </div>
     </div>
 
     <!-- CSVエクスポートセクション -->
