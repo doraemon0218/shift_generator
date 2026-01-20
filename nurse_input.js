@@ -126,20 +126,43 @@ function checkLoginStatus() {
 
 // 自動ログイン
 function autoLogin() {
-  if (!checkLoginStatus()) {
-    window.location.href = 'index.html';
-    return;
+  try {
+    if (!checkLoginStatus()) {
+      window.location.href = 'index.html';
+      return;
+    }
+    
+    // メインコンテンツを表示
+    const mainContent = document.getElementById('mainContent');
+    if (mainContent) {
+      mainContent.style.display = 'block';
+    }
+    
+    // データを読み込み
+    loadData();
+    
+    // currentDataが確実に設定されるまで待つ
+    if (!currentData) {
+      console.error('currentData is null after loadData()');
+      // 再試行
+      setTimeout(() => {
+        if (!currentData) {
+          loadData();
+        }
+        initializePage();
+      }, 100);
+      return;
+    }
+    
+    initializePage();
+  } catch (error) {
+    console.error('Error in autoLogin:', error);
+    alert('ページの読み込みでエラーが発生しました。ページを再読み込みしてください。');
   }
-  
-  // データを読み込み
-  loadData();
-  
-  // メインコンテンツを表示
-  const mainContent = document.getElementById('mainContent');
-  if (mainContent) {
-    mainContent.style.display = 'block';
-  }
-  
+}
+
+// ページの初期化
+function initializePage() {
   // URLパラメータでページを判定
   const urlParams = new URLSearchParams(window.location.search);
   const page = urlParams.get('page');
@@ -154,19 +177,19 @@ function autoLogin() {
     const settingsBtn = document.getElementById('settingsBtn');
     if (settingsBtn) settingsBtn.style.display = 'none';
     
-    // データ読み込み完了後に設定モーダルを開く
-    setTimeout(() => {
-      if (currentData) {
-        openSettingsPage();
-      } else {
-        // データがまだ読み込まれていない場合は再試行
-        setTimeout(() => {
-          if (currentData) {
-            openSettingsPage();
-          }
-        }, 200);
-      }
-    }, 100);
+    // 設定モーダルを開く
+    if (currentData) {
+      openSettingsPage();
+    } else {
+      // データがまだ読み込まれていない場合は再試行
+      setTimeout(() => {
+        if (currentData) {
+          openSettingsPage();
+        } else {
+          console.error('currentData is still null after retry');
+        }
+      }, 200);
+    }
   } else {
     // 通常の希望入力ページ
     showCalendarPage();
@@ -345,7 +368,19 @@ function saveData() {
 // カレンダーの初期化
 function initCalendar() {
   const calendarGrid = document.getElementById('calendarGrid');
-  if (!calendarGrid || !currentData) return;
+  if (!calendarGrid) {
+    console.error('calendarGrid element not found');
+    return;
+  }
+  if (!currentData) {
+    console.error('currentData is null in initCalendar');
+    // currentDataがnullの場合は初期化を試みる
+    loadData();
+    if (!currentData) {
+      console.error('currentData is still null after loadData()');
+      return;
+    }
+  }
 
   hideQuickOptions(true);
   calendarGrid.innerHTML = '';
@@ -1265,8 +1300,13 @@ function cancelSubmit() {
 // 設定ページを開く
 function openSettingsPage() {
   if (!currentData) {
-    console.warn('currentData is not loaded yet');
-    return;
+    console.warn('currentData is not loaded yet, attempting to load...');
+    loadData();
+    if (!currentData) {
+      console.error('Failed to load currentData');
+      alert('データの読み込みに失敗しました。ページを再読み込みしてください。');
+      return;
+    }
   }
   
   const settingsModal = document.getElementById('settingsModal');

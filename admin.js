@@ -530,6 +530,211 @@ function deleteNurseData(userKey) {
   loadValuePreferences();
 }
 
+// 全看護師の勤務希望・価値観を一括管理
+function loadAllNurseRequests() {
+  const container = document.getElementById('allNurseRequestsContainer');
+  if (!container) return;
+
+  // トグル機能
+  const btn = document.getElementById('allNurseRequestsBtn');
+  if (container.style.display !== 'none' && container.innerHTML.trim() !== '') {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    if (btn) btn.textContent = '一括管理画面を表示';
+    return;
+  }
+
+  container.style.display = 'block';
+  if (btn) btn.textContent = '一括管理画面を非表示';
+
+  const allKeys = Object.keys(localStorage);
+  const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
+  const users = getUserDirectory();
+
+  if (requestKeys.length === 0) {
+    container.innerHTML = '<p style="color: #666;">登録されている勤務希望データがありません</p>';
+    return;
+  }
+
+  // 日付リスト（2025年8月）
+  const dates = [];
+  for (let i = 1; i <= 31; i++) {
+    dates.push(`8/${i}`);
+  }
+
+  const nurseDataList = [];
+  requestKeys.forEach(key => {
+    const userKey = key.replace(STORAGE_KEY_PREFIX, '');
+    const dataStr = localStorage.getItem(key);
+    if (!dataStr) return;
+
+    try {
+      const data = JSON.parse(dataStr);
+      const userInfo = users[userKey] || {};
+      const displayName = data.nurseName || userInfo.fullName || userKey;
+      const submittedKey = SUBMITTED_KEY_PREFIX + userKey;
+      const isSubmitted = localStorage.getItem(submittedKey) === 'true';
+
+      nurseDataList.push({
+        userKey,
+        name: displayName,
+        data,
+        isSubmitted,
+        userInfo
+      });
+    } catch (error) {
+      console.error('Failed to parse data for', userKey, error);
+    }
+  });
+
+  // 名前順にソート
+  nurseDataList.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+
+  let html = '<div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 16px; overflow-x: auto;">';
+  html += '<table style="width: 100%; border-collapse: collapse; min-width: 1200px; font-size: 13px;">';
+  html += '<thead><tr style="background: #f8f9fa; border-bottom: 2px solid #ddd; position: sticky; top: 0;">';
+  html += '<th style="padding: 10px; text-align: left; width: 120px;">看護師名</th>';
+  html += '<th style="padding: 10px; text-align: center; width: 80px;">提出</th>';
+  html += '<th style="padding: 10px; text-align: left; width: 150px;">価値観</th>';
+  
+  // 日付ヘッダー（1-31日）
+  dates.forEach((date, idx) => {
+    const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][new Date(2025, 7, idx + 1).getDay()];
+    const isWeekend = dayOfWeek === '日' || dayOfWeek === '土';
+    html += `<th style="padding: 8px 4px; text-align: center; width: 35px; ${isWeekend ? 'background: #fff3cd;' : ''}" title="${date}">${idx + 1}<br><small style="color: #666;">${dayOfWeek}</small></th>`;
+  });
+  
+  html += '<th style="padding: 10px; text-align: left; width: 200px;">備考</th>';
+  html += '<th style="padding: 10px; text-align: center; width: 100px;">操作</th>';
+  html += '</tr></thead><tbody>';
+
+  const requestTypeColors = {
+    [REQUEST_TYPES.AVAILABLE]: '#d4edda',
+    [REQUEST_TYPES.DAY_ONLY]: '#fff3cd',
+    [REQUEST_TYPES.DAY_LATE]: '#d1ecf1',
+    [REQUEST_TYPES.NIGHT_ONLY]: '#e4ddff',
+    [REQUEST_TYPES.PAID_LEAVE]: '#f8d7da'
+  };
+
+  const requestTypeLabels = {
+    [REQUEST_TYPES.AVAILABLE]: '可',
+    [REQUEST_TYPES.DAY_ONLY]: '日',
+    [REQUEST_TYPES.DAY_LATE]: '遅',
+    [REQUEST_TYPES.NIGHT_ONLY]: '夜',
+    [REQUEST_TYPES.PAID_LEAVE]: '休'
+  };
+
+  nurseDataList.forEach(nurse => {
+    html += '<tr style="border-bottom: 1px solid #eee;">';
+    html += `<td style="padding: 10px; font-weight: 600;">${nurse.name}</td>`;
+    html += `<td style="padding: 10px; text-align: center;">`;
+    html += nurse.isSubmitted 
+      ? '<span style="background: #28a745; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">済</span>'
+      : '<span style="background: #ffc107; color: #856404; padding: 4px 8px; border-radius: 4px; font-size: 11px;">未</span>';
+    html += '</td>';
+    
+    // 価値観
+    html += '<td style="padding: 10px;">';
+    if (nurse.data.preferences && nurse.data.preferences.valuePreference) {
+      const pref = VALUE_PREFERENCE_OPTIONS[nurse.data.preferences.valuePreference];
+      if (pref) {
+        html += `<span title="${pref.description}">${pref.icon} ${pref.label}</span>`;
+      } else {
+        html += '<span style="color: #999;">未設定</span>';
+      }
+    } else {
+      html += '<span style="color: #999;">未設定</span>';
+    }
+    html += '</td>';
+
+    // 各日の希望
+    dates.forEach((date, idx) => {
+      const requestType = nurse.data.requests && nurse.data.requests[date] 
+        ? nurse.data.requests[date] 
+        : REQUEST_TYPES.AVAILABLE;
+      const color = requestTypeColors[requestType] || '#f0f0f0';
+      const label = requestTypeLabels[requestType] || '?';
+      const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][new Date(2025, 7, idx + 1).getDay()];
+      const isWeekend = dayOfWeek === '日' || dayOfWeek === '土';
+      
+      html += `<td style="padding: 4px; text-align: center; background: ${color}; ${isWeekend ? 'border-left: 2px solid #ffc107; border-right: 2px solid #ffc107;' : ''}" title="${date} (${requestType})">${label}</td>`;
+    });
+
+    // 備考
+    html += `<td style="padding: 10px; font-size: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${nurse.data.note || ''}">${(nurse.data.note || '').substring(0, 30)}${(nurse.data.note || '').length > 30 ? '...' : ''}</td>`;
+
+    // 操作
+    html += '<td style="padding: 10px; text-align: center;">';
+    if (!isReadOnlyAdminView) {
+      html += `<button onclick="editNurseRequest('${nurse.userKey}')" style="padding: 4px 8px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin: 2px;">編集</button>`;
+      html += `<button onclick="deleteNurseData('${nurse.userKey}')" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin: 2px;">削除</button>`;
+    } else {
+      html += '<span style="color: #999;">閲覧のみ</span>';
+    }
+    html += '</td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+
+  container.innerHTML = html;
+}
+
+// 看護師の勤務希望を編集
+function editNurseRequest(userKey) {
+  if (isReadOnlyAdminView) {
+    alert('閲覧モードでは編集できません');
+    return;
+  }
+
+  const users = getUserDirectory();
+  const user = users[userKey];
+  const displayName = user?.fullName || userKey;
+
+  if (!confirm(`「${displayName}」の勤務希望を編集しますか？\n新しいウィンドウで編集画面が開きます。`)) {
+    return;
+  }
+
+  // 一時的にそのユーザーでログイン状態を作成
+  const storageKey = STORAGE_KEY_PREFIX + userKey;
+  const dataStr = localStorage.getItem(storageKey);
+  
+  if (!dataStr) {
+    alert('勤務希望データが見つかりません');
+    return;
+  }
+
+  // 現在のユーザーをバックアップ
+  const currentUser = getCurrentUser();
+  const originalUserKey = currentUser ? (currentUser.userKey || getCurrentUserKey()) : null;
+
+  // 編集対象ユーザーでログイン状態を作成
+  if (user) {
+    const editUser = {
+      ...user,
+      userKey: userKey,
+      email: user.email || userKey,
+      fullName: displayName
+    };
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(editUser));
+  }
+
+  // 編集ページを新しいタブで開く
+  window.open(`nurse_input.html?edit=${userKey}`, '_blank');
+
+  // 少し待ってから元のユーザーに戻す（編集ページが読み込まれるまで）
+  setTimeout(() => {
+    if (originalUserKey && currentUser) {
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
+    }
+  }, 1000);
+
+  // 管理画面を更新
+  setTimeout(() => {
+    loadAllNurseRequests();
+  }, 2000);
+}
+
 // ページ読み込み時に実行
 document.addEventListener('DOMContentLoaded', () => {
   // ログイン状態と管理者権限を確認
