@@ -497,12 +497,12 @@ function setNurseShiftCapability(userKey, shiftCapability) {
   alert('勤務対応設定を更新しました');
 }
 
-// 看護師の登録データを削除
+// 看護師の登録データを削除（アカウントは残す）
 function deleteNurseData(userKey) {
   const users = getUserDirectory();
   const user = users[userKey];
   const displayName = user?.fullName || userKey;
-  if (!confirm(`「${displayName}」の登録データを削除しますか？\nシフト希望・提出状況・価値観などがリセットされます。`)) {
+  if (!confirm(`「${displayName}」の登録データを削除しますか？\nシフト希望・提出状況・価値観などがリセットされます。\nアカウントは残ります。`)) {
     return;
   }
 
@@ -524,10 +524,97 @@ function deleteNurseData(userKey) {
     keysToDelete.forEach(key => localStorage.removeItem(key));
   }
 
-  alert('登録データを削除しました');
+  alert('登録データを削除しました（アカウントは残ります）');
   loadNurseNightShiftSettings();
   loadSubmissionStatus();
   loadValuePreferences();
+  loadAllNurseRequests();
+}
+
+// 看護師のアカウントを完全削除
+function deleteNurseAccount(userKey) {
+  if (isReadOnlyAdminView) {
+    alert('閲覧モードでは編集できません');
+    return;
+  }
+
+  const users = getUserDirectory();
+  const user = users[userKey];
+  if (!user) {
+    alert('ユーザーが見つかりません');
+    return;
+  }
+
+  const displayName = user.fullName || userKey;
+  const email = user.email || '';
+  const currentUser = getCurrentUser();
+  
+  // 現在ログイン中のユーザーの場合は警告
+  if (currentUser && (currentUser.userKey === userKey || currentUser.email === email)) {
+    if (!confirm(`警告：現在ログイン中のユーザー「${displayName}」を削除しようとしています。\n削除後はログアウトされます。\n本当に削除しますか？`)) {
+      return;
+    }
+  } else {
+    if (!confirm(`「${displayName}」のアカウントを完全に削除しますか？\n\n削除される内容：\n- アカウント情報（ユーザー名、メールアドレスなど）\n- シフト希望データ\n- 提出状況\n- 価値観設定\n- 管理者権限（管理者の場合）\n- 通知データ\n\nこの操作は取り消せません。`)) {
+      return;
+    }
+  }
+
+  // シフト希望データを削除
+  const storageKey = STORAGE_KEY_PREFIX + userKey;
+  localStorage.removeItem(storageKey);
+
+  // 提出状況を削除
+  const submittedKey = SUBMITTED_KEY_PREFIX + userKey;
+  localStorage.removeItem(submittedKey);
+
+  // 通知データを削除
+  if (email) {
+    const notificationPrefix = `notification_sent_${email}_`;
+    const keysToDelete = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(notificationPrefix)) {
+        keysToDelete.push(key);
+      }
+    }
+    keysToDelete.forEach(key => localStorage.removeItem(key));
+  }
+
+  // 管理者リストから削除
+  if (email) {
+    const adminUsers = getAdminUsers();
+    const filteredAdmins = adminUsers.filter(adminEmail => adminEmail !== email);
+    if (filteredAdmins.length !== adminUsers.length) {
+      saveAdminUsers(filteredAdmins);
+    }
+
+    // 管理者申請からも削除
+    const adminRequests = getAdminRequests();
+    const filteredRequests = adminRequests.filter(request => request.email !== email);
+    if (filteredRequests.length !== adminRequests.length) {
+      saveAdminRequests(filteredRequests);
+    }
+  }
+
+  // ユーザー情報から削除
+  delete users[userKey];
+  saveUsers(users);
+
+  // 現在ログイン中のユーザーを削除した場合はログアウト
+  if (currentUser && (currentUser.userKey === userKey || currentUser.email === email)) {
+    alert('アカウントを削除しました。ログアウトします。');
+    localStorage.removeItem(CURRENT_USER_KEY);
+    window.location.href = 'index.html';
+    return;
+  }
+
+  alert('アカウントを削除しました');
+  loadNurseNightShiftSettings();
+  loadSubmissionStatus();
+  loadValuePreferences();
+  loadAllNurseRequests();
+  loadAdminList();
 }
 
 // 全看護師の勤務希望・価値観を一括管理
@@ -667,7 +754,8 @@ function loadAllNurseRequests() {
     html += '<td style="padding: 10px; text-align: center;">';
     if (!isReadOnlyAdminView) {
       html += `<button onclick="editNurseRequest('${nurse.userKey}')" style="padding: 4px 8px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin: 2px;">編集</button>`;
-      html += `<button onclick="deleteNurseData('${nurse.userKey}')" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin: 2px;">削除</button>`;
+      html += `<button onclick="deleteNurseData('${nurse.userKey}')" style="padding: 4px 8px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin: 2px;">希望削除</button>`;
+      html += `<button onclick="deleteNurseAccount('${nurse.userKey}')" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin: 2px;">アカウント削除</button>`;
     } else {
       html += '<span style="color: #999;">閲覧のみ</span>';
     }
