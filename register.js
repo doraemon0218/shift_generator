@@ -106,17 +106,19 @@ function handleRegister(event) {
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
   const passwordConfirm = document.getElementById('passwordConfirm').value;
-  const hireYearInput = document.getElementById('hireYear');
-  const hireYearRaw = hireYearInput ? hireYearInput.value.trim() : '';
+  const graduationYearInput = document.getElementById('graduationYear');
+  const graduationYearRaw = graduationYearInput ? graduationYearInput.value.trim() : '';
   const shiftCapabilityChoice = document.querySelector('input[name="shiftCapability"]:checked');
-  const adminRequestInput = document.getElementById('adminRequest');
-  const wantsAdminRequest = adminRequestInput ? adminRequestInput.checked : false;
+  const valuePreferenceChoice = document.querySelector('input[name="valuePreference"]:checked');
+  const valuePreference = valuePreferenceChoice ? valuePreferenceChoice.value : null;
+  const isAdminInput = document.getElementById('isAdmin');
+  const wantsAdmin = isAdminInput ? isAdminInput.checked : false;
   
   const errorMsg = document.getElementById('errorMessage');
   errorMsg.classList.remove('show');
   
-  if (!lastName || !firstName || !email || !password || !passwordConfirm || !hireYearRaw || !shiftCapabilityChoice) {
-    errorMsg.textContent = 'すべての項目を入力してください';
+  if (!lastName || !firstName || !email || !password || !passwordConfirm || !graduationYearRaw || !shiftCapabilityChoice) {
+    errorMsg.textContent = 'すべての必須項目を入力してください（価値観は任意です）';
     errorMsg.classList.add('show');
     return;
   }
@@ -139,9 +141,9 @@ function handleRegister(event) {
     return;
   }
   
-  const hireYear = parseHireYear(hireYearRaw);
-  if (!hireYear) {
-    errorMsg.textContent = '入職年（西暦）を正しく入力してください（1970年〜現在+1年まで）';
+  const graduationYear = parseHireYear(graduationYearRaw);
+  if (!graduationYear) {
+    errorMsg.textContent = '卒業年度（西暦）を正しく入力してください（1970年〜現在+1年まで）';
     errorMsg.classList.add('show');
     return;
   }
@@ -190,20 +192,35 @@ function handleRegister(event) {
     password: hashedPassword,
     fullName,
     createdAt: new Date().toISOString(),
-    hireYear,
+    graduationYear,
+    hireYear: graduationYear, // 後方互換性のため
     initialShiftCapability: shiftCapability
   };
   saveUsers(users);
   
-  // シフトプロファイルを初期化
-  ensureShiftProfile(userKey, fullName, shiftCapability);
+  // シフトプロファイルを初期化（価値観を含む）
+  const shiftProfileData = {
+    nurseName: fullName,
+    userKey,
+    requests: {},
+    note: '',
+    submitted: false,
+    submittedAt: null,
+    shiftCapability: shiftCapability,
+    doesNightShift: shiftCapability === 'day-night' || shiftCapability === 'all',
+    preferences: {
+      valuePreference: valuePreference
+    }
+  };
+  const storageKey = STORAGE_KEY_PREFIX + userKey;
+  localStorage.setItem(storageKey, JSON.stringify(shiftProfileData));
   
-  // 管理者が設定されていない場合は最初のユーザーを管理者にする
+  // 管理者設定
   let adminUsers = getAdminUsers();
   let isAdmin = false;
   
-  // デモ環境：全ユーザーを管理者にする
-  if (ENABLE_DEMO_ADMIN_FOR_ALL) {
+  // デモ環境：全ユーザーを管理者にする、または希望者が管理者を希望する場合
+  if (ENABLE_DEMO_ADMIN_FOR_ALL || wantsAdmin) {
     isAdmin = true;
     // 管理者リストに追加（まだ登録されていない場合）
     if (!adminUsers.includes(email)) {
@@ -211,6 +228,7 @@ function handleRegister(event) {
       saveAdminUsers(adminUsers);
     }
   } else {
+    // デモ環境でない場合：最初のユーザーを管理者にする
     if (adminUsers.length === 0) {
       adminUsers.push(email);
       saveAdminUsers(adminUsers);
@@ -220,21 +238,13 @@ function handleRegister(event) {
     }
   }
 
+  // 管理者申請の処理（デモ環境では不要）
   const adminRequests = getAdminRequests();
   if (isAdmin) {
+    // 既に管理者の場合は申請を削除
     const filtered = adminRequests.filter(request => request.email !== email);
     if (filtered.length !== adminRequests.length) {
       saveAdminRequests(filtered);
-    }
-  } else if (wantsAdminRequest) {
-    if (!adminRequests.some(request => request.email === email)) {
-      adminRequests.push({
-        email,
-        fullName,
-        userKey,
-        requestedAt: new Date().toISOString()
-      });
-      saveAdminRequests(adminRequests);
     }
   }
   
@@ -246,17 +256,19 @@ function handleRegister(event) {
     fullName,
     isAdmin,
     userKey,
-    hireYear,
+    graduationYear,
+    hireYear: graduationYear, // 後方互換性のため
     initialShiftCapability: shiftCapability
   };
   localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
   
   // トップページにリダイレクト
-  if (wantsAdminRequest && !isAdmin) {
-    alert('管理者申請を受け付けました。既存の管理者が承認すると権限が付与されます。');
-  } else {
-    alert('登録が完了しました。次回からログイン画面でメールアドレスとパスワードでログインできます。');
+  let message = '登録が完了しました。';
+  if (isAdmin) {
+    message += '管理者として登録されました。';
   }
+  message += '次回からログイン画面でメールアドレスとパスワードでログインできます。';
+  alert(message);
   window.location.href = 'top.html';
 }
 
