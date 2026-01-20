@@ -268,16 +268,12 @@
 
     <!-- ステップ2: 夜勤相性表（読み込み後に表示） -->
     <div id="pairMatrixSection" style="display: none; margin-top: 32px;">
-      <h2 style="margin: 0 0 12px; font-size: 20px; color: #333;">🤝 シフト入力者の相性表</h2>
+      <h2 style="margin: 0 0 12px; font-size: 20px; color: #333;">🤝 夜勤ペア相性表</h2>
       <p style="color: #666; margin-bottom: 12px;">
-        CSV内の夜勤可メンバーを対象に、○/△/×で相性を設定します。管理者が修正してください。<br>
-        ○：問題なし、△：極力避けたい、×：禁忌（デフォルトは○）
+        CSVの1列目（氏名）から自動抽出した夜勤する人同士の相性を設定します。<br>
+        ○：問題なし（デフォルト）、△：極力避けたい、×：禁忌<br>
+        ※ 夜勤する人同士のセルのみ編集可能です。
       </p>
-      <div class="form-group">
-        <button id="pairMatrixUpdate" class="btn-success" disabled style="margin-right: 8px;">更新</button>
-        <button id="pairMatrixReload" class="btn-primary" disabled style="margin-right: 8px;">CSVから再作成</button>
-        <button id="pairMatrixClear" class="btn-danger" disabled>全クリア</button>
-      </div>
       <div id="nightPairMatrix" class="pair-matrix"></div>
     </div>
 

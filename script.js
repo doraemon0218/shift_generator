@@ -216,12 +216,12 @@ function renderNightPairMatrix() {
   if (!container) return;
 
   if (!pairMatrixCandidates || pairMatrixCandidates.length === 0) {
-    container.innerHTML = '<p style="color: #666; margin: 0;">夜勤可のメンバーがいません。</p>';
+    container.innerHTML = '<p style="color: #666; margin: 0;">夜勤するメンバーがいません。</p>';
     return;
   }
 
   if (pairMatrixCandidates.length === 1) {
-    container.innerHTML = '<p style="color: #666; margin: 0;">夜勤可のメンバーが1名のみのため、相性表は作成できません。</p>';
+    container.innerHTML = '<p style="color: #666; margin: 0;">夜勤するメンバーが1名のみのため、相性表は作成できません。</p>';
     return;
   }
 
@@ -235,10 +235,13 @@ function renderNightPairMatrix() {
       if (rowIndex === colIndex) {
         return '<td class="pair-diagonal">-</td>';
       }
+      
+      // 夜勤する人同士のセルのみ編集可能（相性表は夜勤する人同士のみなので、全て編集可能）
       // デフォルトは○（ok）、保存済みの値がある場合はそれを使用
-      // 未設定の場合は'ok'（○）をデフォルトとする
       const storedStatus = getMixingStatusForPair(pairs, rowName, colName);
       const status = storedStatus || 'ok';
+      
+      // 夜勤する人同士のセル：編集可能
       return `
         <td>
           <select class="pair-select" data-a="${rowName}" data-b="${colName}">
@@ -272,18 +275,44 @@ function renderNightPairMatrix() {
     </table>
   `;
 
+  // 夜勤する人同士のセルのみイベントリスナーを追加
   container.querySelectorAll('select.pair-select').forEach(select => {
     select.addEventListener('change', () => {
       const a = select.dataset.a;
       const b = select.dataset.b;
       const value = select.value;
+      // 対称のセルも同じ値に更新
       container.querySelectorAll(`select.pair-select[data-a="${b}"][data-b="${a}"]`).forEach(target => {
         if (target.value !== value) {
           target.value = value;
         }
       });
+      // 自動保存（localStorage）
+      saveNightPairMatrixSilent();
     });
   });
+}
+
+// 相性表をサイレント保存（ボタンを押さずに自動保存）
+function saveNightPairMatrixSilent() {
+  const container = document.getElementById('nightPairMatrix');
+  if (!container || !pairMatrixCandidates || pairMatrixCandidates.length < 2) {
+    return;
+  }
+
+  const pairs = {};
+  container.querySelectorAll('select.pair-select').forEach(select => {
+    const value = select.value || 'ok';
+    const a = select.dataset.a;
+    const b = select.dataset.b;
+    if (!pairs[a]) pairs[a] = {};
+    if (!pairs[b]) pairs[b] = {};
+    pairs[a][b] = value;
+    pairs[b][a] = value;
+  });
+
+  const names = [...pairMatrixCandidates];
+  localStorage.setItem(MIXING_MATRIX_KEY, JSON.stringify({ names, pairs }));
 }
 
 function loadNightPairMatrix() {
@@ -1111,9 +1140,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadBtn = document.getElementById('loadBtn');
   const generateBtn = document.getElementById('generateBtn');
   const exportBtn = document.getElementById('exportBtn');
-  const pairReloadBtn = document.getElementById('pairMatrixReload');
-  const pairUpdateBtn = document.getElementById('pairMatrixUpdate');
-  const pairClearBtn = document.getElementById('pairMatrixClear');
+  // 相性表のボタンは削除（自動生成・自動保存のため不要）
 
   // デフォルトファイルを読み込む（data/shift_requests.csv）
   loadBtn.addEventListener('click', async () => {
@@ -1156,12 +1183,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (shiftConditionsSection) shiftConditionsSection.style.display = 'block';
     if (generateSection) generateSection.style.display = 'block';
     
-    if (pairReloadBtn) pairReloadBtn.disabled = false;
-    if (pairUpdateBtn) pairUpdateBtn.disabled = false;
-    if (pairClearBtn) pairClearBtn.disabled = false;
-    
+    // CSVから相性表を自動生成（1列目の氏名から夜勤する人のみ抽出）
     loadNightPairMatrix();
-    alert(`データを読み込みました。看護師数: ${nurses.length}名、期間: ${dateColumns.length}日`);
+    
+    const nightShiftCount = getPairMatrixCandidatesFromNurses().length;
+    alert(`データを読み込みました。\n看護師数: ${nurses.length}名\n期間: ${dateColumns.length}日\n夜勤する人: ${nightShiftCount}名\n\n夜勤ペア相性表が自動生成されました。\n相性表を編集後、「シフト表を生成」ボタンを押してください。`);
   });
 
   // シフト表を生成
@@ -1208,21 +1234,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 100);
   });
 
-  if (pairReloadBtn) {
-    pairReloadBtn.addEventListener('click', () => {
-      loadNightPairMatrix();
-    });
-  }
-  if (pairUpdateBtn) {
-    pairUpdateBtn.addEventListener('click', () => {
-      saveNightPairMatrix();
-    });
-  }
-  if (pairClearBtn) {
-    pairClearBtn.addEventListener('click', () => {
-      clearNightPairMatrix();
-    });
-  }
+  // 相性表のボタンイベントは削除（自動生成・自動保存のため不要）
 
   // CSVでエクスポート
   exportBtn.addEventListener('click', () => {
