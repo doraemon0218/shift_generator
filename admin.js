@@ -1034,9 +1034,18 @@ function loadIntegratedBoard() {
   const statusGrid = document.getElementById('statusGrid');
   const bulkDeleteSection = document.getElementById('bulkDeleteSection');
   
-  if (!container) return;
+  if (!container) {
+    console.error('integratedBoard element not found');
+    return;
+  }
+  
+  if (!statusGrid) {
+    console.error('statusGrid element not found');
+    return;
+  }
   
   container.style.display = 'block';
+  statusGrid.style.display = 'grid';
   
   const allKeys = Object.keys(localStorage);
   const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
@@ -1131,10 +1140,15 @@ function loadIntegratedBoard() {
   
   if (nurseList.length === 0) {
     if (container) {
-      container.innerHTML = '<p style="color: #666;">看護師データがありません</p>';
+      container.innerHTML = '<p style="color: #666; padding: 20px; text-align: center;">看護師データがありません</p>';
     }
     if (bulkDeleteSection) {
       bulkDeleteSection.style.display = 'none';
+    }
+    // データがなくても統計情報は表示
+    if (statusGrid) {
+      statusGrid.style.display = 'grid';
+      statusGrid.style.visibility = 'visible';
     }
     return;
   }
