@@ -1198,6 +1198,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('draftContainer').style.display = 'grid';
         document.getElementById('selectionNotice').style.display = 'block';
         document.getElementById('loadingContainer').style.display = 'none';
+        const exportSection = document.getElementById('exportSection');
+        if (exportSection) exportSection.style.display = 'block';
         exportBtn.disabled = false;
       } catch (error) {
         showError(`シフト表の生成に失敗しました: ${error.message}`);
