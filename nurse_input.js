@@ -344,8 +344,10 @@ function loadData() {
   if (currentNurseNameEl) currentNurseNameEl.textContent = currentNurse;
   if (noteInputEl) noteInputEl.value = currentData.note || '';
 
-  // 夜勤ステータスを表示
-  updateNightShiftStatusInHeader();
+  // 夜勤ステータスを表示（currentDataが設定された後）
+  setTimeout(() => {
+    updateNightShiftStatusInHeader();
+  }, 50);
 
   updateValuePreferenceDisplay();
 }
