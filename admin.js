@@ -871,10 +871,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   updateDeadlineDisplay();
-  loadSubmissionStatus();
   loadAdminRequestList();
   loadAdminList();
-  loadNurseNightShiftSettings();
   loadValuePreferences();
 });
 
@@ -1032,7 +1030,231 @@ function formatDateTimeLocal(date) {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-// 提出状況を読み込み
+// 統合管理ボードを読み込み
+function loadIntegratedBoard() {
+  const container = document.getElementById('integratedBoard');
+  const statusGrid = document.getElementById('statusGrid');
+  const bulkDeleteSection = document.getElementById('bulkDeleteSection');
+  
+  // トグル機能：既に表示されている場合は非表示にする
+  const btn = document.getElementById('integratedBoardBtn');
+  const isVisible = container && container.style.display !== 'none' && container.innerHTML.trim() !== '';
+  if (isVisible) {
+    if (container) container.style.display = 'none';
+    if (statusGrid) statusGrid.style.display = 'none';
+    if (bulkDeleteSection) bulkDeleteSection.style.display = 'none';
+    if (btn) btn.textContent = '管理ボードを表示';
+    return;
+  }
+  
+  if (btn) btn.textContent = '管理ボードを非表示';
+  
+  if (container) container.style.display = 'block';
+  
+  const allKeys = Object.keys(localStorage);
+  const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
+  const users = getUserDirectory();
+  
+  // 統計情報を計算
+  const nurseMap = new Map();
+  
+  requestKeys.forEach(key => {
+    const userKey = key.replace(STORAGE_KEY_PREFIX, '');
+    const dataStr = localStorage.getItem(key);
+    if (!dataStr) return;
+    
+    try {
+      const data = JSON.parse(dataStr);
+      const userInfo = users[userKey] || {};
+      const submittedKey = SUBMITTED_KEY_PREFIX + userKey;
+      const isSubmitted = localStorage.getItem(submittedKey) === 'true';
+      
+      const initialShiftCapability = normalizeShiftCapability(userInfo.initialShiftCapability)
+        ?? normalizeShiftCapability(userInfo.initialNightShift);
+      
+      const storedCapability = normalizeShiftCapability(data.shiftCapability)
+        ?? normalizeShiftCapability(data.doesNightShift);
+      
+      nurseMap.set(userKey, {
+        name: data.nurseName || userInfo.fullName || userKey,
+        userKey,
+        submitted: isSubmitted,
+        adminShiftCapability: storedCapability,
+        effectiveShiftCapability: storedCapability ?? initialShiftCapability,
+        initialShiftCapability,
+        valuePreference: data.preferences?.valuePreference || null,
+        userInfo
+      });
+    } catch (error) {
+      console.error('Failed to parse data for', userKey, error);
+    }
+  });
+  
+  Object.keys(users).forEach(userKey => {
+    if (nurseMap.has(userKey)) return;
+    const user = users[userKey];
+    const initialShiftCapability = normalizeShiftCapability(user?.initialShiftCapability)
+      ?? normalizeShiftCapability(user?.initialNightShift);
+    
+    const submittedKey = SUBMITTED_KEY_PREFIX + userKey;
+    const isSubmitted = localStorage.getItem(submittedKey) === 'true';
+    
+    nurseMap.set(userKey, {
+      name: user.fullName || userKey,
+      userKey,
+      submitted: isSubmitted,
+      adminShiftCapability: null,
+      effectiveShiftCapability: initialShiftCapability,
+      initialShiftCapability,
+      valuePreference: null,
+      userInfo: user
+    });
+  });
+  
+  const nurseList = Array.from(nurseMap.values()).sort((a, b) => {
+    return a.name.localeCompare(b.name, 'ja');
+  });
+  
+  const submitted = nurseList.filter(item => item.submitted).length;
+  const total = nurseList.length;
+  const notSubmitted = total - submitted;
+  
+  // 統計情報を表示
+  if (statusGrid) {
+    statusGrid.style.display = 'grid';
+    statusGrid.innerHTML = `
+      <div class="status-card">
+        <div class="status-label">総看護師数</div>
+        <div class="status-value">${total}</div>
+      </div>
+      <div class="status-card success">
+        <div class="status-label">提出済み</div>
+        <div class="status-value">${submitted}</div>
+      </div>
+      <div class="status-card warning">
+        <div class="status-label">未提出</div>
+        <div class="status-value">${notSubmitted}</div>
+      </div>
+      <div class="status-card">
+        <div class="status-label">提出率</div>
+        <div class="status-value">${total > 0 ? Math.round((submitted / total) * 100) : 0}%</div>
+      </div>
+    `;
+  }
+  
+  if (nurseList.length === 0) {
+    if (container) {
+      container.innerHTML = '<p style="color: #666;">看護師データがありません</p>';
+    }
+    if (bulkDeleteSection) {
+      bulkDeleteSection.style.display = 'none';
+    }
+    return;
+  }
+  
+  // 統合ボードのテーブルを生成
+  let html = `
+    <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 12px; max-height: 700px; overflow-y: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+        <thead>
+          <tr style="background: #f8f9fa; border-bottom: 2px solid #ddd; position: sticky; top: 0;">
+            <th style="padding: 8px; text-align: left; width: 40px;">
+              <input type="checkbox" id="selectAllNurses" onchange="toggleAllNurses(this.checked)" style="cursor: pointer;" />
+            </th>
+            <th style="padding: 8px; text-align: left; width: 150px;">看護師名</th>
+            <th style="padding: 8px; text-align: center; width: 80px;">提出状況</th>
+            <th style="padding: 8px; text-align: left; width: 140px;">勤務対応設定</th>
+            <th style="padding: 8px; text-align: left; width: 200px;">価値観</th>
+            <th style="padding: 8px; text-align: center; width: 300px;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+  
+  nurseList.forEach(nurse => {
+    const adminSetting = nurse.adminShiftCapability;
+    let statusLabel;
+    let statusColor;
+    if (adminSetting) {
+      statusLabel = getShiftCapabilityLabel(adminSetting);
+      statusColor = '#28a745';
+    } else if (nurse.initialShiftCapability) {
+      statusLabel = `${getShiftCapabilityLabel(nurse.initialShiftCapability)}（本人申告）`;
+      statusColor = '#6c757d';
+    } else {
+      statusLabel = '未設定';
+      statusColor = '#ff9800';
+    }
+    
+    // 価値観を取得
+    let valuePreferenceLabel = '未設定';
+    if (nurse.valuePreference) {
+      const pref = VALUE_PREFERENCE_OPTIONS[nurse.valuePreference];
+      if (pref) {
+        valuePreferenceLabel = `${pref.icon} ${pref.label}`;
+      }
+    }
+    
+    html += `
+      <tr style="border-bottom: 1px solid #eee;">
+        <td style="padding: 8px; text-align: center;">
+          <input type="checkbox" class="nurse-checkbox" value="${nurse.userKey}" data-name="${nurse.name}" onchange="updateSelectedCount()" />
+        </td>
+        <td style="padding: 8px; font-weight: 600;">${nurse.name}</td>
+        <td style="padding: 8px; text-align: center;">
+          <span style="padding: 4px 8px; border-radius: 4px; font-size: 11px; ${nurse.submitted ? 'background: #28a745; color: white;' : 'background: #ffc107; color: #856404;'}">
+            ${nurse.submitted ? '提出済み' : '未提出'}
+          </span>
+        </td>
+        <td style="padding: 8px;">
+          <span style="color: ${statusColor}; font-weight: 600; font-size: 11px;">${statusLabel}</span>
+        </td>
+        <td style="padding: 8px; font-size: 11px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${valuePreferenceLabel}">${valuePreferenceLabel}</td>
+        <td style="padding: 8px; text-align: center;">
+          ${isReadOnlyAdminView ? '<span style="color: #999;">閲覧のみ</span>' : `
+          <div style="display: flex; flex-wrap: wrap; gap: 4px; justify-content: center;">
+            <button onclick="editNurseRequest('${nurse.userKey}')" style="padding: 4px 8px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">編集</button>
+            <select onchange="setNurseShiftCapabilityFromSelect('${nurse.userKey}', this.value)" style="padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; cursor: pointer;">
+              <option value="null" ${adminSetting === null ? 'selected' : ''}>未設定</option>
+              <option value="${SHIFT_CAPABILITIES.DAY_ONLY}" ${adminSetting === SHIFT_CAPABILITIES.DAY_ONLY ? 'selected' : ''}>日勤のみ</option>
+              <option value="${SHIFT_CAPABILITIES.DAY_LATE}" ${adminSetting === SHIFT_CAPABILITIES.DAY_LATE ? 'selected' : ''}>日勤＋遅出</option>
+              <option value="${SHIFT_CAPABILITIES.DAY_NIGHT}" ${adminSetting === SHIFT_CAPABILITIES.DAY_NIGHT ? 'selected' : ''}>日勤＋夜勤</option>
+              <option value="${SHIFT_CAPABILITIES.ALL}" ${adminSetting === SHIFT_CAPABILITIES.ALL ? 'selected' : ''}>全部する</option>
+            </select>
+          </div>
+          `}
+        </td>
+      </tr>
+    `;
+  });
+  
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+  
+  if (container) {
+    container.innerHTML = html;
+  }
+  
+  // 一括削除セクションを表示
+  if (bulkDeleteSection) {
+    bulkDeleteSection.style.display = 'block';
+  }
+  
+  updateSelectedCount();
+}
+
+// セレクトボックスから夜勤設定を変更
+function setNurseShiftCapabilityFromSelect(userKey, value) {
+  const capability = value === 'null' ? null : value;
+  setNurseShiftCapability(userKey, capability);
+  // 画面を更新
+  loadIntegratedBoard();
+}
+
+// 提出状況を読み込み（互換性のため残す）
 function loadSubmissionStatus() {
   const statusGrid = document.getElementById('statusGrid');
   const nurseListContainer = document.getElementById('nurseList');

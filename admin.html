@@ -311,27 +311,19 @@
       <div id="deadlineDisplay" class="deadline-display" style="display: none;"></div>
     </div>
 
-    <!-- 提出状況確認セクション -->
+    <!-- 統合管理ボードセクション -->
     <div class="section">
-      <div class="section-title">📊 提出状況確認</div>
-      <p style="color: #666; margin-bottom: 16px;">全看護師の提出状況を一覧で確認できます。チェックボックスで選択してアカウントを一括削除できます。</p>
-      <button onclick="loadSubmissionStatus()" id="submissionStatusBtn">提出状況を表示</button>
+      <div class="section-title">📊 看護師管理ボード</div>
+      <p style="color: #666; margin-bottom: 16px;">提出状況、勤務対応設定、価値観を一覧で確認・管理できます。チェックボックスで選択してアカウントを一括削除できます。</p>
+      <button onclick="loadIntegratedBoard()" id="integratedBoardBtn">管理ボードを表示</button>
       <div class="status-grid" id="statusGrid" style="display: none;"></div>
-      <div id="nurseList" style="display: none; margin-top: 16px;"></div>
+      <div id="integratedBoard" style="display: none; margin-top: 16px;"></div>
       <div id="bulkDeleteSection" style="display: none; margin-top: 16px; padding: 16px; background: #fff3cd; border-radius: 8px; border: 1px solid #ffc107;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <span id="selectedCount" style="font-weight: 600; color: #856404;">選択中: 0名</span>
           <button onclick="deleteSelectedAccounts()" class="btn-danger" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">選択したアカウントを削除</button>
         </div>
       </div>
-    </div>
-
-    <!-- 夜勤設定セクション -->
-    <div class="section">
-      <div class="section-title">🌙 看護師の勤務対応設定</div>
-      <p style="color: #666; margin-bottom: 16px;">各看護師の働き方（日勤/遅出/夜勤）を確認できます</p>
-      <button onclick="loadNurseNightShiftSettings()" id="nightShiftSettingsBtn">勤務対応設定一覧を表示</button>
-      <div id="nightShiftSettings" style="margin-top: 16px;"></div>
     </div>
 
     <!-- 看護師の価値観セクション -->
