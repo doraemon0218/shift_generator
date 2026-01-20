@@ -583,12 +583,12 @@ function deleteNurseAccount(userKey) {
       return;
     }
   } else {
-    if (!confirm(`「${displayName}」のアカウントを完全に削除しますか？\n\n削除される内容：\n- アカウント情報（ユーザー名、メールアドレスなど）\n- シフト希望データ\n- 提出状況\n- 価値観設定\n- 管理者権限（管理者の場合）\n- 通知データ\n\nこの操作は取り消せません。`)) {
+    if (!confirm(`「${displayName}」のアカウントを完全に削除しますか？\n\n削除される内容：\n- アカウント情報（ユーザー名、メールアドレスなど）\n- 勤務希望調査の情報（全期間の希望データ）\n- 価値観設定\n- 夜勤ステータス（勤務対応設定）\n- 提出状況\n- 管理者権限（管理者の場合）\n- 通知データ\n\n※ 削除されたアカウントの情報は、すべての場所から削除されます。\n\nこの操作は取り消せません。`)) {
       return;
     }
   }
 
-  // シフト希望データを削除
+  // シフト希望データを削除（勤務希望調査の情報、価値観、夜勤ステータスを含む）
   const storageKey = STORAGE_KEY_PREFIX + userKey;
   localStorage.removeItem(storageKey);
 
@@ -1265,7 +1265,7 @@ function deleteSelectedAccounts() {
   const selectedNames = Array.from(checkboxes).map(cb => cb.dataset.name);
   const selectedUserKeys = Array.from(checkboxes).map(cb => cb.value);
   
-  const message = `以下の${selectedUserKeys.length}名のアカウントを完全に削除しますか？\n\n${selectedNames.join('\n')}\n\n削除される内容：\n- アカウント情報\n- シフト希望データ\n- 提出状況\n- 価値観設定\n- 勤務対応設定\n- 管理者権限（該当する場合）\n- 通知データ\n\nこの操作は取り消せません。`;
+  const message = `以下の${selectedUserKeys.length}名のアカウントを完全に削除しますか？\n\n${selectedNames.join('\n')}\n\n削除される内容：\n- アカウント情報（ユーザー名、メールアドレスなど）\n- 勤務希望調査の情報（全期間の希望データ）\n- 価値観設定\n- 夜勤ステータス（勤務対応設定）\n- 提出状況\n- 管理者権限（該当する場合）\n- 通知データ\n\n※ 削除されたアカウントの情報は、すべての場所から削除されます。\n\nこの操作は取り消せません。`;
   
   if (!confirm(message)) {
     return;
@@ -1288,7 +1288,7 @@ function deleteSelectedAccounts() {
       loggedOutUser = true;
     }
 
-    // シフト希望データを削除
+    // シフト希望データを削除（勤務希望調査の情報、価値観、夜勤ステータスを含む）
     const storageKey = STORAGE_KEY_PREFIX + userKey;
     localStorage.removeItem(storageKey);
 
