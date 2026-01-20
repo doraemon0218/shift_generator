@@ -315,23 +315,14 @@
     <div class="section">
       <div class="section-title">📊 看護師管理ボード</div>
       <p style="color: #666; margin-bottom: 16px;">提出状況、勤務対応設定、価値観を一覧で確認・管理できます。チェックボックスで選択してアカウントを一括削除できます。</p>
-      <button onclick="loadIntegratedBoard()" id="integratedBoardBtn">管理ボードを表示</button>
-      <div class="status-grid" id="statusGrid" style="display: none;"></div>
-      <div id="integratedBoard" style="display: none; margin-top: 16px;"></div>
+      <div class="status-grid" id="statusGrid"></div>
+      <div id="integratedBoard" style="margin-top: 16px;"></div>
       <div id="bulkDeleteSection" style="display: none; margin-top: 16px; padding: 16px; background: #fff3cd; border-radius: 8px; border: 1px solid #ffc107;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <span id="selectedCount" style="font-weight: 600; color: #856404;">選択中: 0名</span>
           <button onclick="deleteSelectedAccounts()" class="btn-danger" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">選択したアカウントを削除</button>
         </div>
       </div>
-    </div>
-
-    <!-- 看護師の価値観セクション -->
-    <div class="section">
-      <div class="section-title">🧭 看護師の価値観</div>
-      <p style="color: #666; margin-bottom: 16px;">夜勤明けの過ごし方に関する個人の価値観を一覧で確認できます</p>
-      <button onclick="loadValuePreferences()" class="btn-secondary" id="valuePreferencesBtn">価値観を表示</button>
-      <div id="valuePreferenceList" class="value-list"></div>
     </div>
 
     <!-- 勤務希望一括管理セクション -->

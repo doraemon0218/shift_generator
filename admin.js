@@ -871,7 +871,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateDeadlineDisplay();
   loadAdminRequestList();
   loadAdminList();
-  loadValuePreferences();
+  loadIntegratedBoard(); // 統合管理ボードを常に表示
 });
 
 // 毎月15日23:59に設定
@@ -1028,26 +1028,15 @@ function formatDateTimeLocal(date) {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-// 統合管理ボードを読み込み
+// 統合管理ボードを読み込み（常に表示）
 function loadIntegratedBoard() {
   const container = document.getElementById('integratedBoard');
   const statusGrid = document.getElementById('statusGrid');
   const bulkDeleteSection = document.getElementById('bulkDeleteSection');
   
-  // トグル機能：既に表示されている場合は非表示にする
-  const btn = document.getElementById('integratedBoardBtn');
-  const isVisible = container && container.style.display !== 'none' && container.innerHTML.trim() !== '';
-  if (isVisible) {
-    if (container) container.style.display = 'none';
-    if (statusGrid) statusGrid.style.display = 'none';
-    if (bulkDeleteSection) bulkDeleteSection.style.display = 'none';
-    if (btn) btn.textContent = '管理ボードを表示';
-    return;
-  }
+  if (!container) return;
   
-  if (btn) btn.textContent = '管理ボードを非表示';
-  
-  if (container) container.style.display = 'block';
+  container.style.display = 'block';
   
   const allKeys = Object.keys(localStorage);
   const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
