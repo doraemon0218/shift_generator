@@ -186,9 +186,25 @@ function getMixingStatusForPair(pairs, nameA, nameB) {
   return pairs[nameA]?.[nameB] || pairs[nameB]?.[nameA] || '';
 }
 
+// CSVから夜勤をする人のみを抽出
 function getPairMatrixCandidatesFromNurses() {
   if (!nurses || nurses.length === 0) return [];
-  const candidates = nurses.filter(nurse => isNightShiftEligible(nurse));
+  
+  // 夜勤可能な人を抽出
+  // shiftCapabilityがday-nightまたはall、または夜勤可能と判定された人
+  const candidates = nurses.filter(nurse => {
+    // 標準勤務形態から判断
+    if (nurse.shiftCapability === 'day-night' || nurse.shiftCapability === 'all') {
+      return true;
+    }
+    // day-onlyは除外
+    if (nurse.shiftCapability === 'day-only') {
+      return false;
+    }
+    // それ以外はisNightShiftEligibleで判定
+    return isNightShiftEligible(nurse);
+  });
+  
   return candidates
     .map(nurse => nurse.name)
     .filter(name => name)
@@ -220,7 +236,9 @@ function renderNightPairMatrix() {
         return '<td class="pair-diagonal">-</td>';
       }
       // デフォルトは○（ok）、保存済みの値がある場合はそれを使用
-      const status = getMixingStatusForPair(pairs, rowName, colName) || 'ok';
+      // 未設定の場合は'ok'（○）をデフォルトとする
+      const storedStatus = getMixingStatusForPair(pairs, rowName, colName);
+      const status = storedStatus || 'ok';
       return `
         <td>
           <select class="pair-select" data-a="${rowName}" data-b="${colName}">
