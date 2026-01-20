@@ -520,7 +520,7 @@ function setNurseShiftCapability(userKey, shiftCapability) {
   localStorage.setItem(storageKey, JSON.stringify(data));
   
   // 表示を更新
-  loadNurseNightShiftSettings();
+  loadIntegratedBoard();
   loadValuePreferences();
   alert('勤務対応設定を更新しました');
 }
@@ -553,8 +553,7 @@ function deleteNurseData(userKey) {
   }
 
   alert('登録データを削除しました（アカウントは残ります）');
-  loadNurseNightShiftSettings();
-  loadSubmissionStatus();
+  loadIntegratedBoard();
   loadValuePreferences();
   loadAllNurseRequests();
 }
@@ -638,8 +637,7 @@ function deleteNurseAccount(userKey) {
   }
 
   alert('アカウントを削除しました');
-  loadNurseNightShiftSettings();
-  loadSubmissionStatus();
+  loadIntegratedBoard();
   loadValuePreferences();
   loadAllNurseRequests();
   loadAdminList();
@@ -1562,8 +1560,7 @@ function deleteSelectedAccounts() {
   }
 
   // 画面を更新（同じ位置を保持）
-  loadSubmissionStatus();
-  loadNurseNightShiftSettings();
+  loadIntegratedBoard();
   loadValuePreferences();
   loadAllNurseRequests();
   loadAdminList();
