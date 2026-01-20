@@ -12,6 +12,10 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // ユーザー名を表示
   document.getElementById('userName').textContent = user.fullName;
+  
+  // 夜勤ステータスを表示
+  updateNightShiftStatusDisplay(user);
+  
   renderAdminToggle(user);
   
   // 管理者カードは閲覧可能（非管理者は閲覧モード）
@@ -44,6 +48,56 @@ document.addEventListener('DOMContentLoaded', () => {
   // 締め切り情報を定期的に更新（1分ごと）
   setInterval(updateDeadlineDisplay, 60000);
 });
+
+// 夜勤ステータスを表示
+function updateNightShiftStatusDisplay(user) {
+  const badge = document.getElementById('nightShiftStatusBadge');
+  if (!badge) return;
+  
+  // ユーザーの夜勤設定を取得
+  const userKey = user.userKey || getCurrentUserKey();
+  if (!userKey) return;
+  
+  const storageKey = STORAGE_KEY_PREFIX + userKey;
+  const dataStr = localStorage.getItem(storageKey);
+  
+  let shiftCapability = null;
+  if (dataStr) {
+    try {
+      const data = JSON.parse(dataStr);
+      shiftCapability = data.shiftCapability;
+    } catch (error) {
+      console.error('Failed to parse shift data', error);
+    }
+  }
+  
+  // ユーザー情報からも取得を試みる
+  if (!shiftCapability) {
+    shiftCapability = user.initialShiftCapability;
+  }
+  
+  // 夜勤可能かどうかを判定
+  const canNightShift = shiftCapability === SHIFT_CAPABILITIES.DAY_NIGHT || 
+                        shiftCapability === SHIFT_CAPABILITIES.ALL;
+  
+  if (canNightShift) {
+    badge.textContent = '🌙 夜勤可';
+    badge.style.background = '#e3f2fd';
+    badge.style.color = '#1976d2';
+  } else if (shiftCapability === SHIFT_CAPABILITIES.DAY_LATE) {
+    badge.textContent = '🌇 遅出可';
+    badge.style.background = '#fff3e0';
+    badge.style.color = '#f57c00';
+  } else if (shiftCapability === SHIFT_CAPABILITIES.DAY_ONLY) {
+    badge.textContent = '🌞 日勤のみ';
+    badge.style.background = '#f3e5f5';
+    badge.style.color = '#7b1fa2';
+  } else {
+    badge.textContent = '❓ 未設定';
+    badge.style.background = '#f5f5f5';
+    badge.style.color = '#757575';
+  }
+}
 
 function renderAdminToggle(user) {
   const statusEl = document.getElementById('adminToggleStatus');

@@ -1123,7 +1123,7 @@ function exportAllRequests() {
 
   const users = getUserDirectory();
 
-  const header = ['氏名', 'シフト希望期間', '価値観', '備考', ...dates];
+  const header = ['氏名', '夜勤設定', 'シフト希望期間', '価値観', '備考', ...dates];
   const rows = [header];
 
   requestKeys.forEach(key => {
@@ -1138,8 +1138,24 @@ function exportAllRequests() {
     const preferenceInfo = preferenceValue ? VALUE_PREFERENCE_OPTIONS[preferenceValue] : null;
     const preferenceLabel = preferenceInfo ? `${preferenceInfo.icon} ${preferenceInfo.label}` : '';
 
+    // 夜勤設定を取得
+    const shiftCapability = data.shiftCapability || users[userKey]?.initialShiftCapability || null;
+    let nightShiftStatus = '';
+    if (shiftCapability === SHIFT_CAPABILITIES.DAY_ONLY) {
+      nightShiftStatus = '日勤のみ';
+    } else if (shiftCapability === SHIFT_CAPABILITIES.DAY_LATE) {
+      nightShiftStatus = '日勤＋遅出';
+    } else if (shiftCapability === SHIFT_CAPABILITIES.DAY_NIGHT) {
+      nightShiftStatus = '日勤＋夜勤（遅出なし）';
+    } else if (shiftCapability === SHIFT_CAPABILITIES.ALL) {
+      nightShiftStatus = '全部する（日勤・遅出・夜勤）';
+    } else {
+      nightShiftStatus = '未設定';
+    }
+
     const row = [
       displayName,
+      nightShiftStatus,
       '2025年8月1日〜8月31日',
       preferenceLabel,
       data.note || ''

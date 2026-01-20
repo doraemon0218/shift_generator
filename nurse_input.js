@@ -344,7 +344,36 @@ function loadData() {
   if (currentNurseNameEl) currentNurseNameEl.textContent = currentNurse;
   if (noteInputEl) noteInputEl.value = currentData.note || '';
 
+  // 夜勤ステータスを表示
+  updateNightShiftStatusInHeader();
+
   updateValuePreferenceDisplay();
+}
+
+// ヘッダーに夜勤ステータスを表示
+function updateNightShiftStatusInHeader() {
+  const badge = document.getElementById('currentUserNightShiftStatus');
+  if (!badge || !currentData) return;
+  
+  const shiftCapability = resolveShiftCapability(currentData, currentUser);
+  
+  if (shiftCapability === SHIFT_CAPABILITIES.DAY_NIGHT || shiftCapability === SHIFT_CAPABILITIES.ALL) {
+    badge.textContent = '🌙 夜勤可';
+    badge.style.background = '#e3f2fd';
+    badge.style.color = '#1976d2';
+  } else if (shiftCapability === SHIFT_CAPABILITIES.DAY_LATE) {
+    badge.textContent = '🌇 遅出可';
+    badge.style.background = '#fff3e0';
+    badge.style.color = '#f57c00';
+  } else if (shiftCapability === SHIFT_CAPABILITIES.DAY_ONLY) {
+    badge.textContent = '🌞 日勤のみ';
+    badge.style.background = '#f3e5f5';
+    badge.style.color = '#7b1fa2';
+  } else {
+    badge.textContent = '❓ 未設定';
+    badge.style.background = '#f5f5f5';
+    badge.style.color = '#757575';
+  }
 }
 
 // データの保存
