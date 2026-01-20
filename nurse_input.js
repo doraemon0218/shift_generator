@@ -198,6 +198,17 @@ function initializePage() {
 
 // カレンダーページを表示
 function showCalendarPage() {
+  // currentDataがnullの場合は再読み込みを試みる
+  if (!currentData) {
+    console.warn('currentData is null in showCalendarPage, attempting to reload...');
+    loadData();
+    if (!currentData) {
+      console.error('currentData is still null after reload');
+      alert('データの読み込みに失敗しました。ページを再読み込みしてください。');
+      return;
+    }
+  }
+  
   const mainCalendar = document.getElementById('mainCalendar');
   if (mainCalendar) {
     mainCalendar.style.display = 'block';
@@ -207,7 +218,7 @@ function showCalendarPage() {
   const nightShiftInfo = document.getElementById('nightShiftInfo');
   const nightShiftStatus = document.getElementById('nightShiftStatus');
   
-  if (nightShiftInfo) {
+  if (nightShiftInfo && currentData) {
     nightShiftInfo.style.display = 'block';
     const capability = resolveShiftCapability(currentData, null);
     if (nightShiftStatus) {
@@ -225,19 +236,25 @@ function showCalendarPage() {
   // 凡例を更新（夜勤をする人の場合のみ夜勤関連の選択肢を表示）
   const legendDayLate = document.getElementById('legendDayLate');
   const legendNightOnly = document.getElementById('legendNightOnly');
-  const capability = resolveShiftCapability(currentData, null);
-  if (legendDayLate) {
-    legendDayLate.style.display = capability === SHIFT_CAPABILITIES.DAY_LATE || capability === SHIFT_CAPABILITIES.ALL ? 'flex' : 'none';
-  }
-  if (legendNightOnly) {
-    legendNightOnly.style.display = capability === SHIFT_CAPABILITIES.DAY_NIGHT || capability === SHIFT_CAPABILITIES.ALL ? 'flex' : 'none';
+  if (currentData) {
+    const capability = resolveShiftCapability(currentData, null);
+    if (legendDayLate) {
+      legendDayLate.style.display = capability === SHIFT_CAPABILITIES.DAY_LATE || capability === SHIFT_CAPABILITIES.ALL ? 'flex' : 'none';
+    }
+    if (legendNightOnly) {
+      legendNightOnly.style.display = capability === SHIFT_CAPABILITIES.DAY_NIGHT || capability === SHIFT_CAPABILITIES.ALL ? 'flex' : 'none';
+    }
   }
   
   // カレンダーを初期化
-  initCalendar();
-  updateStatus();
-  updatePaidLeaveCounter();
-  loadSharedRequestsTable();
+  if (currentData) {
+    initCalendar();
+    updateStatus();
+    updatePaidLeaveCounter();
+    loadSharedRequestsTable();
+  } else {
+    console.error('Cannot initialize calendar: currentData is null');
+  }
 }
 
 // データの読み込み
