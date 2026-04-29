@@ -3,6 +3,52 @@
 
 let isReadOnlyAdminView = false;
 
+// 管理者画面で選択中の年月
+let adminSelectedYear = null;
+let adminSelectedMonth = null;
+
+function initAdminSelectedMonth() {
+  const target = getShiftTarget();
+  adminSelectedYear = target.year;
+  adminSelectedMonth = target.month;
+}
+
+function adminSwitchToMonth(year, month) {
+  adminSelectedYear = year;
+  adminSelectedMonth = month;
+  renderAdminMonthSelector();
+  loadIntegratedBoard();
+  const container = document.getElementById('allNurseRequestsContainer');
+  if (container && container.style.display !== 'none') {
+    loadAllNurseRequests();
+  }
+  // fixパネルの年月入力も同期
+  const fy = document.getElementById('fixYearInput');
+  const fm = document.getElementById('fixMonthInput');
+  if (fy) fy.value = year;
+  if (fm) fm.value = month;
+  renderFixManagement();
+}
+
+function renderAdminMonthSelector() {
+  const container = document.getElementById('adminMonthSelector');
+  if (!container) return;
+  const now = new Date();
+  container.innerHTML = '';
+  for (let offset = -2; offset <= 3; offset++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const y = d.getFullYear(), m = d.getMonth() + 1;
+    const locked = isMonthLocked(y, m);
+    const isSelected = y === adminSelectedYear && m === adminSelectedMonth;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'month-tab-admin' + (isSelected ? ' active' : '');
+    btn.textContent = `${y}年${m}月` + (locked ? ' 🔒' : '');
+    btn.addEventListener('click', () => adminSwitchToMonth(y, m));
+    container.appendChild(btn);
+  }
+}
+
 // getSageImageUri, normalizeShiftCapability, getCurrentUser, getUsers, saveUsers, getAdminUsers, saveAdminUsers, getAdminRequests, saveAdminRequests は common.js から継承
 
 // SVG版のgetSageImageUri（admin.js用）
@@ -660,41 +706,35 @@ function loadAllNurseRequests() {
   container.style.display = 'block';
   if (btn) btn.textContent = '一括管理画面を非表示';
 
-  const allKeys = Object.keys(localStorage);
-  const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
+  const targetYear  = adminSelectedYear;
+  const targetMonth = adminSelectedMonth;
+  const dates = getMonthDates(targetYear, targetMonth);
   const users = getUserDirectory();
 
-  if (requestKeys.length === 0) {
-    container.innerHTML = '<p style="color: #666;">登録されている勤務希望データがありません</p>';
+  // 月別キーで検索、旧形式もフォールバック
+  const monthSuffix = `_${targetYear}_${targetMonth}`;
+  const allKeys = Object.keys(localStorage);
+  const nurseDataList = [];
+
+  // 登録ユーザー全員を対象にする
+  const userEntries = Object.entries(users);
+  if (userEntries.length === 0) {
+    container.innerHTML = '<p style="color: #666;">登録ユーザーがいません</p>';
     return;
   }
 
-  const dates = getShiftDates();
-  const { year: targetYear, month: targetMonth } = getShiftTarget();
+  userEntries.forEach(([userKey, userInfo]) => {
+    const monthKey  = getMonthRequestKey(userKey, targetYear, targetMonth);
+    const legacyKey = STORAGE_KEY_PREFIX + userKey;
+    const dataStr   = localStorage.getItem(monthKey) || localStorage.getItem(legacyKey);
 
-  const nurseDataList = [];
-  requestKeys.forEach(key => {
-    const userKey = key.replace(STORAGE_KEY_PREFIX, '');
-    const dataStr = localStorage.getItem(key);
-    if (!dataStr) return;
+    const data = dataStr ? JSON.parse(dataStr) : { requests: {}, note: '' };
+    const displayName = data.nurseName || userInfo.fullName || userKey;
 
-    try {
-      const data = JSON.parse(dataStr);
-      const userInfo = users[userKey] || {};
-      const displayName = data.nurseName || userInfo.fullName || userKey;
-      const submittedKey = SUBMITTED_KEY_PREFIX + userKey;
-      const isSubmitted = localStorage.getItem(submittedKey) === 'true';
+    const isSubmitted = localStorage.getItem(getMonthSubmittedKey(userKey, targetYear, targetMonth)) === 'true'
+                     || localStorage.getItem(SUBMITTED_KEY_PREFIX + userKey) === 'true';
 
-      nurseDataList.push({
-        userKey,
-        name: displayName,
-        data,
-        isSubmitted,
-        userInfo
-      });
-    } catch (error) {
-      console.error('Failed to parse data for', userKey, error);
-    }
+    nurseDataList.push({ userKey, name: displayName, data, isSubmitted, userInfo });
   });
 
   // 名前順にソート
@@ -864,8 +904,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   
+  initAdminSelectedMonth();
   updateDeadlineDisplay();
   updateShiftTargetDisplay();
+  renderAdminMonthSelector();
   loadAdminRequestList();
   loadAdminList();
   loadIntegratedBoard();
@@ -1000,6 +1042,103 @@ function updateShiftTargetDisplay() {
   if (monthInput && !monthInput.value) monthInput.value = month;
 }
 
+// ─── シフトFix（月ロック）管理 ────────────────────────────────
+
+function lockMonthFix() {
+  if (isReadOnlyAdminView) { alert('閲覧モードでは操作できません'); return; }
+  const year  = parseInt(document.getElementById('fixYearInput').value, 10);
+  const month = parseInt(document.getElementById('fixMonthInput').value, 10);
+  if (!year || !month || month < 1 || month > 12) { alert('年・月を正しく入力してください'); return; }
+  if (!confirm(`${year}年${month}月のシフトを確定（fix）しますか？\n全員の編集が不可になります。`)) return;
+  localStorage.setItem(getMonthLockedKey(year, month), 'true');
+  renderFixManagement();
+  alert(`${year}年${month}月を確定しました`);
+}
+
+function unlockMonthFix() {
+  if (isReadOnlyAdminView) { alert('閲覧モードでは操作できません'); return; }
+  const year  = parseInt(document.getElementById('fixYearInput').value, 10);
+  const month = parseInt(document.getElementById('fixMonthInput').value, 10);
+  if (!year || !month || month < 1 || month > 12) { alert('年・月を正しく入力してください'); return; }
+  if (!confirm(`${year}年${month}月の確定を解除しますか？全員が編集可能になります。`)) return;
+  localStorage.removeItem(getMonthLockedKey(year, month));
+  // 個別ロック解除もすべてクリア
+  Object.keys(localStorage)
+    .filter(k => k.startsWith(`shift_month_unlocked_`) && k.endsWith(`_${year}_${month}`))
+    .forEach(k => localStorage.removeItem(k));
+  renderFixManagement();
+  alert(`${year}年${month}月の確定を解除しました`);
+}
+
+function unlockUserForMonth(userKey, year, month) {
+  if (isReadOnlyAdminView) { alert('閲覧モードでは操作できません'); return; }
+  localStorage.setItem(getMonthUserUnlockedKey(userKey, year, month), 'true');
+  renderFixManagement();
+}
+
+function relockUserForMonth(userKey, year, month) {
+  if (isReadOnlyAdminView) { alert('閲覧モードでは操作できません'); return; }
+  localStorage.removeItem(getMonthUserUnlockedKey(userKey, year, month));
+  renderFixManagement();
+}
+
+function renderFixManagement() {
+  const container = document.getElementById('fixManagementDetail');
+  if (!container) return;
+
+  const year  = parseInt(document.getElementById('fixYearInput').value, 10);
+  const month = parseInt(document.getElementById('fixMonthInput').value, 10);
+  if (!year || !month) { container.innerHTML = ''; return; }
+
+  const locked = isMonthLocked(year, month);
+  const statusLabel = locked
+    ? `<span style="color:#dc3545;font-weight:700;">🔒 確定済み</span>`
+    : `<span style="color:#28a745;font-weight:700;">🔓 未確定（編集可）</span>`;
+
+  let html = `<p style="margin:0 0 12px;">現在の状態: ${statusLabel}</p>`;
+
+  if (locked) {
+    html += `<p style="font-size:13px;color:#666;margin-bottom:12px;">
+      個別ロック解除：特定のユーザーのみ編集を許可します。修正完了後は再fixしてください。</p>`;
+
+    const users = getUserDirectory();
+    const userList = Object.entries(users).sort((a,b) => (a[1].fullName||'').localeCompare(b[1].fullName||'', 'ja'));
+
+    if (userList.length === 0) {
+      html += '<p style="color:#999;">登録ユーザーなし</p>';
+    } else {
+      html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+      html += '<thead><tr style="background:#f8f9fa;border-bottom:2px solid #ddd;">'
+            + '<th style="padding:8px;text-align:left;">氏名</th>'
+            + '<th style="padding:8px;text-align:center;">状態</th>'
+            + '<th style="padding:8px;text-align:center;">操作</th>'
+            + '</tr></thead><tbody>';
+      userList.forEach(([userKey, info]) => {
+        const name = info.fullName || userKey;
+        const isUnlocked = isUserMonthUnlocked(userKey, year, month);
+        const stateLabel = isUnlocked
+          ? '<span style="color:#f57c00;font-weight:600;">🔓 解除中</span>'
+          : '<span style="color:#666;">🔒 ロック</span>';
+        const btn = isUnlocked
+          ? `<button onclick="relockUserForMonth('${userKey}',${year},${month})"
+               style="padding:4px 10px;background:#dc3545;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">
+               再fix</button>`
+          : `<button onclick="unlockUserForMonth('${userKey}',${year},${month})"
+               style="padding:4px 10px;background:#ff9800;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">
+               解除</button>`;
+        html += `<tr style="border-bottom:1px solid #eee;">
+          <td style="padding:8px;">${name}</td>
+          <td style="padding:8px;text-align:center;">${stateLabel}</td>
+          <td style="padding:8px;text-align:center;">${btn}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+    }
+  }
+
+  container.innerHTML = html;
+}
+
 // 締め切り表示を更新
 function updateDeadlineDisplay() {
   const display = document.getElementById('deadlineDisplay');
@@ -1084,67 +1223,43 @@ function loadIntegratedBoard() {
   
   container.style.display = 'block';
   statusGrid.style.display = 'grid';
-  
-  const allKeys = Object.keys(localStorage);
-  const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
+
+  const boardYear  = adminSelectedYear;
+  const boardMonth = adminSelectedMonth;
   const users = getUserDirectory();
-  
-  // 統計情報を計算
+
+  // 統計情報を計算（月別）
   const nurseMap = new Map();
-  
-  requestKeys.forEach(key => {
-    const userKey = key.replace(STORAGE_KEY_PREFIX, '');
-    const dataStr = localStorage.getItem(key);
-    if (!dataStr) return;
-    
-    try {
-      const data = JSON.parse(dataStr);
-      const userInfo = users[userKey] || {};
-      const submittedKey = SUBMITTED_KEY_PREFIX + userKey;
-      const isSubmitted = localStorage.getItem(submittedKey) === 'true';
-      
-      const initialShiftCapability = normalizeShiftCapability(userInfo.initialShiftCapability)
-        ?? normalizeShiftCapability(userInfo.initialNightShift);
-      
-      const storedCapability = normalizeShiftCapability(data.shiftCapability)
-        ?? normalizeShiftCapability(data.doesNightShift);
-      
-      nurseMap.set(userKey, {
-        name: data.nurseName || userInfo.fullName || userKey,
-        userKey,
-        submitted: isSubmitted,
-        adminShiftCapability: storedCapability,
-        effectiveShiftCapability: storedCapability ?? initialShiftCapability,
-        initialShiftCapability,
-        valuePreference: data.preferences?.valuePreference || null,
-        userInfo
-      });
-    } catch (error) {
-      console.error('Failed to parse data for', userKey, error);
-    }
-  });
-  
+
   Object.keys(users).forEach(userKey => {
     if (nurseMap.has(userKey)) return;
     const user = users[userKey];
     const initialShiftCapability = normalizeShiftCapability(user?.initialShiftCapability)
       ?? normalizeShiftCapability(user?.initialNightShift);
-    
-    const submittedKey = SUBMITTED_KEY_PREFIX + userKey;
-    const isSubmitted = localStorage.getItem(submittedKey) === 'true';
-    
+
+    const monthKey  = getMonthRequestKey(userKey, boardYear, boardMonth);
+    const legacyKey = STORAGE_KEY_PREFIX + userKey;
+    const dataStr   = localStorage.getItem(monthKey) || localStorage.getItem(legacyKey);
+    const data = dataStr ? JSON.parse(dataStr) : {};
+
+    const storedCapability = normalizeShiftCapability(data.shiftCapability)
+      ?? normalizeShiftCapability(data.doesNightShift);
+
+    const isSubmitted = localStorage.getItem(getMonthSubmittedKey(userKey, boardYear, boardMonth)) === 'true'
+                     || localStorage.getItem(SUBMITTED_KEY_PREFIX + userKey) === 'true';
+
     nurseMap.set(userKey, {
-      name: user.fullName || userKey,
+      name: data.nurseName || user.fullName || userKey,
       userKey,
       submitted: isSubmitted,
-      adminShiftCapability: null,
-      effectiveShiftCapability: initialShiftCapability,
+      adminShiftCapability: storedCapability,
+      effectiveShiftCapability: storedCapability ?? initialShiftCapability,
       initialShiftCapability,
-      valuePreference: null,
+      valuePreference: data.preferences?.valuePreference || null,
       userInfo: user
     });
   });
-  
+
   const nurseList = Array.from(nurseMap.values()).sort((a, b) => {
     return a.name.localeCompare(b.name, 'ja');
   });

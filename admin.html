@@ -284,6 +284,20 @@
       color: #999;
       font-weight: 600;
     }
+    .month-tab-admin {
+      padding: 7px 14px;
+      background: #f0f0f0;
+      color: #333;
+      border: 2px solid #ddd;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .month-tab-admin:hover { background: #e3f2fd; border-color: #4a90e2; }
+    .month-tab-admin.active { background: #4a90e2; color: white; border-color: #4a90e2; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="./common.js"></script>
@@ -332,26 +346,53 @@
       </div>
     </div>
 
-    <!-- 統合管理ボードセクション -->
+    <!-- 統合看護師管理ボード（月選択・提出状況・Fix管理・一括管理） -->
     <div class="section">
       <div class="section-title">📊 看護師管理ボード</div>
-      <p style="color: #666; margin-bottom: 16px;">提出状況、勤務対応設定、価値観を一覧で確認・管理できます。チェックボックスで選択してアカウントを一括削除できます。</p>
+
+      <!-- 月セレクタ -->
+      <div style="margin-bottom: 16px;">
+        <label style="font-weight:600; display:block; margin-bottom:8px;">対象月を選択</label>
+        <div id="adminMonthSelector" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+      </div>
+
+      <!-- 提出状況サマリー -->
       <div class="status-grid" id="statusGrid"></div>
       <div id="integratedBoard" style="margin-top: 16px;"></div>
       <div id="bulkDeleteSection" style="display: none; margin-top: 16px; padding: 16px; background: #fff3cd; border-radius: 8px; border: 1px solid #ffc107;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <span id="selectedCount" style="font-weight: 600; color: #856404;">選択中: 0名</span>
-          <button onclick="deleteSelectedAccounts()" class="btn-danger" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">選択したアカウントを削除</button>
+          <button onclick="deleteSelectedAccounts()" class="btn-danger" style="padding: 8px 16px;">選択したアカウントを削除</button>
         </div>
       </div>
-    </div>
 
-    <!-- 勤務希望一括管理セクション -->
-    <div class="section">
-      <div class="section-title">📋 勤務希望・価値観の一括管理</div>
-      <p style="color: #666; margin-bottom: 16px;">全看護師の勤務希望と価値観を一覧で確認・編集できます</p>
-      <button onclick="loadAllNurseRequests()" class="btn-secondary" id="allNurseRequestsBtn">一括管理画面を表示</button>
-      <div id="allNurseRequestsContainer" style="margin-top: 16px; display: none;"></div>
+      <!-- シフトFix管理 -->
+      <div style="margin-top: 24px; padding: 16px; background: #f0f4ff; border-radius: 8px; border: 1px solid #c5cae9;">
+        <div style="font-size:16px; font-weight:700; margin-bottom:12px; color:#333;">🔒 シフトFix（確定・ロック）管理</div>
+        <p style="color:#666; font-size:13px; margin-bottom:12px;">
+          月を確定（Fix）すると、全看護師の編集が不可になります。個別にロック解除して再編集させることもできます。
+        </p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:16px;">
+          <input type="number" id="fixYearInput" placeholder="年" min="2024" max="2099"
+                 style="width:110px; padding:8px; border:1px solid #ddd; border-radius:6px; font-size:14px;" class="admin-action" />
+          <span style="font-weight:600;">年</span>
+          <input type="number" id="fixMonthInput" placeholder="月" min="1" max="12"
+                 style="width:72px; padding:8px; border:1px solid #ddd; border-radius:6px; font-size:14px;" class="admin-action" />
+          <span style="font-weight:600;">月</span>
+          <button onclick="lockMonthFix()" class="btn-danger admin-action">Fix（確定）</button>
+          <button onclick="unlockMonthFix()" class="btn-secondary admin-action">Fix解除</button>
+          <button onclick="renderFixManagement()" class="btn-secondary">状態確認</button>
+        </div>
+        <div id="fixManagementDetail"></div>
+      </div>
+
+      <!-- 勤務希望一括管理 -->
+      <div style="margin-top: 24px;">
+        <div style="font-size:16px; font-weight:700; margin-bottom:12px; color:#333;">📋 勤務希望・価値観の一括管理</div>
+        <p style="color:#666; font-size:13px; margin-bottom:12px;">選択中の月の全看護師希望を一覧で確認・編集できます</p>
+        <button onclick="loadAllNurseRequests()" class="btn-secondary" id="allNurseRequestsBtn">一括管理画面を表示</button>
+        <div id="allNurseRequestsContainer" style="margin-top: 16px; display: none;"></div>
+      </div>
     </div>
 
     <!-- 管理者設定セクション -->

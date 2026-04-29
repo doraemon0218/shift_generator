@@ -94,12 +94,47 @@ function getShiftTarget() {
 // 対象月の全日付を "M/D" 形式で返す
 function getShiftDates() {
   const { year, month } = getShiftTarget();
+  return getMonthDates(year, month);
+}
+
+// 任意の年月の日付を "M/D" 形式で返す
+function getMonthDates(year, month) {
   const daysInMonth = new Date(year, month, 0).getDate();
   const result = [];
   for (let d = 1; d <= daysInMonth; d++) {
     result.push(`${month}/${d}`);
   }
   return result;
+}
+
+// 月別ストレージキー
+function getMonthRequestKey(userKey, year, month) {
+  return `${STORAGE_KEY_PREFIX}${userKey}_${year}_${month}`;
+}
+function getMonthSubmittedKey(userKey, year, month) {
+  return `${SUBMITTED_KEY_PREFIX}${userKey}_${year}_${month}`;
+}
+function getMonthLockedKey(year, month) {
+  return `shift_month_locked_${year}_${month}`;
+}
+function getMonthUserUnlockedKey(userKey, year, month) {
+  return `shift_month_unlocked_${userKey}_${year}_${month}`;
+}
+
+// 月がfixされているか（管理者による全体ロック）
+function isMonthLocked(year, month) {
+  return localStorage.getItem(getMonthLockedKey(year, month)) === 'true';
+}
+
+// 個人レベルでロック解除されているか
+function isUserMonthUnlocked(userKey, year, month) {
+  return localStorage.getItem(getMonthUserUnlockedKey(userKey, year, month)) === 'true';
+}
+
+// ユーザーがその月を編集できるか
+function canEditMonth(userKey, year, month) {
+  if (!isMonthLocked(year, month)) return true;
+  return isUserMonthUnlocked(userKey, year, month);
 }
 
 // 日付が週末かどうか判定

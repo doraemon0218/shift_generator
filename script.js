@@ -815,17 +815,17 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
 
           // 明け休みやその翌日の公休は交換不可
           if (assignment.isDayOffAfterNight || other.isDayOffAfterNight) {
-            continue;
+            return;
           }
-          
+
           // 前日が明け休みの場合も交換不可（翌日は公休である必要がある）
           const prevDay = getPreviousDayShift(schedule, dayIndex);
           if (prevDay) {
             const prevAssignment = prevDay.nurses.find(a => a.name === nurse.name);
             const prevOtherAssignment = prevDay.nurses.find(a => a.name === otherNurse.name);
-            if ((prevAssignment && prevAssignment.isDayOffAfterNight) || 
+            if ((prevAssignment && prevAssignment.isDayOffAfterNight) ||
                 (prevOtherAssignment && prevOtherAssignment.isDayOffAfterNight)) {
-              continue;
+              return;
             }
           }
           

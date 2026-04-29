@@ -106,8 +106,28 @@ function isDayCellTarget(target) {
   return Boolean(target.closest('.day-cell'));
 }
 
-// 対象月の日付を動的生成
-const dates = getShiftDates();
+// 選択中の年月（月セレクタで変更される）
+let selectedYear = null;
+let selectedMonth = null;
+let dates = [];
+
+function initSelectedMonth() {
+  const target = getShiftTarget();
+  selectedYear = target.year;
+  selectedMonth = target.month;
+  dates = getMonthDates(selectedYear, selectedMonth);
+}
+
+function switchToMonth(year, month) {
+  selectedYear = year;
+  selectedMonth = month;
+  dates = getMonthDates(year, month);
+  loadData();
+  initCalendar();
+  renderMonthSelector();
+  updateStatus();
+  updatePaidLeaveCounter();
+}
 
 // isWeekend, getDayOfWeek は common.js から継承
 
@@ -128,7 +148,9 @@ function autoLogin() {
       window.location.href = 'index.html';
       return;
     }
-    
+
+    initSelectedMonth();
+
     // メインコンテンツを表示
     const mainContent = document.getElementById('mainContent');
     if (mainContent) {
@@ -258,14 +280,16 @@ function showCalendarPage() {
 function loadData() {
   const currentUser = getCurrentUser();
   let userKey = currentNurse;
-  
+
   if (currentUser) {
     userKey = currentUser.userKey || currentNurse;
   }
-  
-  const storageKey = STORAGE_KEY_PREFIX + userKey;
-  const stored = localStorage.getItem(storageKey);
-  
+
+  // 月別キーを優先し、旧形式にフォールバック
+  const monthKey = getMonthRequestKey(userKey, selectedYear, selectedMonth);
+  const legacyKey = STORAGE_KEY_PREFIX + userKey;
+  const stored = localStorage.getItem(monthKey) || localStorage.getItem(legacyKey);
+
   if (stored) {
     currentData = JSON.parse(stored);
   } else {
@@ -318,11 +342,13 @@ function loadData() {
     }
   }
 
-  // 提出状態を確認
+  // 提出状態を確認（月別）
   if (currentUser) {
     const userKeyForSubmit = getCurrentUserKey() || currentNurse;
-    const submittedKey = SUBMITTED_KEY_PREFIX + userKeyForSubmit;
-    const isSubmitted = localStorage.getItem(submittedKey) === 'true';
+    const monthSubmittedKey = getMonthSubmittedKey(userKeyForSubmit, selectedYear, selectedMonth);
+    const legacySubmittedKey = SUBMITTED_KEY_PREFIX + userKeyForSubmit;
+    const isSubmitted = localStorage.getItem(monthSubmittedKey) === 'true'
+                     || localStorage.getItem(legacySubmittedKey) === 'true';
     currentData.submitted = isSubmitted;
   }
 
@@ -395,19 +421,19 @@ function updateNightShiftStatusInHeader() {
 
 // データの保存
 function saveData() {
-  if (!currentNurse) return;
-  
+  if (!currentNurse || !selectedYear || !selectedMonth) return;
+
   const CURRENT_USER_KEY = 'current_user';
   const currentUser = localStorage.getItem(CURRENT_USER_KEY);
   let userKey = currentNurse;
-  
+
   if (currentUser) {
     const user = JSON.parse(currentUser);
     userKey = user.userKey || currentNurse;
     currentData.userKey = userKey;
   }
-  
-  const storageKey = STORAGE_KEY_PREFIX + userKey;
+
+  const storageKey = getMonthRequestKey(userKey, selectedYear, selectedMonth);
   localStorage.setItem(storageKey, JSON.stringify(currentData));
 }
 
@@ -433,8 +459,7 @@ function initCalendar() {
 
   const monthHeader = document.getElementById('calendarMonthHeader');
   if (monthHeader) {
-    const { year, month } = getShiftTarget();
-    monthHeader.textContent = `${year}年${month}月`;
+    monthHeader.textContent = `${selectedYear}年${selectedMonth}月`;
   }
 
   // 締め切りチェック
@@ -454,8 +479,7 @@ function initCalendar() {
     calendarGrid.appendChild(weekdayCell);
   });
   
-  const { year, month } = getShiftTarget();
-  const firstDay = new Date(year, month - 1, 1);
+  const firstDay = new Date(selectedYear, selectedMonth - 1, 1);
   const firstDayOfWeek = firstDay.getDay();
   
   // 最初の週の空白セル
@@ -1151,19 +1175,52 @@ function updateStatus() {
 // 提出ボタンの状態を更新
 function updateSubmitButtons() {
   if (!currentData) return;
-  
+
   const submitBtn = document.getElementById('submitBtn');
   const cancelBtn = document.getElementById('cancelSubmitBtn');
   const saveDraftBtn = document.getElementById('saveDraftBtn');
+  const lockBanner = document.getElementById('lockBanner');
   const deadlineStr = localStorage.getItem(DEADLINE_KEY);
   const isDeadlinePassed = deadlineStr ? new Date(deadlineStr) < new Date() : false;
-  
+
+  // ロック状態チェック
+  const userKey = getCurrentUserKey() || currentNurse;
+  const locked = isMonthLocked(selectedYear, selectedMonth);
+  const unlocked = isUserMonthUnlocked(userKey, selectedYear, selectedMonth);
+  const isEditable = !locked || unlocked;
+
+  if (lockBanner) {
+    if (locked && !unlocked) {
+      lockBanner.style.display = 'block';
+      lockBanner.textContent = `🔒 ${selectedYear}年${selectedMonth}月のシフトは確定済みです。編集できません。`;
+    } else if (locked && unlocked) {
+      lockBanner.style.display = 'block';
+      lockBanner.textContent = `🔓 ${selectedYear}年${selectedMonth}月は個別にロック解除中です。修正後は管理者に連絡してください。`;
+      lockBanner.style.background = '#fff3cd';
+      lockBanner.style.borderColor = '#ffc107';
+      lockBanner.style.color = '#856404';
+    } else {
+      lockBanner.style.display = 'none';
+    }
+  }
+
+  if (!isEditable) {
+    // 確定月：編集不可
+    if (submitBtn) submitBtn.style.display = 'none';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    if (saveDraftBtn) saveDraftBtn.disabled = true;
+    document.querySelectorAll('.day-cell').forEach(cell => {
+      if (!cell.classList.contains('empty')) cell.classList.add('disabled');
+    });
+    return;
+  }
+
   if (currentData.submitted) {
     if (submitBtn) submitBtn.style.display = 'none';
     if (cancelBtn) cancelBtn.style.display = 'block';
     if (saveDraftBtn) saveDraftBtn.disabled = true;
     if (cancelBtn) cancelBtn.disabled = isDeadlinePassed;
-    
+
     document.querySelectorAll('.day-cell').forEach(cell => {
       if (!cell.classList.contains('empty')) {
         cell.classList.add('disabled');
@@ -1292,20 +1349,19 @@ function submit() {
   
   currentData.submitted = true;
   currentData.submittedAt = new Date().toISOString();
-  
-  // 提出フラグを保存
+
+  // 提出フラグを月別で保存
   const CURRENT_USER_KEY = 'current_user';
   const currentUser = localStorage.getItem(CURRENT_USER_KEY);
   let userKeyForSubmit = currentNurse;
-  
+
   if (currentUser) {
     const user = JSON.parse(currentUser);
     userKeyForSubmit = user.userKey || currentNurse;
   }
-  
-  const submittedKey = SUBMITTED_KEY_PREFIX + userKeyForSubmit;
-  localStorage.setItem(submittedKey, 'true');
-  
+
+  localStorage.setItem(getMonthSubmittedKey(userKeyForSubmit, selectedYear, selectedMonth), 'true');
+
   saveData();
   updateStatus();
   alert('シフト希望を提出しました。ありがとうございます。');
@@ -1339,13 +1395,12 @@ function cancelSubmit() {
     userKeyForSubmit = user.userKey || currentNurse;
   }
   
-  const submittedKey = SUBMITTED_KEY_PREFIX + userKeyForSubmit;
-  localStorage.removeItem(submittedKey);
-  
+  localStorage.removeItem(getMonthSubmittedKey(userKeyForSubmit, selectedYear, selectedMonth));
+
   saveData();
   updateStatus();
   initCalendar();
-  
+
   alert('提出を取り消しました。再度編集できます。');
 }
 
@@ -1419,6 +1474,41 @@ function saveSettings() {
 // トップページに戻る
 function goToTop() {
   window.location.href = 'top.html';
+}
+
+// 月セレクタを描画（現在月 ±5ヶ月を表示）
+function renderMonthSelector() {
+  const container = document.getElementById('monthSelector');
+  if (!container) return;
+
+  const userKey = getCurrentUserKey() || currentNurse;
+  const now = new Date();
+  const tabs = [];
+
+  // 当月から -2 ～ +3 の計6ヶ月分
+  for (let offset = -2; offset <= 3; offset++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    tabs.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
+  }
+
+  container.innerHTML = '';
+  tabs.forEach(({ year, month }) => {
+    const locked = isMonthLocked(year, month);
+    const unlocked = locked && isUserMonthUnlocked(userKey, year, month);
+    const isSelected = year === selectedYear && month === selectedMonth;
+
+    const btn = document.createElement('button');
+    btn.className = 'month-tab' + (isSelected ? ' active' : '');
+    btn.type = 'button';
+
+    let lockIcon = '';
+    if (locked && !unlocked) lockIcon = ' 🔒';
+    else if (locked && unlocked) lockIcon = ' 🔓';
+
+    btn.textContent = `${year}年${month}月${lockIcon}`;
+    btn.addEventListener('click', () => switchToMonth(year, month));
+    container.appendChild(btn);
+  });
 }
 
 // イベントリスナーの設定

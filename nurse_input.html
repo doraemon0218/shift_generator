@@ -721,6 +721,27 @@
         font-size: 13px;
       }
     }
+    .month-tab {
+      padding: 8px 14px;
+      background: #f0f0f0;
+      color: #333;
+      border: 2px solid #ddd;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .month-tab:hover {
+      background: #e3f2fd;
+      border-color: #4a90e2;
+    }
+    .month-tab.active {
+      background: #4a90e2;
+      color: white;
+      border-color: #4a90e2;
+    }
     .global-top-button {
       position: fixed;
       top: 16px;
@@ -826,6 +847,12 @@
         <span>夜勤のみ可能（日勤・遅出不可）</span>
       </div>
     </div>
+
+    <!-- 月セレクタ -->
+    <div id="monthSelector" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;"></div>
+
+    <!-- ロックバナー -->
+    <div id="lockBanner" style="display:none; padding:10px 14px; background:#f8d7da; border-left:4px solid #dc3545; border-radius:6px; margin-bottom:12px; font-weight:600; color:#721c24;"></div>
 
     <div class="calendar-container">
       <div class="calendar-month-header" id="calendarMonthHeader">読み込み中...</div>
