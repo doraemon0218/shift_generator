@@ -9,6 +9,7 @@ const STORAGE_KEY_PREFIX = 'shift_request_';
 const DEADLINE_KEY = 'shift_deadline';
 const SUBMITTED_KEY_PREFIX = 'shift_submitted_';
 const MIXING_MATRIX_KEY = 'mixing_matrix';
+const SHIFT_TARGET_KEY = 'shift_target_month';
 const PAID_LEAVE_LIMIT = 8;
 
 // シフト対応状況
@@ -68,16 +69,51 @@ function normalizeShiftCapability(value) {
   return map[value] || null;
 }
 
-// 日付が週末かどうか判定（2025年8月）
+// シフト対象年月を取得（管理者が明示設定 → 締め切りの翌月 → 来月）
+function getShiftTarget() {
+  const stored = localStorage.getItem(SHIFT_TARGET_KEY);
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed.year && parsed.month) return parsed;
+    } catch (e) {}
+  }
+  const deadlineStr = localStorage.getItem(DEADLINE_KEY);
+  if (deadlineStr) {
+    const deadline = new Date(deadlineStr);
+    if (!isNaN(deadline.getTime())) {
+      const d = new Date(deadline.getFullYear(), deadline.getMonth() + 1, 1);
+      return { year: d.getFullYear(), month: d.getMonth() + 1 };
+    }
+  }
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+}
+
+// 対象月の全日付を "M/D" 形式で返す
+function getShiftDates() {
+  const { year, month } = getShiftTarget();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const result = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    result.push(`${month}/${d}`);
+  }
+  return result;
+}
+
+// 日付が週末かどうか判定
 function isWeekend(dateStr) {
+  const { year } = getShiftTarget();
   const [month, day] = dateStr.split('/').map(Number);
-  return [0, 6].includes(new Date(2025, month - 1, day).getDay());
+  return [0, 6].includes(new Date(year, month - 1, day).getDay());
 }
 
 // 日付文字列から曜日を取得
 function getDayOfWeek(dateStr) {
+  const { year } = getShiftTarget();
   const [month, day] = dateStr.split('/').map(Number);
-  return ['日', '月', '火', '水', '木', '金', '土'][new Date(2025, month - 1, day).getDay()];
+  return ['日', '月', '火', '水', '木', '金', '土'][new Date(year, month - 1, day).getDay()];
 }
 
 // 仙人画像URIを取得

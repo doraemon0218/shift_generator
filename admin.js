@@ -669,11 +669,8 @@ function loadAllNurseRequests() {
     return;
   }
 
-  // 日付リスト（2025年8月）
-  const dates = [];
-  for (let i = 1; i <= 31; i++) {
-    dates.push(`8/${i}`);
-  }
+  const dates = getShiftDates();
+  const { year: targetYear, month: targetMonth } = getShiftTarget();
 
   const nurseDataList = [];
   requestKeys.forEach(key => {
@@ -710,9 +707,8 @@ function loadAllNurseRequests() {
   html += '<th style="padding: 10px; text-align: center; width: 80px;">提出</th>';
   html += '<th style="padding: 10px; text-align: left; width: 150px;">価値観</th>';
   
-  // 日付ヘッダー（1-31日）
   dates.forEach((date, idx) => {
-    const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][new Date(2025, 7, idx + 1).getDay()];
+    const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][new Date(targetYear, targetMonth - 1, idx + 1).getDay()];
     const isWeekend = dayOfWeek === '日' || dayOfWeek === '土';
     html += `<th style="padding: 8px 4px; text-align: center; width: 35px; ${isWeekend ? 'background: #fff3cd;' : ''}" title="${date}">${idx + 1}<br><small style="color: #666;">${dayOfWeek}</small></th>`;
   });
@@ -767,9 +763,9 @@ function loadAllNurseRequests() {
         : REQUEST_TYPES.AVAILABLE;
       const color = requestTypeColors[requestType] || '#f0f0f0';
       const label = requestTypeLabels[requestType] || '?';
-      const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][new Date(2025, 7, idx + 1).getDay()];
+      const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][new Date(targetYear, targetMonth - 1, idx + 1).getDay()];
       const isWeekend = dayOfWeek === '日' || dayOfWeek === '土';
-      
+
       html += `<td style="padding: 4px; text-align: center; background: ${color}; ${isWeekend ? 'border-left: 2px solid #ffc107; border-right: 2px solid #ffc107;' : ''}" title="${date} (${requestType})">${label}</td>`;
     });
 
@@ -869,9 +865,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   updateDeadlineDisplay();
+  updateShiftTargetDisplay();
   loadAdminRequestList();
   loadAdminList();
-  loadIntegratedBoard(); // 統合管理ボードを常に表示
+  loadIntegratedBoard();
 });
 
 // 毎月15日23:59に設定
@@ -960,6 +957,47 @@ function clearDeadline() {
   }
   updateDeadlineDisplay();
   alert('締め切りをクリアしました');
+}
+
+// シフト対象月を設定
+function setShiftTarget() {
+  if (isReadOnlyAdminView) {
+    alert('閲覧モードでは編集できません');
+    return;
+  }
+  const yearVal = parseInt(document.getElementById('targetYearInput').value, 10);
+  const monthVal = parseInt(document.getElementById('targetMonthInput').value, 10);
+  if (!yearVal || !monthVal || monthVal < 1 || monthVal > 12) {
+    alert('年・月を正しく入力してください');
+    return;
+  }
+  localStorage.setItem(SHIFT_TARGET_KEY, JSON.stringify({ year: yearVal, month: monthVal }));
+  updateShiftTargetDisplay();
+  alert(`シフト対象月を ${yearVal}年${monthVal}月 に設定しました`);
+}
+
+function clearShiftTarget() {
+  if (isReadOnlyAdminView) {
+    alert('閲覧モードでは編集できません');
+    return;
+  }
+  localStorage.removeItem(SHIFT_TARGET_KEY);
+  updateShiftTargetDisplay();
+  alert('シフト対象月の明示設定をクリアしました（締め切り日または来月が自動適用されます）');
+}
+
+function updateShiftTargetDisplay() {
+  const display = document.getElementById('shiftTargetDisplay');
+  if (!display) return;
+  const { year, month } = getShiftTarget();
+  const stored = localStorage.getItem(SHIFT_TARGET_KEY);
+  const source = stored ? '手動設定' : (localStorage.getItem(DEADLINE_KEY) ? '締め切りから自動' : '来月（デフォルト）');
+  display.textContent = `現在の対象月: ${year}年${month}月（${source}）`;
+
+  const yearInput = document.getElementById('targetYearInput');
+  const monthInput = document.getElementById('targetMonthInput');
+  if (yearInput && !yearInput.value) yearInput.value = year;
+  if (monthInput && !monthInput.value) monthInput.value = month;
 }
 
 // 締め切り表示を更新
@@ -1579,10 +1617,9 @@ function exportAllRequests() {
     return;
   }
 
-  const dates = [];
-  for (let i = 1; i <= 31; i++) {
-    dates.push(`8/${i}`);
-  }
+  const dates = getShiftDates();
+  const { year: exportYear, month: exportMonth } = getShiftTarget();
+  const daysInMonth = new Date(exportYear, exportMonth, 0).getDate();
 
   const users = getUserDirectory();
 
@@ -1619,7 +1656,7 @@ function exportAllRequests() {
     const row = [
       displayName,
       nightShiftStatus,
-      '2025年8月1日〜8月31日',
+      `${exportYear}年${exportMonth}月1日〜${exportMonth}月${daysInMonth}日`,
       preferenceLabel,
       data.note || ''
     ];

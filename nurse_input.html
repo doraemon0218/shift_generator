@@ -648,22 +648,77 @@
       margin-right: 8px;
     }
     @media (max-width: 768px) {
+      body {
+        padding: 8px;
+      }
+      .container {
+        padding: 12px;
+        border-radius: 8px;
+      }
+      h1 {
+        font-size: 20px;
+      }
+      .calendar-container {
+        padding: 12px;
+        border-radius: 8px;
+      }
+      .calendar-month-header {
+        font-size: 18px;
+        margin-bottom: 12px;
+      }
       .calendar-grid {
-        gap: 4px;
+        gap: 3px;
+      }
+      .calendar-weekday {
+        padding: 6px 2px;
+        font-size: 11px;
+        border-radius: 4px;
       }
       .day-cell {
-        min-height: 60px;
-        padding: 8px 4px;
-        font-size: 12px;
+        min-height: 56px;
+        padding: 4px 2px;
+        font-size: 11px;
+        border-radius: 6px;
+        border-width: 1px;
       }
       .day-number {
-        font-size: 14px;
+        font-size: 13px;
+        font-weight: 700;
       }
       .day-label {
-        font-size: 10px;
+        font-size: 9px;
+        line-height: 1.2;
       }
       .quick-options {
-        width: 220px;
+        width: calc(100vw - 32px);
+        max-width: 320px;
+        left: 50% !important;
+        transform: translateX(-50%);
+        top: auto !important;
+        bottom: 16px;
+        position: fixed;
+      }
+      .global-top-button {
+        top: 8px;
+        right: 8px;
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+      .action-buttons {
+        position: sticky;
+        bottom: 0;
+        background: white;
+        padding: 12px;
+        box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+        z-index: 100;
+        margin: 0 -12px;
+        justify-content: center;
+      }
+      .action-buttons button {
+        flex: 1;
+        min-width: 100px;
+        padding: 12px 8px;
+        font-size: 13px;
       }
     }
     .global-top-button {
@@ -773,7 +828,7 @@
     </div>
 
     <div class="calendar-container">
-      <div class="calendar-month-header">2025年8月</div>
+      <div class="calendar-month-header" id="calendarMonthHeader">読み込み中...</div>
       <div class="calendar-grid" id="calendarGrid">
         <!-- カレンダーは動的に生成されます -->
       </div>

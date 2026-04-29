@@ -106,11 +106,8 @@ function isDayCellTarget(target) {
   return Boolean(target.closest('.day-cell'));
 }
 
-// 日付の生成（2025年8月）
-const dates = [];
-for (let i = 1; i <= 31; i++) {
-  dates.push(`8/${i}`);
-}
+// 対象月の日付を動的生成
+const dates = getShiftDates();
 
 // isWeekend, getDayOfWeek は common.js から継承
 
@@ -434,6 +431,12 @@ function initCalendar() {
   hideQuickOptions(true);
   calendarGrid.innerHTML = '';
 
+  const monthHeader = document.getElementById('calendarMonthHeader');
+  if (monthHeader) {
+    const { year, month } = getShiftTarget();
+    monthHeader.textContent = `${year}年${month}月`;
+  }
+
   // 締め切りチェック
   const deadlineStr = localStorage.getItem(DEADLINE_KEY);
   const isDeadlinePassed = deadlineStr ? new Date(deadlineStr) < new Date() : false;
@@ -451,8 +454,8 @@ function initCalendar() {
     calendarGrid.appendChild(weekdayCell);
   });
   
-  // 2025年8月の最初の日を取得
-  const firstDay = new Date(2025, 7, 1);
+  const { year, month } = getShiftTarget();
+  const firstDay = new Date(year, month - 1, 1);
   const firstDayOfWeek = firstDay.getDay();
   
   // 最初の週の空白セル

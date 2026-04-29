@@ -311,6 +311,27 @@
       <div id="deadlineDisplay" class="deadline-display" style="display: none;"></div>
     </div>
 
+    <!-- シフト対象月設定セクション -->
+    <div class="section">
+      <div class="section-title">📆 シフト対象月設定</div>
+      <p style="color: #666; margin-bottom: 16px;">
+        看護師が希望を入力する対象月を設定します。未設定の場合は締め切り日の翌月が自動適用されます。
+      </p>
+      <div id="shiftTargetDisplay" style="font-weight: 600; margin-bottom: 16px; color: #333;"></div>
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <input type="number" id="targetYearInput" placeholder="年（例: 2026）" min="2024" max="2099"
+               style="width: 130px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"
+               class="admin-action" />
+        <span style="font-weight: 600;">年</span>
+        <input type="number" id="targetMonthInput" placeholder="月" min="1" max="12"
+               style="width: 80px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"
+               class="admin-action" />
+        <span style="font-weight: 600;">月</span>
+        <button onclick="setShiftTarget()" class="btn-success admin-action">設定</button>
+        <button onclick="clearShiftTarget()" class="btn-secondary admin-action">クリア（自動）</button>
+      </div>
+    </div>
+
     <!-- 統合管理ボードセクション -->
     <div class="section">
       <div class="section-title">📊 看護師管理ボード</div>

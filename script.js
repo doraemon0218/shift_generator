@@ -31,12 +31,11 @@ async function loadCSV(file) {
   });
 }
 
-// 日付列を取得
+// 日付列を取得（M/D 形式 — 月は動的）
 function getDateColumns(rows) {
   if (!rows.length) return [];
   const cols = Object.keys(rows[0]);
-  // 8/1 から 8/31 の形式の列を取得
-  return cols.filter(col => /^8\/\d+$/.test(col));
+  return cols.filter(col => /^\d{1,2}\/\d{1,2}$/.test(col));
 }
 
 // LocalStorageから看護師の標準勤務形態を取得
@@ -466,6 +465,20 @@ function getPreviousDayShift(schedule, dateIndex) {
   return prevDay;
 }
 
+// 看護師の直近 n 日間の連続勤務数を計算
+function countConsecutiveWorkDays(nurseName, schedule, beforeIndex) {
+  let count = 0;
+  for (let i = beforeIndex - 1; i >= 0; i--) {
+    const assignment = schedule[i]?.nurses.find(a => a.name === nurseName);
+    if (assignment && assignment.shift !== SHIFT_TYPES.OFF) {
+      count++;
+    } else {
+      break;
+    }
+  }
+  return count;
+}
+
 // 夜勤をしない人かどうか判定（標準勤務形態と希望データから判断）
 function isNightShiftEligible(nurse) {
   // 標準勤務形態を優先的に確認
@@ -589,6 +602,10 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
         if (!isNightShiftEligible(n) && isWeekend(day.date)) {
           return false;
         }
+        // 5日以上連続勤務は避ける（師長の配慮を自動化）
+        if (countConsecutiveWorkDays(n.name, schedule, dayIndex) >= 5) {
+          return false;
+        }
         return true;
       })
       , random).sort((a, b) => {
@@ -641,6 +658,10 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
         }
         // 夜勤をしない人は除外
         if (!isNightShiftEligible(n)) {
+          return false;
+        }
+        // 5日以上連続勤務は避ける
+        if (countConsecutiveWorkDays(n.name, schedule, dayIndex) >= 5) {
           return false;
         }
         return true;
@@ -1104,7 +1125,8 @@ function exportToCSV(schedule, filenameSuffix = '') {
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   const suffix = filenameSuffix ? `_${filenameSuffix}` : '';
-  link.download = `shift_schedule_2025_08${suffix}.csv`;
+  const { year, month } = getShiftTarget();
+  link.download = `shift_schedule_${year}_${String(month).padStart(2, '0')}${suffix}.csv`;
   link.click();
 }
 
