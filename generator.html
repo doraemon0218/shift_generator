@@ -4,8 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>シフト表生成 - 手術室シフト管理</title>
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body { 
@@ -264,33 +262,22 @@
     </div>
     
     <p style="color: #666; margin-bottom: 24px;">
-      CSVファイルを選択して「データを読み込む」をクリックすると、シフト入力者の相性表が表示されます。<br>
-      相性表を修正後、勤務配置人数を入力して「シフト表を出力」をクリックすると、3つの候補が表示されます。<br>
-      ※ 夜勤明けの翌日は、基本的に休みとして自動付与されます（生成ルール）。
+      対象月を選択してデータを読み込むと夜勤ペア相性表が表示されます。<br>
+      相性表を確認後、勤務配置人数を入力して「シフト表を生成」をクリックすると3つの候補が表示されます。<br>
+      ※ 夜勤明けの翌日は基本的に休みとして自動付与されます（生成ルール）。
     </p>
 
     <!-- ステップ1: データ読み込み -->
-    <div style="background:#f0f4ff; border:1px solid #c7d2fe; border-radius:8px; padding:16px; margin-bottom:16px;">
-      <h3 style="margin:0 0 12px; font-size:15px; color:#3730a3;">方法A：勤務希望システムのデータを直接読み込む（推奨）</h3>
-      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <label style="margin:0; font-weight:normal;">対象月：</label>
-        <input type="number" id="lsYear" style="width:80px;" placeholder="年" />
-        <span>年</span>
-        <input type="number" id="lsMonth" style="width:60px;" min="1" max="12" placeholder="月" />
-        <span>月</span>
-        <button id="lsLoadBtn" class="btn-primary">LocalStorageから読み込む</button>
-        <button id="dummyLoadBtn" style="background:#8b5cf6;">テスト用ダミーデータ（30名）</button>
-      </div>
-      <p style="margin:8px 0 0; font-size:12px; color:#666;">※ 看護師が勤務希望入力画面で入力したデータをそのまま読み込みます。ダミーボタンは来月分の30名分テストデータを書き込んでから読み込みます。</p>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:16px;">
+      <label style="margin:0; font-weight:600;">対象月：</label>
+      <input type="number" id="lsYear" style="width:80px; padding:8px; border:1px solid #ddd; border-radius:4px; font-size:14px;" placeholder="年" />
+      <span>年</span>
+      <input type="number" id="lsMonth" style="width:60px; padding:8px; border:1px solid #ddd; border-radius:4px; font-size:14px;" min="1" max="12" placeholder="月" />
+      <span>月</span>
+      <button id="lsLoadBtn" class="btn-primary">データを読み込む</button>
+      <button id="dummyLoadBtn" style="background:#8b5cf6;">テスト用ダミーデータ（30名）</button>
     </div>
-
-    <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:16px; margin-bottom:16px;">
-      <h3 style="margin:0 0 12px; font-size:15px; color:#374151;">方法B：CSVファイルから読み込む</h3>
-      <div class="form-group" style="margin:0;">
-        <input type="file" id="fileInput" accept=".csv" />
-        <button id="loadBtn" class="btn-primary">CSVを読み込む</button>
-      </div>
-    </div>
+    <p style="margin:0 0 16px; font-size:12px; color:#666;">※ 看護師が勤務希望入力画面で入力したデータを読み込みます。ダミーボタンは来月分30名のテストデータを書き込んでから読み込みます。</p>
 
     <div id="errorContainer"></div>
 
@@ -298,9 +285,8 @@
     <div id="pairMatrixSection" style="display: none; margin-top: 32px;">
       <h2 style="margin: 0 0 12px; font-size: 20px; color: #333;">🤝 夜勤ペア相性表</h2>
       <p style="color: #666; margin-bottom: 12px;">
-        CSVの1列目（氏名）から自動抽出した夜勤する人同士の相性を設定します。<br>
-        ○：問題なし（デフォルト）、△：極力避けたい、×：禁忌<br>
-        ※ 夜勤する人同士のセルのみ編集可能です。
+        夜勤可能なスタッフ同士の相性を設定します。前回の設定が自動的に引き継がれます。<br>
+        ○：問題なし（デフォルト）、△：極力避けたい、×：禁忌
       </p>
       <div id="nightPairMatrix" class="pair-matrix"></div>
     </div>

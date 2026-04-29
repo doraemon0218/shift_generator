@@ -1,5 +1,4 @@
 // グローバル変数
-let requestData = [];
 let shiftSchedule = [];
 let scheduleDrafts = [];
 let selectedDraftIndex = null;
@@ -10,26 +9,6 @@ let dateColumns = [];
 let mixingMatrix = null;
 
 // 定数は common.js から継承
-
-// CSVを読み込む
-async function loadCSV(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const { data } = Papa.parse(e.target.result, {
-          header: true,
-          skipEmptyLines: true
-        });
-        resolve(data);
-      } catch (error) {
-        reject(error);
-      }
-    };
-    reader.onerror = reject;
-    reader.readAsText(file);
-  });
-}
 
 // 日付列を取得（M/D 形式 — 月は動的）
 function getDateColumns(rows) {
@@ -1279,55 +1258,11 @@ function processNursesLoaded(loadedNurses) {
   alert(`データを読み込みました。\n看護師数: ${nurses.length}名\n期間: ${dateColumns.length}日\n夜勤する人: ${nightShiftCount}名\n\n夜勤ペア相性表が前回の設定を引き継ぎました。\n確認後、「シフト表を生成」ボタンを押してください。`);
 }
 
-function processLoadedData() {
-  nurses = parseNurseData(requestData);
-  if (nurses.length === 0) {
-    showError('データが見つかりませんでした');
-    return;
-  }
-  processNursesLoaded(nurses);
-}
 
 // メイン処理
 document.addEventListener('DOMContentLoaded', () => {
-  // ログイン状態を確認（管理者ページではないので、任意）
-  // const currentUser = localStorage.getItem('current_user');
-  // if (!currentUser) {
-  //   // ログインしていなくてもCSV読み込みは可能
-  // }
-  
-  const fileInput = document.getElementById('fileInput');
-  const loadBtn = document.getElementById('loadBtn');
   const generateBtn = document.getElementById('generateBtn');
   const exportBtn = document.getElementById('exportBtn');
-  // 相性表のボタンは削除（自動生成・自動保存のため不要）
-
-  // デフォルトファイルを読み込む（data/shift_requests.csv）
-  loadBtn.addEventListener('click', async () => {
-    clearError();
-    const file = fileInput.files[0];
-
-    if (!file) {
-      try {
-        const response = await fetch('./data/shift_requests.csv');
-        if (!response.ok) throw new Error('デフォルトファイルが見つかりません');
-        const text = await response.text();
-        const { data } = Papa.parse(text, { header: true, skipEmptyLines: true });
-        requestData = data;
-      } catch (error) {
-        showError(`ファイルの読み込みに失敗しました: ${error.message}`);
-        return;
-      }
-    } else {
-      try {
-        requestData = await loadCSV(file);
-      } catch (error) {
-        showError(`ファイルの読み込みに失敗しました: ${error.message}`);
-        return;
-      }
-    }
-    processLoadedData();
-  });
 
   // テスト用ダミーデータ読み込み（LocalStorageに書き込んでから読み込む）
   const dummyBtn = document.getElementById('dummyLoadBtn');
