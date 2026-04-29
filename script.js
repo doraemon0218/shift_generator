@@ -189,6 +189,17 @@ function getPairMatrixCandidatesFromNurses() {
     .sort((a, b) => a.localeCompare(b, 'ja'));
 }
 
+// 表示名：同姓がいる場合は「田中(花)」形式、いなければ苗字のみ
+function pairDisplayName(fullName, allNames) {
+  const parts = fullName.trim().split(/\s+/);
+  const last = parts[0] || fullName;
+  const first = parts.slice(1).join('');
+  const hasDup = allNames.some(n => n !== fullName && (n.trim().split(/\s+/)[0] || n) === last);
+  return hasDup && first ? `${last}(${first[0]})` : last;
+}
+
+const PAIR_SYMBOL = { ok: '○', avoid: '△', block: '×' };
+
 function renderNightPairMatrix() {
   const container = document.getElementById('nightPairMatrix');
   if (!container) return;
@@ -197,7 +208,6 @@ function renderNightPairMatrix() {
     container.innerHTML = '<p style="color: #666; margin: 0;">夜勤するメンバーがいません。</p>';
     return;
   }
-
   if (pairMatrixCandidates.length === 1) {
     container.innerHTML = '<p style="color: #666; margin: 0;">夜勤するメンバーが1名のみのため、相性表は作成できません。</p>';
     return;
@@ -205,67 +215,49 @@ function renderNightPairMatrix() {
 
   const storedMatrix = getStoredMixingMatrix();
   const pairs = storedMatrix?.pairs || {};
+  const allNames = pairMatrixCandidates;
 
-  const headerCells = pairMatrixCandidates.map(name => `<th>${name}</th>`).join('');
+  const headerCells = allNames.map(name =>
+    `<th>${pairDisplayName(name, allNames)}</th>`
+  ).join('');
 
-  const rows = pairMatrixCandidates.map((rowName, rowIndex) => {
-    const cells = pairMatrixCandidates.map((colName, colIndex) => {
+  const rows = allNames.map((rowName, rowIndex) => {
+    const cells = allNames.map((colName, colIndex) => {
       if (rowIndex === colIndex) {
         return '<td class="pair-diagonal">-</td>';
       }
-      
-      // 夜勤する人同士のセルのみ編集可能（相性表は夜勤する人同士のみなので、全て編集可能）
-      // デフォルトは○（ok）、保存済みの値がある場合はそれを使用
-      const storedStatus = getMixingStatusForPair(pairs, rowName, colName);
-      const status = storedStatus || 'ok';
-      
-      // 夜勤する人同士のセル：編集可能
-      return `
-        <td>
-          <select class="pair-select" data-a="${rowName}" data-b="${colName}">
-            <option value="ok" ${status === 'ok' ? 'selected' : ''}>○ 問題なし</option>
-            <option value="avoid" ${status === 'avoid' ? 'selected' : ''}>△ 極力避けたい</option>
-            <option value="block" ${status === 'block' ? 'selected' : ''}>× 禁忌</option>
-          </select>
-        </td>
-      `;
+      const status = getMixingStatusForPair(pairs, rowName, colName) || 'ok';
+      if (rowIndex < colIndex) {
+        // 上三角：編集可能（select）
+        return `<td><select class="pair-select" data-a="${rowName}" data-b="${colName}">
+          <option value="ok"    ${status === 'ok'    ? 'selected' : ''}>○</option>
+          <option value="avoid" ${status === 'avoid' ? 'selected' : ''}>△</option>
+          <option value="block" ${status === 'block' ? 'selected' : ''}>×</option>
+        </select></td>`;
+      }
+      // 下三角：読み取り専用（ミラー表示）
+      return `<td class="pair-mirror" data-a="${rowName}" data-b="${colName}">${PAIR_SYMBOL[status]}</td>`;
     }).join('');
 
-    return `
-      <tr>
-        <th class="name-cell">${rowName}</th>
-        ${cells}
-      </tr>
-    `;
+    return `<tr><th class="name-cell">${pairDisplayName(rowName, allNames)}</th>${cells}</tr>`;
   }).join('');
 
   container.innerHTML = `
     <table>
-      <thead>
-        <tr>
-          <th class="name-cell">氏名</th>
-          ${headerCells}
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-      </tbody>
+      <thead><tr><th class="name-cell"></th>${headerCells}</tr></thead>
+      <tbody>${rows}</tbody>
     </table>
   `;
 
-  // 夜勤する人同士のセルのみイベントリスナーを追加
   container.querySelectorAll('select.pair-select').forEach(select => {
     select.addEventListener('change', () => {
       const a = select.dataset.a;
       const b = select.dataset.b;
       const value = select.value;
-      // 対称のセルも同じ値に更新
-      container.querySelectorAll(`select.pair-select[data-a="${b}"][data-b="${a}"]`).forEach(target => {
-        if (target.value !== value) {
-          target.value = value;
-        }
+      // 下三角のミラーセルを更新
+      container.querySelectorAll(`.pair-mirror[data-a="${b}"][data-b="${a}"]`).forEach(cell => {
+        cell.textContent = PAIR_SYMBOL[value] || '○';
       });
-      // 自動保存（localStorage）
       saveNightPairMatrixSilent();
     });
   });
