@@ -127,6 +127,7 @@ function switchToMonth(year, month) {
   renderMonthSelector();
   updateStatus();
   updatePaidLeaveCounter();
+  loadSharedRequestsTable();
 }
 
 // isWeekend, getDayOfWeek は common.js から継承
@@ -663,36 +664,40 @@ function isNightUnavailableRequest(requestType) {
   return requestType === REQUEST_TYPES.DAY_ONLY || requestType === REQUEST_TYPES.DAY_LATE;
 }
 
+// 選択中の月のキーからuserKeyを抽出するヘルパー
+function extractUserKeyFromMonthKey(key) {
+  const tail = key.slice(STORAGE_KEY_PREFIX.length);
+  const match = tail.match(/^(.+)_(\d{4})_(\d{1,2})$/);
+  if (!match) return null;
+  const y = parseInt(match[2]), m = parseInt(match[3]);
+  if (y !== selectedYear || m !== selectedMonth) return null;
+  return match[1]; // userKey
+}
+
 function getSharedRequestSummary() {
-  const allKeys = Object.keys(localStorage);
-  const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
   const summary = {};
   const currentUserKey = getCurrentUserKey();
 
-  requestKeys.forEach(key => {
-    const userKey = key.replace(STORAGE_KEY_PREFIX, '');
-    if (userKey === currentUserKey) return;
-    const dataStr = localStorage.getItem(key);
-    if (!dataStr) return;
-    try {
-      const data = JSON.parse(dataStr);
-      const requests = data.requests || {};
-      dates.forEach(date => {
-        const request = normalizeRequestType(requests[date]);
-        if (!request) return;
-        if (!summary[date]) {
-          summary[date] = { paidLeave: 0, nightOff: 0 };
-        }
-        if (request === REQUEST_TYPES.PAID_LEAVE) {
-          summary[date].paidLeave += 1;
-        } else if (isNightUnavailableRequest(request)) {
-          summary[date].nightOff += 1;
-        }
-      });
-    } catch (error) {
-      console.error('Failed to parse shared request data', error);
-    }
-  });
+  Object.keys(localStorage)
+    .filter(k => k.startsWith(STORAGE_KEY_PREFIX))
+    .forEach(key => {
+      const userKey = extractUserKeyFromMonthKey(key);
+      if (!userKey || userKey === currentUserKey) return;
+      try {
+        const data = JSON.parse(localStorage.getItem(key));
+        const requests = data.requests || {};
+        dates.forEach(date => {
+          const request = normalizeRequestType(requests[date]);
+          if (!request) return;
+          if (!summary[date]) summary[date] = { paidLeave: 0, nightOff: 0 };
+          if (request === REQUEST_TYPES.PAID_LEAVE) {
+            summary[date].paidLeave += 1;
+          } else if (isNightUnavailableRequest(request)) {
+            summary[date].nightOff += 1;
+          }
+        });
+      } catch (e) { /* ignore */ }
+    });
 
   return summary;
 }
@@ -710,41 +715,35 @@ function loadSharedRequestsTable() {
   if (!container) return;
 
   const users = getUserDirectory();
-  const allKeys = Object.keys(localStorage);
-  const requestKeys = allKeys.filter(key => key.startsWith(STORAGE_KEY_PREFIX));
   const nurseMap = new Map();
 
-  requestKeys.forEach(key => {
-    const userKey = key.replace(STORAGE_KEY_PREFIX, '');
-    const dataStr = localStorage.getItem(key);
-    if (!dataStr) return;
-    try {
-      const data = JSON.parse(dataStr);
-      const userInfo = users[userKey] || {};
-      const name = data.nurseName || userInfo.fullName || userKey;
-      const hireYear = typeof userInfo.hireYear === 'number' ? userInfo.hireYear : null;
-      const shiftCapability = resolveShiftCapability(data, userInfo);
-      nurseMap.set(userKey, {
-        name,
-        requests: data.requests || {},
-        hireYear,
-        shiftCapability
-      });
-    } catch (error) {
-      console.error('Failed to parse shift request data', error);
-    }
-  });
+  // 選択中の月のデータのみ収集（ユーザーキーを正確に抽出）
+  Object.keys(localStorage)
+    .filter(k => k.startsWith(STORAGE_KEY_PREFIX))
+    .forEach(key => {
+      const userKey = extractUserKeyFromMonthKey(key);
+      if (!userKey) return;
+      try {
+        const data = JSON.parse(localStorage.getItem(key));
+        const userInfo = users[userKey] || {};
+        nurseMap.set(userKey, {
+          name: data.nurseName || userInfo.fullName || userKey,
+          requests: data.requests || {},
+          hireYear: typeof userInfo.hireYear === 'number' ? userInfo.hireYear : null,
+          shiftCapability: resolveShiftCapability(data, userInfo)
+        });
+      } catch (e) { /* ignore */ }
+    });
 
+  // 登録ユーザーでデータなしの人も空欄で表示
   Object.keys(users).forEach(userKey => {
     if (nurseMap.has(userKey)) return;
     const user = users[userKey];
-    const hireYear = typeof user?.hireYear === 'number' ? user.hireYear : null;
-    const shiftCapability = resolveShiftCapability(null, user);
     nurseMap.set(userKey, {
       name: user.fullName || userKey,
       requests: {},
-      hireYear,
-      shiftCapability
+      hireYear: typeof user?.hireYear === 'number' ? user.hireYear : null,
+      shiftCapability: resolveShiftCapability(null, user)
     });
   });
 
