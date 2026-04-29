@@ -1482,14 +1482,13 @@ function renderMonthSelector() {
   if (!container) return;
 
   const userKey = getCurrentUserKey() || currentNurse;
-  const now = new Date();
-  const tabs = [];
 
-  // 当月から -2 ～ +3 の計6ヶ月分
-  for (let offset = -2; offset <= 3; offset++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-    tabs.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
-  }
+  // 管理者指定月（指定月 / 翌月 / 翌々月）の3ヶ月を表示
+  const base = getShiftTarget();
+  const tabs = [0, 1, 2].map(offset => {
+    const d = new Date(base.year, base.month - 1 + offset, 1);
+    return { year: d.getFullYear(), month: d.getMonth() + 1 };
+  });
 
   container.innerHTML = '';
   tabs.forEach(({ year, month }) => {
