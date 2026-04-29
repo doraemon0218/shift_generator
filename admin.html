@@ -312,31 +312,20 @@
       現在は閲覧モードです。操作系のボタンは無効化されています。
     </div>
 
-    <!-- シフト対象月・締め切り設定（統合） -->
+    <!-- 締め切り設定 -->
     <div class="section">
-      <div class="section-title">📅 シフト対象月・締め切り設定</div>
+      <div class="section-title">📅 シフト希望入力の締め切り設定</div>
       <p style="color: #666; margin-bottom: 20px;">
-        シフトを組む対象月と締め切り日をまとめて設定します。<br>
-        締め切りは「対象月の前月◯日 23:59」として自動計算されます。<br>
-        <strong>締め切り日は一度設定すると保存され、次回から自動補完されます。</strong>対象月だけ変更すれば再設定不要です。
+        シフト希望入力の締め切りを設定します。対象月は自動で「来月」が適用されます。<br>
+        一度設定すれば毎月自動的に引き継がれます。
       </p>
 
       <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
-        <span style="font-weight: 600; white-space: nowrap;">対象月：</span>
-        <input type="number" id="targetYearInput" placeholder="年" min="2024" max="2099"
-               style="width: 100px; padding: 9px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"
-               class="admin-action" />
-        <span style="font-weight: 600;">年</span>
-        <input type="number" id="targetMonthInput" placeholder="月" min="1" max="12"
-               style="width: 70px; padding: 9px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"
-               class="admin-action" />
-        <span style="font-weight: 600; margin-right: 16px;">月</span>
-
-        <span style="font-weight: 600; white-space: nowrap;">締め切り：前月</span>
-        <input type="number" id="deadlineDayInput" value="15" min="1" max="31"
+        <span style="font-weight: 600; white-space: nowrap;">前の月の</span>
+        <input type="number" id="deadlineDayInput" value="25" min="1" max="31"
                style="width: 65px; padding: 9px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"
                class="admin-action" />
-        <span style="font-weight: 600;">日 23:59</span>
+        <span style="font-weight: 600;">日 23:59 締め切り</span>
       </div>
 
       <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
@@ -345,7 +334,6 @@
       </div>
 
       <div id="unifiedSettingsDisplay" style="display:none; padding: 14px 16px; background: #e8f5e9; border-left: 4px solid #28a745; border-radius: 6px; font-size: 14px; line-height: 1.8;"></div>
-      <!-- 締め切りカウントダウン（既存ロジックと互換） -->
       <div id="deadlineDisplay" class="deadline-display" style="display: none; margin-top: 12px;"></div>
     </div>
 

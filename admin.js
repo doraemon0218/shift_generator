@@ -1005,41 +1005,32 @@ function clearDeadline() {
 // 対象月と締め切りを一括設定
 function setUnifiedSettings() {
   if (isReadOnlyAdminView) { alert('閲覧モードでは編集できません'); return; }
-  const year  = parseInt(document.getElementById('targetYearInput').value, 10);
-  const month = parseInt(document.getElementById('targetMonthInput').value, 10);
   const dayInput = document.getElementById('deadlineDayInput');
-  const rawDay = dayInput ? parseInt(dayInput.value, 10) : NaN;
+  const day = dayInput ? parseInt(dayInput.value, 10) : NaN;
 
-  // 締め切り日は入力があれば更新、なければ保存済みの値を使う
-  const storedDay = parseInt(localStorage.getItem(DEADLINE_DAY_KEY), 10);
-  const day = (!isNaN(rawDay) && rawDay >= 1 && rawDay <= 31) ? rawDay
-            : (!isNaN(storedDay) ? storedDay : null);
-
-  if (!year || !month || month < 1 || month > 12) {
-    alert('対象月（年・月）を正しく入力してください');
-    return;
-  }
-  if (!day) {
+  if (!day || day < 1 || day > 31) {
     alert('締め切り日（1〜31）を入力してください');
     return;
   }
 
-  // 対象月を保存
-  localStorage.setItem(SHIFT_TARGET_KEY, JSON.stringify({ year, month }));
-
-  // 締め切り日を独立して保存（次回から自動補完される）
+  // 締め切り日を独立して保存
   localStorage.setItem(DEADLINE_DAY_KEY, day);
 
-  // 締め切り = 対象月の前月 day 日 23:59:59
-  const deadline = new Date(year, month - 2, day, 23, 59, 59);
+  // 明示的な対象月設定は削除してgetShiftTarget()の自動導出に任せる
+  localStorage.removeItem(SHIFT_TARGET_KEY);
+
+  // 締め切り = 今月の day 日 23:59:59（対象月は自動で来月）
+  const now = new Date();
+  const deadline = new Date(now.getFullYear(), now.getMonth(), day, 23, 59, 59);
   localStorage.setItem(DEADLINE_KEY, deadline.toISOString());
 
   updateUnifiedDisplay();
   updateDeadlineDisplay();
   renderAdminMonthSelector();
 
+  const target = getShiftTarget();
   const dl = `${deadline.getFullYear()}年${deadline.getMonth() + 1}月${deadline.getDate()}日 23:59`;
-  alert(`設定しました\n対象月: ${year}年${month}月\n締め切り: ${dl}`);
+  alert(`設定しました\n対象月（自動）: ${target.year}年${target.month}月\n締め切り: ${dl}`);
 }
 
 function clearUnifiedSettings() {
@@ -1059,7 +1050,7 @@ function updateUnifiedDisplay() {
   const { year, month } = getShiftTarget();
   const deadlineStr = localStorage.getItem(DEADLINE_KEY);
 
-  let html = `<strong>対象月：</strong> ${year}年${month}月`;
+  let html = `<strong>対象月（自動）：</strong> ${year}年${month}月`;
   if (deadlineStr) {
     const d = new Date(deadlineStr);
     html += `　　<strong>締め切り：</strong> ${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 23:59`;
@@ -1069,13 +1060,8 @@ function updateUnifiedDisplay() {
   display.style.display = 'block';
   display.innerHTML = html;
 
-  // 入力欄に現在値を反映（未入力の場合のみ）
-  const fy = document.getElementById('targetYearInput');
-  const fm = document.getElementById('targetMonthInput');
+  // 締め切り日を入力欄に自動補完
   const fd = document.getElementById('deadlineDayInput');
-  if (fy && !fy.value) fy.value = year;
-  if (fm && !fm.value) fm.value = month;
-  // 締め切り日は保存済みの値で常に補完
   const storedDay = localStorage.getItem(DEADLINE_DAY_KEY);
   if (fd && storedDay) fd.value = storedDay;
 }

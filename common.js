@@ -33,6 +33,7 @@ const REQUEST_TYPES = {
 // シフトの種類
 const SHIFT_TYPES = {
   DAY: '日勤',
+  LATE: '遅出',
   NIGHT: '夜勤',
   OFF: '休'
 };

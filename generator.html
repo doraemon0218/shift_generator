@@ -115,21 +115,31 @@
       background: #ffebee;
       color: #c62828;
     }
-    .day-shift {
-      background: #e3f2fd;
+    .day-shift  { background: #e3f2fd; }
+    .late-shift { background: #e8f5e9; }
+    .night-shift { background: #fff3e0; }
+    .off-day { background: #f5f5f5; }
+    .conditions-table {
+      border-collapse: collapse;
+      margin-top: 4px;
     }
-    .night-shift {
-      background: #fff3e0;
+    .conditions-table th,
+    .conditions-table td {
+      border: 1px solid #ddd;
+      padding: 6px 10px;
+      text-align: center;
+      font-size: 14px;
     }
-    .off-day {
-      background: #f5f5f5;
-    }
-    .late-capable {
-      background: #c8e6c9 !important;
-      font-weight: 600;
-    }
-    .late-capable.violation {
-      background: #ffcdd2 !important;
+    .conditions-table th { background: #f8f9fa; font-weight: 600; }
+    .conditions-table .weekday-row td:first-child { font-weight: 600; color: #1a1a1a; }
+    .conditions-table .weekend-row td:first-child { font-weight: 600; color: #d32f2f; }
+    .cond-input {
+      width: 60px;
+      padding: 4px 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      text-align: center;
     }
     .stats {
       margin-top: 24px;
@@ -302,24 +312,35 @@
     <!-- ステップ3: シフト条件入力 -->
     <div id="shiftConditionsSection" style="display: none; margin-top: 32px;">
       <h2 style="margin: 0 0 12px; font-size: 20px; color: #333;">⚙️ シフト条件</h2>
-      <div class="form-group">
-        <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
-          <div>
-            <label for="dayShiftRequired" style="display: block; margin-bottom: 4px;">平日日勤の配置人数:</label>
-            <input type="number" id="dayShiftRequired" value="3" min="1" />
-          </div>
-          <div>
-            <label for="lateShiftRequired" style="display: block; margin-bottom: 4px;">平日遅出の配置人数:</label>
-            <input type="number" id="lateShiftRequired" value="0" min="0" />
-          </div>
-          <div>
-            <label for="nightShiftRequired" style="display: block; margin-bottom: 4px;">平日夜勤の配置人数:</label>
-            <input type="number" id="nightShiftRequired" value="2" min="1" />
-          </div>
-          <div>
-            <label for="standardHolidayDays" style="display: block; margin-bottom: 4px;">公休の日数:</label>
-            <input type="number" id="standardHolidayDays" value="9" min="0" />
-          </div>
+
+      <table class="conditions-table">
+        <thead>
+          <tr>
+            <th>曜日</th>
+            <th>手術列数</th>
+            <th>日勤</th>
+            <th>遅出</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="weekday-row"><td>月</td><td><input type="number" id="cfg_surgery_1" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_1" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_1" value="1" min="0" class="cond-input"></td></tr>
+          <tr class="weekday-row"><td>火</td><td><input type="number" id="cfg_surgery_2" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_2" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_2" value="1" min="0" class="cond-input"></td></tr>
+          <tr class="weekday-row"><td>水</td><td><input type="number" id="cfg_surgery_3" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_3" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_3" value="1" min="0" class="cond-input"></td></tr>
+          <tr class="weekday-row"><td>木</td><td><input type="number" id="cfg_surgery_4" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_4" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_4" value="1" min="0" class="cond-input"></td></tr>
+          <tr class="weekday-row"><td>金</td><td><input type="number" id="cfg_surgery_5" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_5" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_5" value="1" min="0" class="cond-input"></td></tr>
+          <tr class="weekend-row"><td>土</td><td><input type="number" id="cfg_surgery_6" value="2" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_6" value="2" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_6" value="0" min="0" class="cond-input"></td></tr>
+          <tr class="weekend-row"><td>日</td><td><input type="number" id="cfg_surgery_0" value="0" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_0" value="0" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_0" value="0" min="0" class="cond-input"></td></tr>
+        </tbody>
+      </table>
+
+      <div style="display:flex; gap:24px; align-items:center; flex-wrap:wrap; margin-top:16px;">
+        <div>
+          <label for="nightShiftRequired" style="display:block; margin-bottom:4px; font-weight:600;">夜勤の配置人数:</label>
+          <input type="number" id="nightShiftRequired" value="2" min="0" style="width:80px; padding:8px; border:1px solid #ddd; border-radius:4px;" />
+        </div>
+        <div>
+          <label for="standardHolidayDays" style="display:block; margin-bottom:4px; font-weight:600;">公休の日数:</label>
+          <input type="number" id="standardHolidayDays" value="9" min="0" style="width:80px; padding:8px; border:1px solid #ddd; border-radius:4px;" />
         </div>
       </div>
     </div>
@@ -343,10 +364,11 @@
     <div id="legendContainer" style="display: none; margin-top: 24px;">
       <h3>凡例</h3>
       <ul>
-        <li><strong>日</strong>: 日勤</li>
-        <li><strong>夜</strong>: 夜勤</li>
-        <li><strong>休</strong>: 休日</li>
-        <li><span class="violation">赤背景</span>: 希望違反</li>
+        <li><span class="day-shift" style="padding:2px 6px;">日勤</span></li>
+        <li><span class="late-shift" style="padding:2px 6px;">遅出</span></li>
+        <li><span class="night-shift" style="padding:2px 6px;">夜勤</span></li>
+        <li><span class="off-day" style="padding:2px 6px;">休</span></li>
+        <li><span class="violation" style="padding:2px 6px;">赤背景</span>: 希望違反</li>
         <li><strong>太字</strong>: 週末（土日）</li>
       </ul>
     </div>

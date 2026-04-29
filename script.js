@@ -7,6 +7,8 @@ let pairMatrixCandidates = [];
 let nurses = [];
 let dateColumns = [];
 let mixingMatrix = null;
+let generatorYear = null;
+let generatorMonth = null;
 
 // 定数は common.js から継承
 
@@ -85,21 +87,19 @@ function parseNurseData(rows) {
   return nurses;
 }
 
-// 日付が週末かどうか判定（2025年8月）
-function isWeekend(dateStr) {
+function getDateDow(dateStr) {
   const [month, day] = dateStr.split('/').map(Number);
-  const date = new Date(2025, month - 1, day);
-  const dayOfWeek = date.getDay();
-  return dayOfWeek === 0 || dayOfWeek === 6; // 0=日曜, 6=土曜
+  return new Date(generatorYear || new Date().getFullYear(), month - 1, day).getDay();
 }
 
-// 日付文字列から曜日を取得
+function isWeekend(dateStr) {
+  const dow = getDateDow(dateStr);
+  return dow === 0 || dow === 6;
+}
+
 function getDayOfWeek(dateStr) {
-  const [month, day] = dateStr.split('/').map(Number);
-  const date = new Date(2025, month - 1, day);
-  const dayOfWeek = date.getDay();
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-  return weekdays[dayOfWeek];
+  return weekdays[getDateDow(dateStr)];
 }
 
 function normalizeName(value) {
@@ -419,11 +419,14 @@ function checkViolation(nurse, date, shift, schedule, dateIndex) {
   if (request === REQUEST_TYPES.PAID_LEAVE) {
     return shift !== SHIFT_TYPES.OFF;
   }
-  if (request === REQUEST_TYPES.DAY_ONLY || request === REQUEST_TYPES.DAY_LATE) {
+  if (request === REQUEST_TYPES.DAY_ONLY) {
+    return shift === SHIFT_TYPES.NIGHT || shift === SHIFT_TYPES.LATE;
+  }
+  if (request === REQUEST_TYPES.DAY_LATE) {
     return shift === SHIFT_TYPES.NIGHT;
   }
   if (request === REQUEST_TYPES.NIGHT_ONLY) {
-    return shift === SHIFT_TYPES.DAY;
+    return shift === SHIFT_TYPES.DAY || shift === SHIFT_TYPES.LATE;
   }
   return false;
 }
@@ -451,6 +454,12 @@ function countConsecutiveWorkDays(nurseName, schedule, beforeIndex) {
 }
 
 // 夜勤をしない人かどうか判定（標準勤務形態と希望データから判断）
+function isLateShiftEligible(nurse) {
+  if (nurse.shiftCapability === 'day-only') return false;
+  if (nurse.shiftCapability === 'day-late' || nurse.shiftCapability === 'all') return true;
+  return true; // 未設定はデフォルト可
+}
+
 function isNightShiftEligible(nurse) {
   // 標準勤務形態を優先的に確認
   if (nurse.shiftCapability) {
@@ -485,7 +494,37 @@ function doesNightShift(nurse) {
 }
 
 // シフト表を生成
-function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, targetWorkDays, standardHolidayDays, options = {}) {
+function getShiftConfigFromUI() {
+  const dow = {};
+  [0,1,2,3,4,5,6].forEach(d => {
+    dow[d] = {
+      surgeryLines: parseInt(document.getElementById(`cfg_surgery_${d}`)?.value) || 0,
+      dayShift:     parseInt(document.getElementById(`cfg_day_${d}`)?.value)     || 0,
+      lateShift:    parseInt(document.getElementById(`cfg_late_${d}`)?.value)    || 0,
+    };
+  });
+  return {
+    dow,
+    nightShift:  parseInt(document.getElementById('nightShiftRequired')?.value) || 2,
+    holidayDays: parseInt(document.getElementById('standardHolidayDays')?.value) || 9,
+  };
+}
+
+function generateShiftSchedule(nurses, shiftConfig, targetWorkDays, options = {}) {
+  // 後方互換：旧シグネチャ（数値）で呼ばれた場合のフォールバック
+  if (typeof shiftConfig === 'number') {
+    const dayReq = shiftConfig;
+    const nightReq = targetWorkDays;
+    const twDays = options;
+    shiftConfig = { dow: {}, nightShift: nightReq, holidayDays: 9 };
+    [0,1,2,3,4,5,6].forEach(d => {
+      shiftConfig.dow[d] = { surgeryLines: 0, dayShift: (d===0||d===6)?0:dayReq, lateShift: 0 };
+    });
+    targetWorkDays = typeof twDays === 'number' ? twDays : 20;
+    options = {};
+  }
+  const nightShiftRequired = shiftConfig.nightShift || 2;
+  const standardHolidayDays = shiftConfig.holidayDays || 9;
   const schedule = [];
   const random = options.randomFn || Math.random;
   const targetPublicHolidays = standardHolidayDays || null; // 標準公休日数
@@ -604,15 +643,36 @@ function generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, tar
         return aStats.violations - bStats.violations;
       });
     
-    const requiredDayShift = isWeekend(day.date) ? nightShiftRequired : dayShiftRequired;
-    for (let i = 0; i < requiredDayShift && i < dayShiftCandidates.length; i++) {
+    const dow = getDateDow(day.date);
+    const dowCfg = shiftConfig.dow[dow] || { dayShift: 0, lateShift: 0 };
+
+    for (let i = 0; i < dowCfg.dayShift && i < dayShiftCandidates.length; i++) {
       const nurse = dayShiftCandidates[i];
       const violation = checkViolation(nurse, day.date, SHIFT_TYPES.DAY, schedule, dayIndex);
-      day.nurses.push({
-        name: nurse.name,
-        shift: SHIFT_TYPES.DAY,
-        violation
-      });
+      day.nurses.push({ name: nurse.name, shift: SHIFT_TYPES.DAY, violation });
+      nurseStats[nurse.name].workDays++;
+      if (violation) nurseStats[nurse.name].violations++;
+    }
+
+    // 遅出を割り当て
+    const assignedAfterDay = new Set(day.nurses.map(n => n.name));
+    const lateShiftCandidates = shuffleArray(available.filter(n => {
+      if (assignedAfterDay.has(n.name)) return false;
+      if (prevDayOffAfterNight.has(n.name)) return false;
+      const req = n.requests[day.date];
+      if (req === REQUEST_TYPES.PAID_LEAVE || req === REQUEST_TYPES.NIGHT_ONLY || req === REQUEST_TYPES.DAY_ONLY) return false;
+      if (!isLateShiftEligible(n)) return false;
+      if (countConsecutiveWorkDays(n.name, schedule, dayIndex) >= 5) return false;
+      return true;
+    }), random).sort((a, b) => {
+      const aStats = getNurseStats(a.name, schedule.slice(0, dayIndex + 1));
+      const bStats = getNurseStats(b.name, schedule.slice(0, dayIndex + 1));
+      return aStats.workDays - bStats.workDays;
+    });
+    for (let i = 0; i < (dowCfg.lateShift || 0) && i < lateShiftCandidates.length; i++) {
+      const nurse = lateShiftCandidates[i];
+      const violation = checkViolation(nurse, day.date, SHIFT_TYPES.LATE, schedule, dayIndex);
+      day.nurses.push({ name: nurse.name, shift: SHIFT_TYPES.LATE, violation });
       nurseStats[nurse.name].workDays++;
       if (violation) nurseStats[nurse.name].violations++;
     }
@@ -877,19 +937,8 @@ function renderShiftTable(schedule, container) {
         td.textContent = assignment.shift;
         if (assignment.shift === SHIFT_TYPES.DAY) {
           td.classList.add('day-shift');
-          // 遅出可能な人に色をつける
-          const nurse = nurses.find(n => n.name === assignment.name);
-          if (nurse) {
-            const request = nurse.requests[date];
-            const canLate = nurse.shiftCapability === 'day-late' || 
-                           nurse.shiftCapability === 'all' ||
-                           request === REQUEST_TYPES.DAY_LATE ||
-                           (request === REQUEST_TYPES.AVAILABLE && (nurse.shiftCapability === 'day-late' || nurse.shiftCapability === 'all'));
-            if (canLate) {
-              td.classList.add('late-capable');
-              td.title = '遅出可能';
-            }
-          }
+        } else if (assignment.shift === SHIFT_TYPES.LATE) {
+          td.classList.add('late-shift');
         } else if (assignment.shift === SHIFT_TYPES.NIGHT) {
           td.classList.add('night-shift');
         } else {
@@ -990,12 +1039,12 @@ function renderStats(schedule, targetWorkDays, container) {
   statsContainer.appendChild(detailDiv);
 }
 
-function generateScheduleDrafts(count, dayShiftRequired, nightShiftRequired, targetWorkDays, standardHolidayDays) {
+function generateScheduleDrafts(count, shiftConfig, targetWorkDays) {
   const drafts = [];
   const baseSeed = Date.now();
   for (let i = 0; i < count; i += 1) {
     const randomFn = createSeededRandom(baseSeed + (i + 1) * 9973);
-    drafts.push(generateShiftSchedule(nurses, dayShiftRequired, nightShiftRequired, targetWorkDays, standardHolidayDays, { randomFn }));
+    drafts.push(generateShiftSchedule(nurses, shiftConfig, targetWorkDays, { randomFn }));
   }
   return drafts;
 }
@@ -1203,6 +1252,8 @@ function writeDummyToLocalStorage(year, month) {
 
 // LocalStorageからnursesとdateColumnsを構築（nurse_input.jsと同一形式）
 function loadNursesFromLocalStorage(year, month) {
+  generatorYear = year;
+  generatorMonth = month;
   dateColumns = getMonthDates(year, month);
   const prefix = STORAGE_KEY_PREFIX;
   const result = [];
@@ -1294,16 +1345,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // シフト表を生成
   generateBtn.addEventListener('click', () => {
     clearError();
-    const dayShiftRequired = parseInt(document.getElementById('dayShiftRequired').value) || 3;
-    const nightShiftRequired = parseInt(document.getElementById('nightShiftRequired').value) || 2;
-    const standardHolidayDays = parseInt(document.getElementById('standardHolidayDays').value) || 0;
-
     if (nurses.length === 0) {
       showError('まずデータを読み込んでください');
       return;
     }
 
-    const targetWorkDays = Math.max(0, dateColumns.length - standardHolidayDays);
+    const shiftConfig = getShiftConfigFromUI();
+    const targetWorkDays = Math.max(0, dateColumns.length - shiftConfig.holidayDays);
     loadMixingMatrix();
     document.getElementById('loadingContainer').style.display = 'block';
     document.getElementById('tableContainer').style.display = 'none';
@@ -1316,7 +1364,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 非同期で処理（UIブロックを防ぐ）
     setTimeout(() => {
       try {
-        scheduleDrafts = generateScheduleDrafts(3, dayShiftRequired, nightShiftRequired, targetWorkDays, standardHolidayDays);
+        scheduleDrafts = generateScheduleDrafts(3, shiftConfig, targetWorkDays);
         selectedDraftIndex = null;
         shiftSchedule = [];
         lastTargetWorkDays = targetWorkDays;
