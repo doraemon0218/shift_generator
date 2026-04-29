@@ -10,6 +10,7 @@ const DEADLINE_KEY = 'shift_deadline';
 const SUBMITTED_KEY_PREFIX = 'shift_submitted_';
 const MIXING_MATRIX_KEY = 'mixing_matrix';
 const SHIFT_TARGET_KEY = 'shift_target_month';
+const DEADLINE_DAY_KEY = 'shift_deadline_day';
 const PAID_LEAVE_LIMIT = 8;
 
 // シフト対応状況

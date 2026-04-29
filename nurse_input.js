@@ -270,6 +270,7 @@ function showCalendarPage() {
   
   // カレンダーを初期化
   if (currentData) {
+    renderMonthSelector();
     initCalendar();
     updateStatus();
     updatePaidLeaveCounter();
@@ -465,10 +466,18 @@ function initCalendar() {
     monthHeader.textContent = `${selectedYear}年${selectedMonth}月`;
   }
 
-  // 締め切りチェック
+  // ロック状態チェック
+  const userKey = getCurrentUserKey() || currentNurse;
+  const locked = isMonthLocked(selectedYear, selectedMonth);
+  const unlocked = locked && isUserMonthUnlocked(userKey, selectedYear, selectedMonth);
+
+  // 締め切りチェックは管理者が設定した対象月のみ適用
   const deadlineStr = localStorage.getItem(DEADLINE_KEY);
-  const isDeadlinePassed = deadlineStr ? new Date(deadlineStr) < new Date() : false;
-  const isEditable = !currentData.submitted && !isDeadlinePassed;
+  const adminTarget = getShiftTarget();
+  const isTargetMonth = selectedYear === adminTarget.year && selectedMonth === adminTarget.month;
+  const isDeadlinePassed = isTargetMonth && deadlineStr ? new Date(deadlineStr) < new Date() : false;
+
+  const isEditable = (!locked || unlocked) && !currentData.submitted && !isDeadlinePassed;
   
   // 曜日ヘッダー
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
@@ -580,9 +589,9 @@ function initCalendar() {
   });
   
   // 最後の週の空白セル
-  const lastDay = new Date(2025, 7, 31);
-  const lastDayOfWeek = lastDay.getDay();
-  const remainingCells = 6 - lastDayOfWeek;
+  const lastDayDate = new Date(selectedYear, selectedMonth - 1, dates.length);
+  const lastDayOfWeek = lastDayDate.getDay();
+  const remainingCells = lastDayOfWeek < 6 ? 6 - lastDayOfWeek : 0;
   for (let i = 0; i < remainingCells; i++) {
     const emptyCell = document.createElement('div');
     emptyCell.className = 'day-cell empty';

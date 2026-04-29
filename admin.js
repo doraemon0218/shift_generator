@@ -1007,22 +1007,30 @@ function setUnifiedSettings() {
   if (isReadOnlyAdminView) { alert('閲覧モードでは編集できません'); return; }
   const year  = parseInt(document.getElementById('targetYearInput').value, 10);
   const month = parseInt(document.getElementById('targetMonthInput').value, 10);
-  const day   = parseInt(document.getElementById('deadlineDayInput').value, 10);
+  const dayInput = document.getElementById('deadlineDayInput');
+  const rawDay = dayInput ? parseInt(dayInput.value, 10) : NaN;
+
+  // 締め切り日は入力があれば更新、なければ保存済みの値を使う
+  const storedDay = parseInt(localStorage.getItem(DEADLINE_DAY_KEY), 10);
+  const day = (!isNaN(rawDay) && rawDay >= 1 && rawDay <= 31) ? rawDay
+            : (!isNaN(storedDay) ? storedDay : null);
 
   if (!year || !month || month < 1 || month > 12) {
     alert('対象月（年・月）を正しく入力してください');
     return;
   }
-  if (!day || day < 1 || day > 31) {
-    alert('締め切り日（1〜31）を正しく入力してください');
+  if (!day) {
+    alert('締め切り日（1〜31）を入力してください');
     return;
   }
 
   // 対象月を保存
   localStorage.setItem(SHIFT_TARGET_KEY, JSON.stringify({ year, month }));
 
+  // 締め切り日を独立して保存（次回から自動補完される）
+  localStorage.setItem(DEADLINE_DAY_KEY, day);
+
   // 締め切り = 対象月の前月 day 日 23:59:59
-  // new Date(year, month-2, day) = 対象月(1-indexed) の前月(0-indexed: month-2)
   const deadline = new Date(year, month - 2, day, 23, 59, 59);
   localStorage.setItem(DEADLINE_KEY, deadline.toISOString());
 
@@ -1064,8 +1072,12 @@ function updateUnifiedDisplay() {
   // 入力欄に現在値を反映（未入力の場合のみ）
   const fy = document.getElementById('targetYearInput');
   const fm = document.getElementById('targetMonthInput');
+  const fd = document.getElementById('deadlineDayInput');
   if (fy && !fy.value) fy.value = year;
   if (fm && !fm.value) fm.value = month;
+  // 締め切り日は保存済みの値で常に補完
+  const storedDay = localStorage.getItem(DEADLINE_DAY_KEY);
+  if (fd && storedDay) fd.value = storedDay;
 }
 
 // 旧関数（内部互換用）
