@@ -1150,6 +1150,117 @@ function clearError() {
   document.getElementById('errorContainer').innerHTML = '';
 }
 
+// テスト用：30名分のダミーデータを生成（来月の日付で固定パターン）
+function generateDummyCSV() {
+  const now = new Date();
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const year = nextMonth.getFullYear();
+  const month = nextMonth.getMonth() + 1;
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  const dateCols = [];
+  for (let d = 1; d <= daysInMonth; d++) dateCols.push(`${month}/${d}`);
+
+  // 固定シード乱数（毎回同じダミーデータ）
+  const seeded = createSeededRandom(20260428);
+
+  // 30名の名前と勤務タイプ定義
+  const nurseProfiles = [
+    // day-onlyスタッフ（夜勤不可）
+    { name: '田中 花子', cap: 'day-only' },
+    { name: '鈴木 美咲', cap: 'day-only' },
+    { name: '高橋 葵', cap: 'day-only' },
+    { name: '伊藤 結衣', cap: 'day-only' },
+    { name: '渡辺 莉子', cap: 'day-only' },
+    // day-lateスタッフ（遅出まで可）
+    { name: '山本 千夏', cap: 'day-late' },
+    { name: '中村 さくら', cap: 'day-late' },
+    { name: '小林 陽菜', cap: 'day-late' },
+    { name: '加藤 凜', cap: 'day-late' },
+    { name: '吉田 心', cap: 'day-late' },
+    // 全シフト対応スタッフ（夜勤あり）
+    { name: '佐藤 彩', cap: 'all' },
+    { name: '松本 菜々', cap: 'all' },
+    { name: '井上 あい', cap: 'all' },
+    { name: '木村 春香', cap: 'all' },
+    { name: '林 翠', cap: 'all' },
+    { name: '清水 舞', cap: 'all' },
+    { name: '山田 桃花', cap: 'all' },
+    { name: '斎藤 ひかり', cap: 'all' },
+    { name: '藤田 夕佳', cap: 'all' },
+    { name: '岡田 みほ', cap: 'all' },
+    { name: '池田 恵', cap: 'all' },
+    { name: '橋本 ともみ', cap: 'all' },
+    { name: '石川 まい', cap: 'all' },
+    { name: '前田 萌', cap: 'all' },
+    { name: '藤原 悠', cap: 'all' },
+    { name: '小川 里奈', cap: 'all' },
+    { name: '岩田 朱音', cap: 'all' },
+    { name: '坂本 遥', cap: 'all' },
+    { name: '村田 玲', cap: 'all' },
+    { name: '中島 由衣', cap: 'all' },
+  ];
+
+  const rows = ['氏名,シフト希望期間,備考,' + dateCols.join(',')];
+
+  nurseProfiles.forEach(({ name, cap }) => {
+    const period = `${year}年${month}月1日〜${month}月${daysInMonth}日`;
+    const cells = dateCols.map(dateStr => {
+      const [m, d] = dateStr.split('/').map(Number);
+      const dow = new Date(year, m - 1, d).getDay(); // 0=日,6=土
+      const isWeekendDay = dow === 0 || dow === 6;
+      const r = seeded();
+
+      if (cap === 'day-only') {
+        // 夜勤不可 毎日。約15%で終日不可（公休希望）
+        if (r < 0.15) return '終日不可';
+        return '希望なし（終日勤務可能）'; // parseで夜勤不可相当に後述変換
+      }
+      if (cap === 'day-late') {
+        if (r < 0.12) return '終日不可';
+        if (r < 0.25) return '夜勤不可';
+        return '希望なし（終日勤務可能）';
+      }
+      // 'all': 夜勤対応
+      if (isWeekendDay && r < 0.20) return '終日不可';
+      if (r < 0.08) return '終日不可';
+      if (r < 0.16) return '日勤不可';
+      if (r < 0.22) return '夜勤不可';
+      return '希望なし（終日勤務可能）';
+    });
+
+    // day-onlyの場合、備考に夜勤不可を記入し、全日付を上書き
+    const note = cap === 'day-only' ? '日勤のみ' : (cap === 'day-late' ? '遅出まで可' : '');
+    if (cap === 'day-only') {
+      // 夜勤不可を全セルに埋め込む（終日不可はそのまま）
+      cells.forEach((c, i) => {
+        if (c !== '終日不可') cells[i] = '夜勤不可';
+      });
+    }
+
+    rows.push(`"${name}","${period}","${note}",` + cells.map(c => `"${c}"`).join(','));
+  });
+
+  return rows.join('\n');
+}
+
+function processLoadedData() {
+  nurses = parseNurseData(requestData);
+  if (nurses.length === 0) {
+    showError('データが見つかりませんでした');
+    return;
+  }
+  const pairMatrixSection = document.getElementById('pairMatrixSection');
+  const shiftConditionsSection = document.getElementById('shiftConditionsSection');
+  const generateSection = document.getElementById('generateSection');
+  if (pairMatrixSection) pairMatrixSection.style.display = 'block';
+  if (shiftConditionsSection) shiftConditionsSection.style.display = 'block';
+  if (generateSection) generateSection.style.display = 'block';
+  loadNightPairMatrix();
+  const nightShiftCount = getPairMatrixCandidatesFromNurses().length;
+  alert(`データを読み込みました。\n看護師数: ${nurses.length}名\n期間: ${dateColumns.length}日\n夜勤する人: ${nightShiftCount}名\n\n夜勤ペア相性表が自動生成されました。\n相性表を編集後、「シフト表を生成」ボタンを押してください。`);
+}
+
 // メイン処理
 document.addEventListener('DOMContentLoaded', () => {
   // ログイン状態を確認（管理者ページではないので、任意）
@@ -1168,9 +1279,8 @@ document.addEventListener('DOMContentLoaded', () => {
   loadBtn.addEventListener('click', async () => {
     clearError();
     const file = fileInput.files[0];
-    
+
     if (!file) {
-      // ファイルが選択されていない場合、デフォルトファイルを読み込む
       try {
         const response = await fetch('./data/shift_requests.csv');
         if (!response.ok) throw new Error('デフォルトファイルが見つかりません');
@@ -1189,28 +1299,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
     }
-
-    nurses = parseNurseData(requestData);
-    if (nurses.length === 0) {
-      showError('データが見つかりませんでした');
-      return;
-    }
-
-    // 読み込み後に相性表セクションを表示
-    const pairMatrixSection = document.getElementById('pairMatrixSection');
-    const shiftConditionsSection = document.getElementById('shiftConditionsSection');
-    const generateSection = document.getElementById('generateSection');
-    
-    if (pairMatrixSection) pairMatrixSection.style.display = 'block';
-    if (shiftConditionsSection) shiftConditionsSection.style.display = 'block';
-    if (generateSection) generateSection.style.display = 'block';
-    
-    // CSVから相性表を自動生成（1列目の氏名から夜勤する人のみ抽出）
-    loadNightPairMatrix();
-    
-    const nightShiftCount = getPairMatrixCandidatesFromNurses().length;
-    alert(`データを読み込みました。\n看護師数: ${nurses.length}名\n期間: ${dateColumns.length}日\n夜勤する人: ${nightShiftCount}名\n\n夜勤ペア相性表が自動生成されました。\n相性表を編集後、「シフト表を生成」ボタンを押してください。`);
+    processLoadedData();
   });
+
+  // テスト用ダミーデータ読み込み
+  const dummyBtn = document.getElementById('dummyLoadBtn');
+  if (dummyBtn) {
+    dummyBtn.addEventListener('click', () => {
+      clearError();
+      const csvText = generateDummyCSV();
+      const { data } = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+      requestData = data;
+      processLoadedData();
+    });
+  }
 
   // シフト表を生成
   generateBtn.addEventListener('click', () => {

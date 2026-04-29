@@ -112,9 +112,11 @@ let selectedMonth = null;
 let dates = [];
 
 function initSelectedMonth() {
-  const target = getShiftTarget();
-  selectedYear = target.year;
-  selectedMonth = target.month;
+  // デフォルトは「来月」（今日から見て最も近い入力対象月）
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  selectedYear  = next.getFullYear();
+  selectedMonth = next.getMonth() + 1;
   dates = getMonthDates(selectedYear, selectedMonth);
 }
 
@@ -1494,10 +1496,10 @@ function renderMonthSelector() {
   const userKey = getCurrentUserKey() || currentNurse;
   const monthSet = new Map(); // "YYYY-MM" → {year, month}
 
-  // 1) 管理者指定月 +0/+1/+2（新規入力用）
-  const base = getShiftTarget();
-  [0, 1, 2].forEach(offset => {
-    const d = new Date(base.year, base.month - 1 + offset, 1);
+  // 1) 今日基準：来月・再来月・その次の月（+1/+2/+3）
+  const now = new Date();
+  [1, 2, 3].forEach(offset => {
+    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
     const y = d.getFullYear(), m = d.getMonth() + 1;
     monthSet.set(`${y}-${m}`, { year: y, month: m });
   });
