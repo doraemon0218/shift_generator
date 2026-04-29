@@ -1150,106 +1150,124 @@ function clearError() {
   document.getElementById('errorContainer').innerHTML = '';
 }
 
-// テスト用：30名分のダミーデータを生成（来月の日付で固定パターン）
-function generateDummyCSV() {
-  const now = new Date();
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const year = nextMonth.getFullYear();
-  const month = nextMonth.getMonth() + 1;
-  const daysInMonth = new Date(year, month, 0).getDate();
+// 30名の固定プロファイル（ダミーデータ用）
+const DUMMY_PROFILES = [
+  { name: '田中 花子',   cap: 'day-only' },
+  { name: '鈴木 美咲',   cap: 'day-only' },
+  { name: '高橋 葵',     cap: 'day-only' },
+  { name: '伊藤 結衣',   cap: 'day-only' },
+  { name: '渡辺 莉子',   cap: 'day-only' },
+  { name: '山本 千夏',   cap: 'day-late' },
+  { name: '中村 さくら', cap: 'day-late' },
+  { name: '小林 陽菜',   cap: 'day-late' },
+  { name: '加藤 凜',     cap: 'day-late' },
+  { name: '吉田 心',     cap: 'day-late' },
+  { name: '佐藤 彩',     cap: 'all' },
+  { name: '松本 菜々',   cap: 'all' },
+  { name: '井上 あい',   cap: 'all' },
+  { name: '木村 春香',   cap: 'all' },
+  { name: '林 翠',       cap: 'all' },
+  { name: '清水 舞',     cap: 'all' },
+  { name: '山田 桃花',   cap: 'all' },
+  { name: '斎藤 ひかり', cap: 'all' },
+  { name: '藤田 夕佳',   cap: 'all' },
+  { name: '岡田 みほ',   cap: 'all' },
+  { name: '池田 恵',     cap: 'all' },
+  { name: '橋本 ともみ', cap: 'all' },
+  { name: '石川 まい',   cap: 'all' },
+  { name: '前田 萌',     cap: 'all' },
+  { name: '藤原 悠',     cap: 'all' },
+  { name: '小川 里奈',   cap: 'all' },
+  { name: '岩田 朱音',   cap: 'all' },
+  { name: '坂本 遥',     cap: 'all' },
+  { name: '村田 玲',     cap: 'all' },
+  { name: '中島 由衣',   cap: 'all' },
+];
 
-  const dateCols = [];
-  for (let d = 1; d <= daysInMonth; d++) dateCols.push(`${month}/${d}`);
-
-  // 固定シード乱数（毎回同じダミーデータ）
+// テスト用ダミーデータをLocalStorageに書き込む（nurse_input.js と同一形式）
+function writeDummyToLocalStorage(year, month) {
+  const dateCols = getMonthDates(year, month); // common.js: ["5/1","5/2",...]
   const seeded = createSeededRandom(20260428);
 
-  // 30名の名前と勤務タイプ定義
-  const nurseProfiles = [
-    // day-onlyスタッフ（夜勤不可）
-    { name: '田中 花子', cap: 'day-only' },
-    { name: '鈴木 美咲', cap: 'day-only' },
-    { name: '高橋 葵', cap: 'day-only' },
-    { name: '伊藤 結衣', cap: 'day-only' },
-    { name: '渡辺 莉子', cap: 'day-only' },
-    // day-lateスタッフ（遅出まで可）
-    { name: '山本 千夏', cap: 'day-late' },
-    { name: '中村 さくら', cap: 'day-late' },
-    { name: '小林 陽菜', cap: 'day-late' },
-    { name: '加藤 凜', cap: 'day-late' },
-    { name: '吉田 心', cap: 'day-late' },
-    // 全シフト対応スタッフ（夜勤あり）
-    { name: '佐藤 彩', cap: 'all' },
-    { name: '松本 菜々', cap: 'all' },
-    { name: '井上 あい', cap: 'all' },
-    { name: '木村 春香', cap: 'all' },
-    { name: '林 翠', cap: 'all' },
-    { name: '清水 舞', cap: 'all' },
-    { name: '山田 桃花', cap: 'all' },
-    { name: '斎藤 ひかり', cap: 'all' },
-    { name: '藤田 夕佳', cap: 'all' },
-    { name: '岡田 みほ', cap: 'all' },
-    { name: '池田 恵', cap: 'all' },
-    { name: '橋本 ともみ', cap: 'all' },
-    { name: '石川 まい', cap: 'all' },
-    { name: '前田 萌', cap: 'all' },
-    { name: '藤原 悠', cap: 'all' },
-    { name: '小川 里奈', cap: 'all' },
-    { name: '岩田 朱音', cap: 'all' },
-    { name: '坂本 遥', cap: 'all' },
-    { name: '村田 玲', cap: 'all' },
-    { name: '中島 由衣', cap: 'all' },
-  ];
+  DUMMY_PROFILES.forEach(({ name, cap }) => {
+    const userKey = name.replace(/\s/g, '_');
+    const requests = {};
 
-  const rows = ['氏名,シフト希望期間,備考,' + dateCols.join(',')];
-
-  nurseProfiles.forEach(({ name, cap }) => {
-    const period = `${year}年${month}月1日〜${month}月${daysInMonth}日`;
-    const cells = dateCols.map(dateStr => {
+    dateCols.forEach(dateStr => {
       const [m, d] = dateStr.split('/').map(Number);
-      const dow = new Date(year, m - 1, d).getDay(); // 0=日,6=土
+      const dow = new Date(year, m - 1, d).getDay();
       const isWeekendDay = dow === 0 || dow === 6;
       const r = seeded();
 
       if (cap === 'day-only') {
-        // 夜勤不可 毎日。約15%で終日不可（公休希望）
-        if (r < 0.15) return '終日不可';
-        return '希望なし（終日勤務可能）'; // parseで夜勤不可相当に後述変換
+        requests[dateStr] = r < 0.15 ? REQUEST_TYPES.PAID_LEAVE : REQUEST_TYPES.DAY_ONLY;
+      } else if (cap === 'day-late') {
+        if (r < 0.12) requests[dateStr] = REQUEST_TYPES.PAID_LEAVE;
+        else if (r < 0.25) requests[dateStr] = REQUEST_TYPES.DAY_LATE;
+        else requests[dateStr] = REQUEST_TYPES.AVAILABLE;
+      } else {
+        if ((isWeekendDay && r < 0.20) || r < 0.08) requests[dateStr] = REQUEST_TYPES.PAID_LEAVE;
+        else if (r < 0.16) requests[dateStr] = REQUEST_TYPES.NIGHT_ONLY;
+        else if (r < 0.22) requests[dateStr] = REQUEST_TYPES.DAY_LATE;
+        else requests[dateStr] = REQUEST_TYPES.AVAILABLE;
       }
-      if (cap === 'day-late') {
-        if (r < 0.12) return '終日不可';
-        if (r < 0.25) return '夜勤不可';
-        return '希望なし（終日勤務可能）';
-      }
-      // 'all': 夜勤対応
-      if (isWeekendDay && r < 0.20) return '終日不可';
-      if (r < 0.08) return '終日不可';
-      if (r < 0.16) return '日勤不可';
-      if (r < 0.22) return '夜勤不可';
-      return '希望なし（終日勤務可能）';
     });
 
-    // day-onlyの場合、備考に夜勤不可を記入し、全日付を上書き
-    const note = cap === 'day-only' ? '日勤のみ' : (cap === 'day-late' ? '遅出まで可' : '');
-    if (cap === 'day-only') {
-      // 夜勤不可を全セルに埋め込む（終日不可はそのまま）
-      cells.forEach((c, i) => {
-        if (c !== '終日不可') cells[i] = '夜勤不可';
-      });
-    }
+    const data = {
+      nurseName: name,
+      userKey,
+      requests,
+      note: cap === 'day-only' ? '日勤のみ' : (cap === 'day-late' ? '遅出まで可' : ''),
+      submitted: true,
+      submittedAt: new Date().toISOString(),
+      shiftCapability: cap,
+      doesNightShift: cap === 'all',
+      preferences: { valuePreference: null }
+    };
 
-    rows.push(`"${name}","${period}","${note}",` + cells.map(c => `"${c}"`).join(','));
+    const key = `${STORAGE_KEY_PREFIX}${userKey}_${year}_${month}`;
+    localStorage.setItem(key, JSON.stringify(data));
   });
-
-  return rows.join('\n');
 }
 
-function processLoadedData() {
-  nurses = parseNurseData(requestData);
-  if (nurses.length === 0) {
+// LocalStorageからnursesとdateColumnsを構築（nurse_input.jsと同一形式）
+function loadNursesFromLocalStorage(year, month) {
+  dateColumns = getMonthDates(year, month);
+  const prefix = STORAGE_KEY_PREFIX;
+  const result = [];
+
+  Object.keys(localStorage).forEach(key => {
+    if (!key.startsWith(prefix)) return;
+    const tail = key.slice(prefix.length);
+    const match = tail.match(/^(.+)_(\d{4})_(\d{1,2})$/);
+    if (!match) return;
+    const y = parseInt(match[2]), m = parseInt(match[3]);
+    if (y !== year || m !== month) return;
+
+    try {
+      const data = JSON.parse(localStorage.getItem(key));
+      const nurse = {
+        name: data.nurseName || match[1].replace(/_/g, ' '),
+        note: data.note || '',
+        requests: {},
+        shiftCapability: data.shiftCapability || null
+      };
+      dateColumns.forEach(date => {
+        nurse.requests[date] = data.requests?.[date] || REQUEST_TYPES.AVAILABLE;
+      });
+      result.push(nurse);
+    } catch (e) {}
+  });
+
+  return result;
+}
+
+function processNursesLoaded(loadedNurses) {
+  if (!loadedNurses || loadedNurses.length === 0) {
     showError('データが見つかりませんでした');
     return;
   }
+  nurses = loadedNurses;
   const pairMatrixSection = document.getElementById('pairMatrixSection');
   const shiftConditionsSection = document.getElementById('shiftConditionsSection');
   const generateSection = document.getElementById('generateSection');
@@ -1258,7 +1276,16 @@ function processLoadedData() {
   if (generateSection) generateSection.style.display = 'block';
   loadNightPairMatrix();
   const nightShiftCount = getPairMatrixCandidatesFromNurses().length;
-  alert(`データを読み込みました。\n看護師数: ${nurses.length}名\n期間: ${dateColumns.length}日\n夜勤する人: ${nightShiftCount}名\n\n夜勤ペア相性表が自動生成されました。\n相性表を編集後、「シフト表を生成」ボタンを押してください。`);
+  alert(`データを読み込みました。\n看護師数: ${nurses.length}名\n期間: ${dateColumns.length}日\n夜勤する人: ${nightShiftCount}名\n\n夜勤ペア相性表が前回の設定を引き継ぎました。\n確認後、「シフト表を生成」ボタンを押してください。`);
+}
+
+function processLoadedData() {
+  nurses = parseNurseData(requestData);
+  if (nurses.length === 0) {
+    showError('データが見つかりませんでした');
+    return;
+  }
+  processNursesLoaded(nurses);
 }
 
 // メイン処理
@@ -1302,15 +1329,38 @@ document.addEventListener('DOMContentLoaded', () => {
     processLoadedData();
   });
 
-  // テスト用ダミーデータ読み込み
+  // テスト用ダミーデータ読み込み（LocalStorageに書き込んでから読み込む）
   const dummyBtn = document.getElementById('dummyLoadBtn');
   if (dummyBtn) {
     dummyBtn.addEventListener('click', () => {
       clearError();
-      const csvText = generateDummyCSV();
-      const { data } = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-      requestData = data;
-      processLoadedData();
+      const now = new Date();
+      const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const year = next.getFullYear();
+      const month = next.getMonth() + 1;
+      writeDummyToLocalStorage(year, month);
+      const loaded = loadNursesFromLocalStorage(year, month);
+      processNursesLoaded(loaded);
+    });
+  }
+
+  // LocalStorageから勤務希望データを読み込む
+  const lsLoadBtn = document.getElementById('lsLoadBtn');
+  if (lsLoadBtn) {
+    lsLoadBtn.addEventListener('click', () => {
+      clearError();
+      const yearVal = parseInt(document.getElementById('lsYear').value);
+      const monthVal = parseInt(document.getElementById('lsMonth').value);
+      if (!yearVal || !monthVal || monthVal < 1 || monthVal > 12) {
+        showError('年と月を正しく入力してください');
+        return;
+      }
+      const loaded = loadNursesFromLocalStorage(yearVal, monthVal);
+      if (!loaded.length) {
+        showError(`${yearVal}年${monthVal}月の勤務希望データがLocalStorageに見つかりません`);
+        return;
+      }
+      processNursesLoaded(loaded);
     });
   }
 
