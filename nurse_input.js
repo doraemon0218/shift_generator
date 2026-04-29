@@ -1482,13 +1482,34 @@ function renderMonthSelector() {
   if (!container) return;
 
   const userKey = getCurrentUserKey() || currentNurse;
+  const monthSet = new Map(); // "YYYY-MM" → {year, month}
 
-  // 管理者指定月（指定月 / 翌月 / 翌々月）の3ヶ月を表示
+  // 1) 管理者指定月 +0/+1/+2（新規入力用）
   const base = getShiftTarget();
-  const tabs = [0, 1, 2].map(offset => {
+  [0, 1, 2].forEach(offset => {
     const d = new Date(base.year, base.month - 1 + offset, 1);
-    return { year: d.getFullYear(), month: d.getMonth() + 1 };
+    const y = d.getFullYear(), m = d.getMonth() + 1;
+    monthSet.set(`${y}-${m}`, { year: y, month: m });
   });
+
+  // 2) ユーザーがすでにデータを持つ月（管理者が対象月を動かしても消えない）
+  //    キー形式: shift_request_{userKey}_{year}_{month}
+  //    年月は末尾の _YYYY_M(M) で識別（userKey自体が _ を含む可能性があるため末尾正規表現）
+  const prefix = `${STORAGE_KEY_PREFIX}${userKey}_`;
+  Object.keys(localStorage)
+    .filter(k => k.startsWith(prefix))
+    .forEach(k => {
+      const tail = k.slice(prefix.length);          // "2026_6" など
+      const match = tail.match(/^(\d{4})_(\d{1,2})$/);
+      if (match) {
+        const y = parseInt(match[1]), m = parseInt(match[2]);
+        monthSet.set(`${y}-${m}`, { year: y, month: m });
+      }
+    });
+
+  // 時系列順にソート
+  const tabs = Array.from(monthSet.values())
+    .sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
 
   container.innerHTML = '';
   tabs.forEach(({ year, month }) => {
