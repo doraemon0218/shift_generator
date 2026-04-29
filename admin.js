@@ -905,8 +905,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   initAdminSelectedMonth();
+  updateUnifiedDisplay();
   updateDeadlineDisplay();
-  updateShiftTargetDisplay();
   renderAdminMonthSelector();
   loadAdminRequestList();
   loadAdminList();
@@ -1002,45 +1002,76 @@ function clearDeadline() {
 }
 
 // シフト対象月を設定
-function setShiftTarget() {
-  if (isReadOnlyAdminView) {
-    alert('閲覧モードでは編集できません');
+// 対象月と締め切りを一括設定
+function setUnifiedSettings() {
+  if (isReadOnlyAdminView) { alert('閲覧モードでは編集できません'); return; }
+  const year  = parseInt(document.getElementById('targetYearInput').value, 10);
+  const month = parseInt(document.getElementById('targetMonthInput').value, 10);
+  const day   = parseInt(document.getElementById('deadlineDayInput').value, 10);
+
+  if (!year || !month || month < 1 || month > 12) {
+    alert('対象月（年・月）を正しく入力してください');
     return;
   }
-  const yearVal = parseInt(document.getElementById('targetYearInput').value, 10);
-  const monthVal = parseInt(document.getElementById('targetMonthInput').value, 10);
-  if (!yearVal || !monthVal || monthVal < 1 || monthVal > 12) {
-    alert('年・月を正しく入力してください');
+  if (!day || day < 1 || day > 31) {
+    alert('締め切り日（1〜31）を正しく入力してください');
     return;
   }
-  localStorage.setItem(SHIFT_TARGET_KEY, JSON.stringify({ year: yearVal, month: monthVal }));
-  updateShiftTargetDisplay();
-  alert(`シフト対象月を ${yearVal}年${monthVal}月 に設定しました`);
+
+  // 対象月を保存
+  localStorage.setItem(SHIFT_TARGET_KEY, JSON.stringify({ year, month }));
+
+  // 締め切り = 対象月の前月 day 日 23:59:59
+  // new Date(year, month-2, day) = 対象月(1-indexed) の前月(0-indexed: month-2)
+  const deadline = new Date(year, month - 2, day, 23, 59, 59);
+  localStorage.setItem(DEADLINE_KEY, deadline.toISOString());
+
+  updateUnifiedDisplay();
+  updateDeadlineDisplay();
+  renderAdminMonthSelector();
+
+  const dl = `${deadline.getFullYear()}年${deadline.getMonth() + 1}月${deadline.getDate()}日 23:59`;
+  alert(`設定しました\n対象月: ${year}年${month}月\n締め切り: ${dl}`);
 }
 
-function clearShiftTarget() {
-  if (isReadOnlyAdminView) {
-    alert('閲覧モードでは編集できません');
-    return;
-  }
+function clearUnifiedSettings() {
+  if (isReadOnlyAdminView) { alert('閲覧モードでは編集できません'); return; }
+  if (!confirm('対象月・締め切りの設定をクリアしますか？')) return;
   localStorage.removeItem(SHIFT_TARGET_KEY);
-  updateShiftTargetDisplay();
-  alert('シフト対象月の明示設定をクリアしました（締め切り日または来月が自動適用されます）');
+  localStorage.removeItem(DEADLINE_KEY);
+  updateUnifiedDisplay();
+  updateDeadlineDisplay();
+  alert('クリアしました（デフォルト: 来月を対象月として自動適用）');
 }
 
-function updateShiftTargetDisplay() {
-  const display = document.getElementById('shiftTargetDisplay');
+function updateUnifiedDisplay() {
+  const display = document.getElementById('unifiedSettingsDisplay');
   if (!display) return;
-  const { year, month } = getShiftTarget();
-  const stored = localStorage.getItem(SHIFT_TARGET_KEY);
-  const source = stored ? '手動設定' : (localStorage.getItem(DEADLINE_KEY) ? '締め切りから自動' : '来月（デフォルト）');
-  display.textContent = `現在の対象月: ${year}年${month}月（${source}）`;
 
-  const yearInput = document.getElementById('targetYearInput');
-  const monthInput = document.getElementById('targetMonthInput');
-  if (yearInput && !yearInput.value) yearInput.value = year;
-  if (monthInput && !monthInput.value) monthInput.value = month;
+  const { year, month } = getShiftTarget();
+  const deadlineStr = localStorage.getItem(DEADLINE_KEY);
+
+  let html = `<strong>対象月：</strong> ${year}年${month}月`;
+  if (deadlineStr) {
+    const d = new Date(deadlineStr);
+    html += `　　<strong>締め切り：</strong> ${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 23:59`;
+  } else {
+    html += `　　<strong>締め切り：</strong> 未設定`;
+  }
+  display.style.display = 'block';
+  display.innerHTML = html;
+
+  // 入力欄に現在値を反映（未入力の場合のみ）
+  const fy = document.getElementById('targetYearInput');
+  const fm = document.getElementById('targetMonthInput');
+  if (fy && !fy.value) fy.value = year;
+  if (fm && !fm.value) fm.value = month;
 }
+
+// 旧関数（内部互換用）
+function setShiftTarget() { setUnifiedSettings(); }
+function clearShiftTarget() { clearUnifiedSettings(); }
+function updateShiftTargetDisplay() { updateUnifiedDisplay(); }
 
 // ─── シフトFix（月ロック）管理 ────────────────────────────────
 

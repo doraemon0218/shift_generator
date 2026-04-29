@@ -312,38 +312,40 @@
       現在は閲覧モードです。操作系のボタンは無効化されています。
     </div>
 
-    <!-- 締め切り設定セクション -->
+    <!-- シフト対象月・締め切り設定（統合） -->
     <div class="section">
-      <div class="section-title">📅 締め切り設定</div>
-      <div class="form-group">
-        <label>締め切り日時（毎月15日23:59に自動設定）</label>
-        <input type="datetime-local" id="deadlineInput" class="admin-action" />
-        <button onclick="setDeadlineMonthly()" class="admin-action" style="margin-left: 8px;">毎月15日23:59に設定</button>
-        <button onclick="setDeadline()" class="btn-success admin-action" style="margin-left: 8px;">設定</button>
-        <button onclick="clearDeadline()" class="btn-danger admin-action" style="margin-left: 8px;">クリア</button>
-      </div>
-      <div id="deadlineDisplay" class="deadline-display" style="display: none;"></div>
-    </div>
-
-    <!-- シフト対象月設定セクション -->
-    <div class="section">
-      <div class="section-title">📆 シフト対象月設定</div>
-      <p style="color: #666; margin-bottom: 16px;">
-        看護師が希望を入力する対象月を設定します。未設定の場合は締め切り日の翌月が自動適用されます。
+      <div class="section-title">📅 シフト対象月・締め切り設定</div>
+      <p style="color: #666; margin-bottom: 20px;">
+        シフトを組む対象月と、希望入力の締め切り日をまとめて設定します。<br>
+        締め切りは「対象月の前月◯日 23:59」として自動計算されます。
       </p>
-      <div id="shiftTargetDisplay" style="font-weight: 600; margin-bottom: 16px; color: #333;"></div>
-      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-        <input type="number" id="targetYearInput" placeholder="年（例: 2026）" min="2024" max="2099"
-               style="width: 130px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"
+
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
+        <span style="font-weight: 600; white-space: nowrap;">対象月：</span>
+        <input type="number" id="targetYearInput" placeholder="年" min="2024" max="2099"
+               style="width: 100px; padding: 9px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"
                class="admin-action" />
         <span style="font-weight: 600;">年</span>
         <input type="number" id="targetMonthInput" placeholder="月" min="1" max="12"
-               style="width: 80px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"
+               style="width: 70px; padding: 9px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"
                class="admin-action" />
-        <span style="font-weight: 600;">月</span>
-        <button onclick="setShiftTarget()" class="btn-success admin-action">設定</button>
-        <button onclick="clearShiftTarget()" class="btn-secondary admin-action">クリア（自動）</button>
+        <span style="font-weight: 600; margin-right: 16px;">月</span>
+
+        <span style="font-weight: 600; white-space: nowrap;">締め切り：前月</span>
+        <input type="number" id="deadlineDayInput" value="15" min="1" max="31"
+               style="width: 65px; padding: 9px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"
+               class="admin-action" />
+        <span style="font-weight: 600;">日 23:59</span>
       </div>
+
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+        <button onclick="setUnifiedSettings()" class="btn-success admin-action">設定</button>
+        <button onclick="clearUnifiedSettings()" class="btn-secondary admin-action">クリア</button>
+      </div>
+
+      <div id="unifiedSettingsDisplay" style="display:none; padding: 14px 16px; background: #e8f5e9; border-left: 4px solid #28a745; border-radius: 6px; font-size: 14px; line-height: 1.8;"></div>
+      <!-- 締め切りカウントダウン（既存ロジックと互換） -->
+      <div id="deadlineDisplay" class="deadline-display" style="display: none; margin-top: 12px;"></div>
     </div>
 
     <!-- 統合看護師管理ボード（月選択・提出状況・Fix管理・一括管理） -->
