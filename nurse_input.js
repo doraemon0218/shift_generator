@@ -111,6 +111,22 @@ let selectedYear = null;
 let selectedMonth = null;
 let dates = [];
 
+// 指定月の締め切り日時を返す（DEADLINE_DAY_KEY: 前月の??日 23:59）
+function getDeadlineForMonth(year, month) {
+  const day = parseInt(localStorage.getItem(DEADLINE_DAY_KEY), 10);
+  if (day >= 1 && day <= 31) {
+    return new Date(year, month - 2, day, 23, 59, 59);
+  }
+  // 旧形式フォールバック
+  const str = localStorage.getItem(DEADLINE_KEY);
+  return str ? new Date(str) : null;
+}
+
+function isDeadlinePassedFor(year, month) {
+  const deadline = getDeadlineForMonth(year, month);
+  return deadline ? deadline < new Date() : false;
+}
+
 function initSelectedMonth() {
   // デフォルトは「来月」（今日から見て最も近い入力対象月）
   const now = new Date();
@@ -471,11 +487,8 @@ function initCalendar() {
   const locked = isMonthLocked(selectedYear, selectedMonth);
   const unlocked = locked && isUserMonthUnlocked(userKey, selectedYear, selectedMonth);
 
-  // 締め切りチェックは管理者が設定した対象月のみ適用
-  const deadlineStr = localStorage.getItem(DEADLINE_KEY);
-  const adminTarget = getShiftTarget();
-  const isTargetMonth = selectedYear === adminTarget.year && selectedMonth === adminTarget.month;
-  const isDeadlinePassed = isTargetMonth && deadlineStr ? new Date(deadlineStr) < new Date() : false;
+  // 締め切りチェック：選択月の前月??日 23:59
+  const isDeadlinePassed = isDeadlinePassedFor(selectedYear, selectedMonth);
 
   const isEditable = (!locked || unlocked) && !currentData.submitted && !isDeadlinePassed;
   
@@ -1110,10 +1123,7 @@ function setRequest(date, requestType) {
   }
   
   // 締め切りチェック
-  const deadlineStr = localStorage.getItem(DEADLINE_KEY);
-  const isDeadlinePassed = deadlineStr ? new Date(deadlineStr) < new Date() : false;
-  
-  if (currentData.submitted || isDeadlinePassed) {
+  if (currentData.submitted || isDeadlinePassedFor(selectedYear, selectedMonth)) {
     alert('締め切りが過ぎているか、既に提出済みのため編集できません。');
     return;
   }
@@ -1191,14 +1201,8 @@ function updateSubmitButtons() {
   const saveDraftBtn = document.getElementById('saveDraftBtn');
   const lockBanner = document.getElementById('lockBanner');
 
-  // 締め切りチェックは管理者が設定した対象月のみ適用。
-  // 翌月・翌々月の事前入力は締め切り制限なし。
-  const deadlineStr = localStorage.getItem(DEADLINE_KEY);
-  const adminTarget = getShiftTarget();
-  const isTargetMonth = selectedYear === adminTarget.year && selectedMonth === adminTarget.month;
-  const isDeadlinePassed = isTargetMonth && deadlineStr
-    ? new Date(deadlineStr) < new Date()
-    : false;
+  // 締め切りチェック：選択月の前月??日 23:59
+  const isDeadlinePassed = isDeadlinePassedFor(selectedYear, selectedMonth);
 
   // ロック状態チェック
   const userKey = getCurrentUserKey() || currentNurse;
@@ -1254,12 +1258,11 @@ function updateSubmitButtons() {
 // 締め切り情報を更新
 function updateDeadlineInfo() {
   const deadlineBanner = document.getElementById('deadlineBanner');
-  const deadlineStr = localStorage.getItem(DEADLINE_KEY);
-  
+  const deadline = getDeadlineForMonth(selectedYear, selectedMonth);
+
   if (!deadlineBanner) return;
-  
-  if (deadlineStr) {
-    const deadline = new Date(deadlineStr);
+
+  if (deadline) {
     const now = new Date();
     const diff = deadline - now;
     const sageImg = document.getElementById('deadlineSage');
@@ -1348,10 +1351,7 @@ function saveDraft() {
 function submit() {
   if (!currentData) return;
 
-  const deadlineStr = localStorage.getItem(DEADLINE_KEY);
-  const adminTarget = getShiftTarget();
-  const isTargetMonth = selectedYear === adminTarget.year && selectedMonth === adminTarget.month;
-  const isDeadlinePassed = isTargetMonth && deadlineStr ? new Date(deadlineStr) < new Date() : false;
+  const isDeadlinePassed = isDeadlinePassedFor(selectedYear, selectedMonth);
   if (isDeadlinePassed) {
     alert('締め切りが過ぎているため、提出できません。');
     return;
@@ -1390,10 +1390,7 @@ function submit() {
 function cancelSubmit() {
   if (!currentData) return;
 
-  const deadlineStr = localStorage.getItem(DEADLINE_KEY);
-  const adminTarget = getShiftTarget();
-  const isTargetMonth = selectedYear === adminTarget.year && selectedMonth === adminTarget.month;
-  const isDeadlinePassed = isTargetMonth && deadlineStr ? new Date(deadlineStr) < new Date() : false;
+  const isDeadlinePassed = isDeadlinePassedFor(selectedYear, selectedMonth);
 
   if (isDeadlinePassed) {
     alert('締め切りが過ぎているため、提出を取り消すことはできません。');

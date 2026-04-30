@@ -175,10 +175,61 @@ function handleLogin(event) {
   window.location.href = 'top.html';
 }
 
+// デモアカウントでワンクリックログイン
+function demoLogin() {
+  const DEMO_LAST = 'デモ';
+  const DEMO_FIRST = 'ユーザー';
+  const DEMO_EMAIL = 'demo@example.com';
+  const DEMO_KEY = `${DEMO_LAST}_${DEMO_FIRST}_${DEMO_EMAIL}`;
+  const DEMO_FULL = `${DEMO_LAST} ${DEMO_FIRST}`;
+
+  // ユーザー登録（未登録の場合）
+  const users = getUsers();
+  if (!users[DEMO_KEY]) {
+    users[DEMO_KEY] = {
+      lastName: DEMO_LAST,
+      firstName: DEMO_FIRST,
+      email: DEMO_EMAIL,
+      fullName: DEMO_FULL,
+      password: '',
+      shiftCapability: SHIFT_CAPABILITIES.ALL,
+      initialShiftCapability: SHIFT_CAPABILITIES.ALL,
+      hireYear: null
+    };
+    saveUsers(users);
+  }
+
+  // 管理者登録
+  const adminUsers = getAdminUsers();
+  if (!adminUsers.includes(DEMO_EMAIL)) {
+    adminUsers.push(DEMO_EMAIL);
+    saveAdminUsers(adminUsers);
+  }
+
+  // シフトプロファイル作成
+  ensureShiftProfile(DEMO_KEY, DEMO_FULL, SHIFT_CAPABILITIES.ALL);
+
+  // ログイン状態を保存
+  const currentUser = {
+    lastName: DEMO_LAST,
+    firstName: DEMO_FIRST,
+    email: DEMO_EMAIL,
+    fullName: DEMO_FULL,
+    isAdmin: true,
+    userKey: DEMO_KEY,
+    hireYear: null,
+    initialShiftCapability: SHIFT_CAPABILITIES.ALL
+  };
+  localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
+
+  window.location.href = 'top.html';
+}
+
   // フォーム送信イベント
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('loginForm').addEventListener('submit', handleLogin);
-  
+  document.getElementById('demoLoginBtn').addEventListener('click', demoLogin);
+
   // 既存のログイン状態を確認
   const currentUser = localStorage.getItem(CURRENT_USER_KEY);
   if (currentUser) {

@@ -102,6 +102,33 @@
     .register-link a:hover {
       text-decoration: underline;
     }
+    .demo-section {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px dashed #ddd;
+      text-align: center;
+    }
+    .demo-label {
+      font-size: 12px;
+      color: #999;
+      margin-bottom: 10px;
+    }
+    .demo-btn {
+      background: #f0f0f0;
+      color: #555;
+      border: 1px dashed #bbb;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.2s;
+      margin-top: 0;
+    }
+    .demo-btn:hover {
+      background: #e0e0e0;
+    }
   </style>
   <script src="./common.js"></script>
   <script src="./login.js" defer></script>
@@ -142,6 +169,11 @@
     
     <div class="register-link">
       初めての方は <a href="register.html">新規登録</a>
+    </div>
+
+    <div class="demo-section">
+      <div class="demo-label">デモ用</div>
+      <button type="button" id="demoLoginBtn" class="demo-btn">デモアカウントでログイン</button>
     </div>
   </div>
 </body>
