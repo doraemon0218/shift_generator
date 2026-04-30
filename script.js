@@ -501,12 +501,13 @@ function getShiftConfigFromUI() {
       surgeryLines: parseInt(document.getElementById(`cfg_surgery_${d}`)?.value) || 0,
       dayShift:     parseInt(document.getElementById(`cfg_day_${d}`)?.value)     || 0,
       lateShift:    parseInt(document.getElementById(`cfg_late_${d}`)?.value)    || 0,
+      nightShift:   parseInt(document.getElementById(`cfg_night_${d}`)?.value)   ?? 2,
     };
   });
   return {
     dow,
-    nightShift:  parseInt(document.getElementById('nightShiftRequired')?.value) || 2,
-    holidayDays: parseInt(document.getElementById('standardHolidayDays')?.value) || 9,
+    holidayDays:      parseInt(document.getElementById('standardHolidayDays')?.value) || 8,
+    dayAfterNightOff: true,
   };
 }
 
@@ -516,15 +517,14 @@ function generateShiftSchedule(nurses, shiftConfig, targetWorkDays, options = {}
     const dayReq = shiftConfig;
     const nightReq = targetWorkDays;
     const twDays = options;
-    shiftConfig = { dow: {}, nightShift: nightReq, holidayDays: 9 };
+    shiftConfig = { dow: {}, holidayDays: 8, dayAfterNightOff: true };
     [0,1,2,3,4,5,6].forEach(d => {
-      shiftConfig.dow[d] = { surgeryLines: 0, dayShift: (d===0||d===6)?0:dayReq, lateShift: 0 };
+      shiftConfig.dow[d] = { surgeryLines: 0, dayShift: (d===0||d===6)?0:dayReq, lateShift: 0, nightShift: nightReq };
     });
     targetWorkDays = typeof twDays === 'number' ? twDays : 20;
     options = {};
   }
-  const nightShiftRequired = shiftConfig.nightShift || 2;
-  const standardHolidayDays = shiftConfig.holidayDays || 9;
+  const standardHolidayDays = shiftConfig.holidayDays || 8;
   const schedule = [];
   const random = options.randomFn || Math.random;
   const targetPublicHolidays = standardHolidayDays || null; // 標準公休日数
@@ -583,12 +583,12 @@ function generateShiftSchedule(nurses, shiftConfig, targetWorkDays, options = {}
     // 現在の日までに割り当てられた看護師の統計を計算
     const currentSchedule = schedule.slice(0, dayIndex + 1);
     
-    // 前日が明け休みの人は除外（明け休みの翌日は必ず公休）
+    // 前日が明け休みの人は除外（当直明け翌日休暇オプションが有効な場合）
     const prevDayAssignments = prevDay ? prevDay.nurses : [];
     const prevDayOffAfterNight = new Set(
-      prevDayAssignments
-        .filter(a => a.isDayOffAfterNight)
-        .map(a => a.name)
+      shiftConfig.dayAfterNightOff !== false
+        ? prevDayAssignments.filter(a => a.isDayOffAfterNight).map(a => a.name)
+        : []
     );
     
     // 日勤を割り当て
@@ -644,7 +644,7 @@ function generateShiftSchedule(nurses, shiftConfig, targetWorkDays, options = {}
       });
     
     const dow = getDateDow(day.date);
-    const dowCfg = shiftConfig.dow[dow] || { dayShift: 0, lateShift: 0 };
+    const dowCfg = shiftConfig.dow[dow] || { dayShift: 0, lateShift: 0, nightShift: 2 };
 
     for (let i = 0; i < dowCfg.dayShift && i < dayShiftCandidates.length; i++) {
       const nurse = dayShiftCandidates[i];
@@ -719,6 +719,7 @@ function generateShiftSchedule(nurses, shiftConfig, targetWorkDays, options = {}
         return aStats.workDays - bStats.workDays;
       });
     
+    const nightShiftRequired = dowCfg.nightShift ?? 2;
     const selectedNight = [];
     const usedNight = new Set();
     for (let i = 0; i < nightShiftRequired && i < nightShiftCandidates.length; i++) {
@@ -783,8 +784,8 @@ function generateShiftSchedule(nurses, shiftConfig, targetWorkDays, options = {}
             });
           }
           
-          // 明け休みの翌日は必ず公休にする
-          if (dayIndex + 1 < dateColumns.length - 1) {
+          // 明け休みの翌日も公休にする（オプション）
+          if (shiftConfig.dayAfterNightOff !== false && dayIndex + 1 < dateColumns.length - 1) {
             const afterNextDate = dateColumns[dayIndex + 2];
             const afterNextDay = schedule.find(d => d.date === afterNextDate);
             if (afterNextDay) {

@@ -320,27 +320,27 @@
             <th>手術列数</th>
             <th>日勤</th>
             <th>遅出</th>
+            <th>夜勤</th>
           </tr>
         </thead>
         <tbody>
-          <tr class="weekday-row"><td>月</td><td><input type="number" id="cfg_surgery_1" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_1" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_1" value="1" min="0" class="cond-input"></td></tr>
-          <tr class="weekday-row"><td>火</td><td><input type="number" id="cfg_surgery_2" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_2" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_2" value="1" min="0" class="cond-input"></td></tr>
-          <tr class="weekday-row"><td>水</td><td><input type="number" id="cfg_surgery_3" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_3" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_3" value="1" min="0" class="cond-input"></td></tr>
-          <tr class="weekday-row"><td>木</td><td><input type="number" id="cfg_surgery_4" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_4" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_4" value="1" min="0" class="cond-input"></td></tr>
-          <tr class="weekday-row"><td>金</td><td><input type="number" id="cfg_surgery_5" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_5" value="4" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_5" value="1" min="0" class="cond-input"></td></tr>
-          <tr class="weekend-row"><td>土</td><td><input type="number" id="cfg_surgery_6" value="2" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_6" value="2" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_6" value="0" min="0" class="cond-input"></td></tr>
-          <tr class="weekend-row"><td>日</td><td><input type="number" id="cfg_surgery_0" value="0" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_0" value="0" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_0" value="0" min="0" class="cond-input"></td></tr>
+          <tr class="weekday-row"><td>月</td><td><input type="number" id="cfg_surgery_1" value="10" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_1" value="20" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_1" value="1" min="0" class="cond-input"></td><td><input type="number" id="cfg_night_1" value="2" min="0" class="cond-input"></td></tr>
+          <tr class="weekday-row"><td>火</td><td><input type="number" id="cfg_surgery_2" value="10" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_2" value="20" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_2" value="1" min="0" class="cond-input"></td><td><input type="number" id="cfg_night_2" value="2" min="0" class="cond-input"></td></tr>
+          <tr class="weekday-row"><td>水</td><td><input type="number" id="cfg_surgery_3" value="10" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_3" value="20" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_3" value="1" min="0" class="cond-input"></td><td><input type="number" id="cfg_night_3" value="2" min="0" class="cond-input"></td></tr>
+          <tr class="weekday-row"><td>木</td><td><input type="number" id="cfg_surgery_4" value="10" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_4" value="20" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_4" value="1" min="0" class="cond-input"></td><td><input type="number" id="cfg_night_4" value="2" min="0" class="cond-input"></td></tr>
+          <tr class="weekday-row"><td>金</td><td><input type="number" id="cfg_surgery_5" value="10" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_5" value="20" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_5" value="1" min="0" class="cond-input"></td><td><input type="number" id="cfg_night_5" value="2" min="0" class="cond-input"></td></tr>
+          <tr class="weekend-row"><td>土</td><td><input type="number" id="cfg_surgery_6" value="0" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_6" value="2" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_6" value="0" min="0" class="cond-input"></td><td><input type="number" id="cfg_night_6" value="2" min="0" class="cond-input"></td></tr>
+          <tr class="weekend-row"><td>日</td><td><input type="number" id="cfg_surgery_0" value="0" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_0" value="2" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_0" value="0" min="0" class="cond-input"></td><td><input type="number" id="cfg_night_0" value="2" min="0" class="cond-input"></td></tr>
         </tbody>
       </table>
 
       <div style="display:flex; gap:24px; align-items:center; flex-wrap:wrap; margin-top:16px;">
         <div>
-          <label for="nightShiftRequired" style="display:block; margin-bottom:4px; font-weight:600;">夜勤の配置人数:</label>
-          <input type="number" id="nightShiftRequired" value="2" min="0" style="width:80px; padding:8px; border:1px solid #ddd; border-radius:4px;" />
-        </div>
-        <div>
           <label for="standardHolidayDays" style="display:block; margin-bottom:4px; font-weight:600;">公休の日数:</label>
-          <input type="number" id="standardHolidayDays" value="9" min="0" style="width:80px; padding:8px; border:1px solid #ddd; border-radius:4px;" />
+          <input type="number" id="standardHolidayDays" value="8" min="0" style="width:80px; padding:8px; border:1px solid #ddd; border-radius:4px;" />
+        </div>
+        <div style="margin-top:8px; padding:8px 12px; background:#fff3e0; border-left:4px solid #ff9800; border-radius:4px; font-size:13px; color:#555;">
+          夜勤明け（夜勤入りの翌日）は<strong>夜勤明け休</strong>、さらにその翌日も<strong>必ず公休</strong>とします。
         </div>
       </div>
     </div>
