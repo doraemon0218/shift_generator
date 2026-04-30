@@ -321,12 +321,32 @@ function clearNightPairMatrix() {
   renderNightPairMatrix();
 }
 
-function isNightPairBlocked(candidateName, selectedNames) {
+// × は夜勤2人のみ編成時のみ禁忌。3人以上なら△と同じ扱い
+function isNightPairBlocked(candidateName, selectedNames, nightShiftRequired) {
+  if (nightShiftRequired !== 2) return false;
   return selectedNames.some(name => getMixingStatus(candidateName, name) === 'block');
 }
 
-function isNightPairAvoid(candidateName, selectedNames) {
-  return selectedNames.some(name => getMixingStatus(candidateName, name) === 'avoid');
+function isNightPairAvoid(candidateName, selectedNames, nightShiftRequired) {
+  return selectedNames.some(name => {
+    const status = getMixingStatus(candidateName, name);
+    return status === 'avoid' || (status === 'block' && nightShiftRequired !== 2);
+  });
+}
+
+// ×関係の件数を返す
+function countBlockRelationships(name) {
+  if (!mixingMatrix || !mixingMatrix.pairs) return 0;
+  return Object.values(mixingMatrix.pairs[name] || {}).filter(v => v === 'block').length;
+}
+
+// ×関係が多い上位N名を返す
+function getTopBlockedNurses(n = 5) {
+  return (pairMatrixCandidates || [])
+    .map(name => ({ name, blocks: countBlockRelationships(name) }))
+    .filter(x => x.blocks > 0)
+    .sort((a, b) => b.blocks - a.blocks)
+    .slice(0, n);
 }
 
 // 看護師のスコアを計算（公平性の指標）
@@ -373,41 +393,39 @@ function calculateNurseScore(nurse, schedule, targetWorkDays, targetPublicHolida
 function getNurseStats(nurseName, schedule) {
   let workDays = 0;
   let nightShifts = 0;
+  let lateShifts = 0;
   let weekendOffDays = 0;
   let publicHolidays = 0; // 公休日数（明け休みを除く）
   let violations = 0;
 
-  schedule.forEach((day, dayIndex) => {
+  schedule.forEach((day) => {
     const assignment = day.nurses.find(n => n.name === nurseName);
     if (assignment) {
       if (assignment.shift !== SHIFT_TYPES.OFF) {
         workDays++;
         if (assignment.shift === SHIFT_TYPES.NIGHT) {
           nightShifts++;
+        } else if (assignment.shift === SHIFT_TYPES.LATE) {
+          lateShifts++;
         }
       } else {
-        // 休みの場合
-        // 明け休みは公休にカウントしない
         if (!assignment.isDayOffAfterNight) {
-          // 平日の休みは公休にカウント
           if (!isWeekend(day.date)) {
             publicHolidays++;
           }
-          // 週末の休みも公休にカウント（明け休みでない場合のみ）
           if (isWeekend(day.date)) {
             weekendOffDays++;
             publicHolidays++;
           }
         }
       }
-      
       if (assignment.violation) {
         violations++;
       }
     }
   });
 
-  return { workDays, nightShifts, weekendOffDays, publicHolidays, violations };
+  return { workDays, nightShifts, lateShifts, weekendOffDays, publicHolidays, violations };
 }
 
 // 希望に違反しているかチェック（希望データがない場合は全てOK）
@@ -727,8 +745,8 @@ function generateShiftSchedule(nurses, shiftConfig, targetWorkDays, options = {}
 
       for (const candidate of nightShiftCandidates) {
         if (usedNight.has(candidate.name)) continue;
-        if (isNightPairBlocked(candidate.name, selectedNight)) continue;
-        if (!isNightPairAvoid(candidate.name, selectedNight)) {
+        if (isNightPairBlocked(candidate.name, selectedNight, nightShiftRequired)) continue;
+        if (!isNightPairAvoid(candidate.name, selectedNight, nightShiftRequired)) {
           picked = candidate;
           break;
         }
@@ -737,7 +755,7 @@ function generateShiftSchedule(nurses, shiftConfig, targetWorkDays, options = {}
       if (!picked) {
         for (const candidate of nightShiftCandidates) {
           if (usedNight.has(candidate.name)) continue;
-          if (isNightPairBlocked(candidate.name, selectedNight)) continue;
+          if (isNightPairBlocked(candidate.name, selectedNight, nightShiftRequired)) continue;
           picked = candidate;
           break;
         }
@@ -890,154 +908,287 @@ function generateShiftSchedule(nurses, shiftConfig, targetWorkDays, options = {}
   return schedule;
 }
 
-// シフト表を表示
+// シフト表を表示（コンパクト版）
 function renderShiftTable(schedule, container) {
   const target = container || document.getElementById('tableContainer');
   if (!target) return;
+  // コンテナ専用の場合はh2を残してそれ以降をクリア
+  if (!container) {
+    Array.from(target.children).forEach(child => { if (child.tagName !== 'H2') child.remove(); });
+  } else {
+    target.innerHTML = '';
+  }
 
-  target.innerHTML = '';
+  // 入職年降順ソート（nullは末尾）
+  const sortedNurses = [...nurses].sort((a, b) => {
+    if (a.hireYear == null && b.hireYear == null) return 0;
+    if (a.hireYear == null) return 1;
+    if (b.hireYear == null) return -1;
+    return b.hireYear - a.hireYear;
+  });
+
+  // ×関係が多い上位5名
+  const topBlocked = getTopBlockedNurses(5);
+  const BLOCK_COLORS = ['#b71c1c', '#c0392b', '#e74c3c', '#e67e22', '#f39c12'];
+  const blockColorMap = new Map(topBlocked.map((x, i) => [x.name, BLOCK_COLORS[i]]));
+
+  const LABEL = {
+    [SHIFT_TYPES.DAY]: '日',
+    [SHIFT_TYPES.LATE]: '遅',
+    [SHIFT_TYPES.NIGHT]: '夜',
+    [SHIFT_TYPES.OFF]: '休',
+  };
+  const BG = {
+    [SHIFT_TYPES.DAY]: '#dbeafe',
+    [SHIFT_TYPES.LATE]: '#dcfce7',
+    [SHIFT_TYPES.NIGHT]: '#fef3c7',
+    [SHIFT_TYPES.OFF]: '#f3f4f6',
+  };
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'overflow-x:auto; border:1px solid #ddd; border-radius:6px; max-height:65vh; overflow-y:auto;';
 
   const table = document.createElement('table');
-  const thead = document.createElement('thead');
-  const tbody = document.createElement('tbody');
+  table.style.cssText = 'border-collapse:collapse; font-size:10px; white-space:nowrap;';
 
-  // ヘッダー作成
-  const headerRow = document.createElement('tr');
-  const nameHeader = document.createElement('th');
-  nameHeader.textContent = '看護師名';
-  headerRow.appendChild(nameHeader);
+  // ヘッダー
+  const thead = document.createElement('thead');
+  const hRow = document.createElement('tr');
+
+  const nameTh = document.createElement('th');
+  nameTh.textContent = '氏名';
+  nameTh.style.cssText = 'position:sticky;left:0;top:0;z-index:4;background:#f8f9fa;padding:3px 6px;border:1px solid #ddd;min-width:58px;text-align:left;';
+  hRow.appendChild(nameTh);
 
   dateColumns.forEach(date => {
     const th = document.createElement('th');
-    const dayOfWeek = getDayOfWeek(date);
-    th.textContent = `${date}(${dayOfWeek})`;
-    if (isWeekend(date)) {
-      th.classList.add('weekend');
-    }
-    headerRow.appendChild(th);
+    const d = date.split('/')[1];
+    const dow = getDayOfWeek(date);
+    const isWE = isWeekend(date);
+    th.innerHTML = `${d}<br>${dow}`;
+    th.style.cssText = `position:sticky;top:0;z-index:3;background:#f8f9fa;padding:2px 1px;border:1px solid #ddd;min-width:22px;font-weight:${isWE?'700':'400'};color:${isWE?'#b71c1c':'inherit'};`;
+    hRow.appendChild(th);
   });
-  thead.appendChild(headerRow);
 
-  // 看護師ごとの行を作成
-  nurses.forEach(nurse => {
+  // 集計列ヘッダー
+  [['遅', '#dcfce7'], ['夜', '#fef3c7'], ['公休', '#f3f4f6']].forEach(([label, bg]) => {
+    const th = document.createElement('th');
+    th.textContent = label;
+    th.style.cssText = `position:sticky;top:0;z-index:3;background:${bg};padding:2px 4px;border:1px solid #ddd;min-width:26px;font-weight:700;`;
+    hRow.appendChild(th);
+  });
+
+  thead.appendChild(hRow);
+  table.appendChild(thead);
+
+  // 行
+  const tbody = document.createElement('tbody');
+  sortedNurses.forEach(nurse => {
+    const stats = getNurseStats(nurse.name, schedule);
     const row = document.createElement('tr');
-    const nameCell = document.createElement('td');
-    nameCell.textContent = nurse.name;
-    if (nurse.note) {
-      nameCell.title = nurse.note;
-      nameCell.style.cursor = 'help';
-    }
-    row.appendChild(nameCell);
 
+    // 氏名セル
+    const nameTd = document.createElement('td');
+    const lastName = nurse.name.trim().split(/\s+/)[0] || nurse.name;
+    const blockColor = blockColorMap.get(nurse.name);
+    nameTd.style.cssText = `position:sticky;left:0;z-index:2;background:${blockColor ? blockColor + '1a' : '#fff'};padding:2px 4px;border:1px solid #ddd;font-size:10px;white-space:nowrap;${blockColor ? `border-left:3px solid ${blockColor};` : ''}`;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = lastName;
+    if (blockColor) nameSpan.style.color = blockColor;
+    nameTd.appendChild(nameSpan);
+
+    if (nurse.hireYear) {
+      const yr = document.createElement('span');
+      yr.textContent = `'${String(nurse.hireYear).slice(-2)}`;
+      yr.style.cssText = 'color:#9ca3af;font-size:8px;margin-left:2px;';
+      nameTd.appendChild(yr);
+    }
+    if (blockColor) {
+      const blocks = topBlocked.find(x => x.name === nurse.name)?.blocks || 0;
+      nameTd.title = `×関係 ${blocks}件（要フォロー）`;
+    }
+    row.appendChild(nameTd);
+
+    // 日付セル
     dateColumns.forEach(date => {
       const day = schedule.find(d => d.date === date);
       const assignment = day?.nurses.find(n => n.name === nurse.name);
       const td = document.createElement('td');
+      const isWE = isWeekend(date);
 
       if (assignment) {
-        td.textContent = assignment.shift;
-        if (assignment.shift === SHIFT_TYPES.DAY) {
-          td.classList.add('day-shift');
-        } else if (assignment.shift === SHIFT_TYPES.LATE) {
-          td.classList.add('late-shift');
-        } else if (assignment.shift === SHIFT_TYPES.NIGHT) {
-          td.classList.add('night-shift');
-        } else {
-          td.classList.add('off-day');
-          if (assignment.isDayOffAfterNight) {
-            td.title = '明け休み';
-          }
-        }
+        const isAke = assignment.shift === SHIFT_TYPES.OFF && assignment.isDayOffAfterNight;
+        td.textContent = isAke ? '明' : (LABEL[assignment.shift] || assignment.shift);
+        td.style.background = isAke ? '#fed7aa' : (BG[assignment.shift] || '#fff');
         if (assignment.violation) {
-          td.classList.add('violation');
-          td.title = (td.title ? td.title + ' / ' : '') + '希望に違反しています';
+          td.style.outline = '2px solid #dc2626';
+          td.style.outlineOffset = '-1px';
+          td.title = '希望違反';
         }
       } else {
-        td.textContent = '?';
+        td.textContent = '-';
+        td.style.color = '#ccc';
       }
 
-      if (isWeekend(date)) {
-        td.classList.add('weekend');
-      }
+      td.style.cssText += `padding:1px;border:1px solid #e5e7eb;text-align:center;font-weight:${isWE ? '700' : '400'};`;
+      row.appendChild(td);
+    });
 
+    // 集計セル（遅/夜/公休）
+    [[stats.lateShifts, '#dcfce7'], [stats.nightShifts, '#fef3c7'], [stats.publicHolidays, '#f3f4f6']].forEach(([val, bg]) => {
+      const td = document.createElement('td');
+      td.textContent = val;
+      td.style.cssText = `background:${bg};padding:1px 3px;border:1px solid #ddd;text-align:center;font-weight:700;`;
       row.appendChild(td);
     });
 
     tbody.appendChild(row);
   });
 
-  table.appendChild(thead);
   table.appendChild(tbody);
-  target.appendChild(table);
+  wrap.appendChild(table);
+  target.appendChild(wrap);
+
+  // 凡例
+  const legend = document.createElement('div');
+  legend.style.cssText = 'margin-top:8px; display:flex; gap:12px; flex-wrap:wrap; font-size:11px; align-items:center;';
+  [
+    ['日', '#dbeafe', '日勤'],
+    ['遅', '#dcfce7', '遅出'],
+    ['夜', '#fef3c7', '夜勤'],
+    ['明', '#fed7aa', '夜勤明け'],
+    ['休', '#f3f4f6', '公休'],
+  ].forEach(([label, bg, title]) => {
+    const el = document.createElement('span');
+    el.style.cssText = `background:${bg};padding:2px 6px;border:1px solid #ddd;border-radius:3px;`;
+    el.textContent = `${label} ${title}`;
+    el.title = title;
+    legend.appendChild(el);
+  });
+  if (topBlocked.length > 0) {
+    const note = document.createElement('span');
+    note.style.cssText = 'color:#b71c1c;font-size:10px;border-left:3px solid #b71c1c;padding-left:6px;';
+    note.textContent = `赤名前 = ×関係上位（要フォロー）`;
+    legend.appendChild(note);
+  }
+  target.appendChild(legend);
 }
 
-// 統計情報を表示
+// 統計情報を表示（公平性可視化）
 function renderStats(schedule, targetWorkDays, container) {
   const statsContainer = container || document.getElementById('statsContainer');
   if (!statsContainer) return;
-  statsContainer.innerHTML = '';
+  if (!container) {
+    Array.from(statsContainer.children).forEach(child => { if (child.tagName !== 'H2') child.remove(); });
+  } else {
+    statsContainer.innerHTML = '';
+  }
 
-  const allStats = nurses.map(nurse => getNurseStats(nurse.name, schedule));
-  
-  const avgWorkDays = allStats.reduce((sum, s) => sum + s.workDays, 0) / allStats.length;
-  const avgNightShifts = allStats.reduce((sum, s) => sum + s.nightShifts, 0) / allStats.length;
-  const avgWeekendOff = allStats.reduce((sum, s) => sum + s.weekendOffDays, 0) / allStats.length;
-  const totalViolations = allStats.reduce((sum, s) => sum + s.violations, 0);
+  const allData = nurses.map(nurse => ({ nurse, stats: getNurseStats(nurse.name, schedule) }));
+  const n = allData.length || 1;
 
-  const stats = [
-    { label: '平均勤務日数', value: avgWorkDays.toFixed(1) },
-    { label: '平均夜勤回数', value: avgNightShifts.toFixed(1) },
-    { label: '平均週末休日', value: avgWeekendOff.toFixed(1) },
-    { label: '希望違反総数', value: totalViolations.toString() },
-    { label: '看護師数', value: nurses.length.toString() },
-    { label: 'シフト期間', value: `${dateColumns.length}日` }
-  ];
+  const avgLate   = allData.reduce((s, x) => s + x.stats.lateShifts, 0) / n;
+  const avgNight  = allData.reduce((s, x) => s + x.stats.nightShifts, 0) / n;
+  const avgOff    = allData.reduce((s, x) => s + x.stats.publicHolidays, 0) / n;
+  const avgWork   = allData.reduce((s, x) => s + x.stats.workDays, 0) / n;
+  const totalViol = allData.reduce((s, x) => s + x.stats.violations, 0);
 
-  stats.forEach(stat => {
+  // サマリーカード
+  const summaryDiv = document.createElement('div');
+  summaryDiv.style.cssText = 'display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;';
+  [
+    ['スタッフ数', `${n}名`],
+    ['平均勤務日数', avgWork.toFixed(1)],
+    ['平均遅出回数', avgLate.toFixed(1)],
+    ['平均夜勤回数', avgNight.toFixed(1)],
+    ['平均公休日数', avgOff.toFixed(1)],
+    ['希望違反総数', totalViol],
+  ].forEach(([label, value]) => {
     const card = document.createElement('div');
-    card.className = 'stat-card';
-    card.innerHTML = `
-      <div class="stat-label">${stat.label}</div>
-      <div class="stat-value">${stat.value}</div>
-    `;
-    statsContainer.appendChild(card);
+    card.style.cssText = 'background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;padding:10px 16px;text-align:center;min-width:90px;';
+    card.innerHTML = `<div style="font-size:11px;color:#666;margin-bottom:4px;">${label}</div><div style="font-size:18px;font-weight:700;color:#333;">${value}</div>`;
+    summaryDiv.appendChild(card);
+  });
+  statsContainer.appendChild(summaryDiv);
+
+  // ×関係上位5名の注意書き
+  const topBlocked = getTopBlockedNurses(5);
+  if (topBlocked.length > 0) {
+    const BLOCK_COLORS = ['#b71c1c', '#c0392b', '#e74c3c', '#e67e22', '#f39c12'];
+    const alertDiv = document.createElement('div');
+    alertDiv.style.cssText = 'margin-bottom:16px;padding:10px 14px;background:#fff3f3;border:1px solid #fca5a5;border-radius:6px;font-size:12px;';
+    alertDiv.innerHTML = '<strong style="color:#b71c1c;">⚠ ×関係上位スタッフ（管理者フォロー推奨）</strong><div style="margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;">'
+      + topBlocked.map((x, i) => `<span style="display:inline-flex;align-items:center;gap:4px;background:${BLOCK_COLORS[i]}1a;border:1px solid ${BLOCK_COLORS[i]};border-radius:4px;padding:2px 8px;color:${BLOCK_COLORS[i]};font-weight:600;">
+        ${x.name.split(/\s+/)[0]} <span style="font-size:10px;opacity:0.8;">(×${x.blocks}件)</span></span>`).join('')
+      + '</div>';
+    statsContainer.appendChild(alertDiv);
+  }
+
+  // 公平性テーブル（入職年降順）
+  const sortedData = [...allData].sort((a, b) => {
+    if (a.nurse.hireYear == null && b.nurse.hireYear == null) return 0;
+    if (a.nurse.hireYear == null) return 1;
+    if (b.nurse.hireYear == null) return -1;
+    return b.nurse.hireYear - a.nurse.hireYear;
   });
 
-  // 看護師ごとの詳細統計も表示
-  const detailDiv = document.createElement('div');
-  detailDiv.style.gridColumn = '1 / -1';
-  detailDiv.style.marginTop = '16px';
-  detailDiv.innerHTML = '<h3 style="font-size: 16px; margin-bottom: 12px;">看護師ごとの統計</h3>';
-  
-  const detailTable = document.createElement('table');
-  detailTable.style.fontSize = '12px';
-  detailTable.innerHTML = `
+  function fairnessColor(val, avg) {
+    const diff = val - avg;
+    if (Math.abs(diff) <= 1) return '#f0fdf4'; // 平均内 → 薄緑
+    if (Math.abs(diff) <= 2) return '#fef9c3'; // ±2 → 薄黄
+    return diff > 0 ? '#fee2e2' : '#dbeafe';   // 多い→薄赤, 少ない→薄青
+  }
+
+  const tableWrap = document.createElement('div');
+  tableWrap.style.cssText = 'overflow-x:auto;';
+  const tbl = document.createElement('table');
+  tbl.style.cssText = 'font-size:12px;border-collapse:collapse;width:100%;';
+  tbl.innerHTML = `
     <thead>
-      <tr>
-        <th>看護師名</th>
-        <th>勤務日数</th>
-        <th>夜勤回数</th>
-        <th>週末休日</th>
-        <th>希望違反</th>
+      <tr style="background:#f8f9fa;">
+        <th style="padding:6px 8px;border:1px solid #ddd;text-align:left;">氏名</th>
+        <th style="padding:6px 4px;border:1px solid #ddd;">入職年</th>
+        <th style="padding:6px 4px;border:1px solid #ddd;">勤務日数</th>
+        <th style="padding:6px 4px;border:1px solid #ddd;background:#dcfce7;">遅出</th>
+        <th style="padding:6px 4px;border:1px solid #ddd;background:#fef3c7;">夜勤</th>
+        <th style="padding:6px 4px;border:1px solid #ddd;background:#f3f4f6;">公休</th>
+        <th style="padding:6px 4px;border:1px solid #ddd;">希望違反</th>
       </tr>
     </thead>
     <tbody>
-      ${nurses.map(nurse => {
-        const stats = getNurseStats(nurse.name, schedule);
-        return `
-          <tr>
-            <td>${nurse.name}${nurse.note ? ` (${nurse.note})` : ''}</td>
-            <td>${stats.workDays}</td>
-            <td>${stats.nightShifts}</td>
-            <td>${stats.weekendOffDays}</td>
-            <td>${stats.violations}</td>
-          </tr>
-        `;
+      ${sortedData.map(({ nurse, stats }) => {
+        const lateBg  = fairnessColor(stats.lateShifts,  avgLate);
+        const nightBg = fairnessColor(stats.nightShifts, avgNight);
+        const offBg   = fairnessColor(stats.publicHolidays, avgOff);
+        const lastName = nurse.name.trim().split(/\s+/)[0] || nurse.name;
+        return `<tr>
+          <td style="padding:4px 8px;border:1px solid #ddd;white-space:nowrap;">${lastName}${nurse.hireYear ? `<span style="color:#9ca3af;font-size:10px;margin-left:3px;">'${String(nurse.hireYear).slice(-2)}</span>` : ''}</td>
+          <td style="padding:4px;border:1px solid #ddd;text-align:center;color:#666;">${nurse.hireYear ?? '—'}</td>
+          <td style="padding:4px;border:1px solid #ddd;text-align:center;">${stats.workDays}</td>
+          <td style="padding:4px;border:1px solid #ddd;text-align:center;background:${lateBg};">${stats.lateShifts}</td>
+          <td style="padding:4px;border:1px solid #ddd;text-align:center;background:${nightBg};">${stats.nightShifts}</td>
+          <td style="padding:4px;border:1px solid #ddd;text-align:center;background:${offBg};">${stats.publicHolidays}</td>
+          <td style="padding:4px;border:1px solid #ddd;text-align:center;${stats.violations > 0 ? 'color:#dc2626;font-weight:700;' : ''}">${stats.violations}</td>
+        </tr>`;
       }).join('')}
-    </tbody>
-  `;
-  detailDiv.appendChild(detailTable);
-  statsContainer.appendChild(detailDiv);
+      <tr style="background:#f0f4ff;font-weight:700;">
+        <td style="padding:4px 8px;border:1px solid #ddd;">平均</td>
+        <td style="padding:4px;border:1px solid #ddd;"></td>
+        <td style="padding:4px;border:1px solid #ddd;text-align:center;">${avgWork.toFixed(1)}</td>
+        <td style="padding:4px;border:1px solid #ddd;text-align:center;background:#dcfce7;">${avgLate.toFixed(1)}</td>
+        <td style="padding:4px;border:1px solid #ddd;text-align:center;background:#fef3c7;">${avgNight.toFixed(1)}</td>
+        <td style="padding:4px;border:1px solid #ddd;text-align:center;background:#f3f4f6;">${avgOff.toFixed(1)}</td>
+        <td style="padding:4px;border:1px solid #ddd;text-align:center;">${totalViol}</td>
+      </tr>
+    </tbody>`;
+  tableWrap.appendChild(tbl);
+  statsContainer.appendChild(tableWrap);
+
+  const hint = document.createElement('p');
+  hint.style.cssText = 'font-size:11px;color:#666;margin-top:8px;';
+  hint.textContent = '色: 薄緑=平均±1以内 / 薄黄=平均±2 / 薄赤=多い / 薄青=少ない';
+  statsContainer.appendChild(hint);
 }
 
 function generateScheduleDrafts(count, shiftConfig, targetWorkDays) {
@@ -1066,10 +1217,8 @@ function selectDraft(index, targetWorkDays) {
 
   const tableContainer = document.getElementById('tableContainer');
   const statsContainer = document.getElementById('statsContainer');
-  const legendContainer = document.getElementById('legendContainer');
   if (tableContainer) tableContainer.style.display = 'block';
   if (statsContainer) statsContainer.style.display = 'block';
-  if (legendContainer) legendContainer.style.display = 'block';
 
   const exportBtn = document.getElementById('exportBtn');
   if (exportBtn) exportBtn.disabled = false;
@@ -1173,42 +1322,53 @@ function clearError() {
 
 // 30名の固定プロファイル（ダミーデータ用）
 const DUMMY_PROFILES = [
-  { name: '田中 花子',   cap: 'day-only' },
-  { name: '鈴木 美咲',   cap: 'day-only' },
-  { name: '高橋 葵',     cap: 'day-only' },
-  { name: '伊藤 結衣',   cap: 'day-only' },
-  { name: '渡辺 莉子',   cap: 'day-only' },
-  { name: '山本 千夏',   cap: 'day-late' },
-  { name: '中村 さくら', cap: 'day-late' },
-  { name: '小林 陽菜',   cap: 'day-late' },
-  { name: '加藤 凜',     cap: 'day-late' },
-  { name: '吉田 心',     cap: 'day-late' },
-  { name: '佐藤 彩',     cap: 'all' },
-  { name: '松本 菜々',   cap: 'all' },
-  { name: '井上 あい',   cap: 'all' },
-  { name: '木村 春香',   cap: 'all' },
-  { name: '林 翠',       cap: 'all' },
-  { name: '清水 舞',     cap: 'all' },
-  { name: '山田 桃花',   cap: 'all' },
-  { name: '斎藤 ひかり', cap: 'all' },
-  { name: '藤田 夕佳',   cap: 'all' },
-  { name: '岡田 みほ',   cap: 'all' },
-  { name: '池田 恵',     cap: 'all' },
-  { name: '橋本 ともみ', cap: 'all' },
-  { name: '石川 まい',   cap: 'all' },
-  { name: '前田 萌',     cap: 'all' },
-  { name: '藤原 悠',     cap: 'all' },
-  { name: '小川 里奈',   cap: 'all' },
-  { name: '岩田 朱音',   cap: 'all' },
-  { name: '坂本 遥',     cap: 'all' },
-  { name: '村田 玲',     cap: 'all' },
-  { name: '中島 由衣',   cap: 'all' },
+  { name: '田中 花子',   cap: 'day-only', hireYear: 2005 },
+  { name: '鈴木 美咲',   cap: 'day-only', hireYear: 2007 },
+  { name: '高橋 葵',     cap: 'day-only', hireYear: 2010 },
+  { name: '伊藤 結衣',   cap: 'day-only', hireYear: 2012 },
+  { name: '渡辺 莉子',   cap: 'day-only', hireYear: 2015 },
+  { name: '山本 千夏',   cap: 'day-late', hireYear: 2008 },
+  { name: '中村 さくら', cap: 'day-late', hireYear: 2011 },
+  { name: '小林 陽菜',   cap: 'day-late', hireYear: 2014 },
+  { name: '加藤 凜',     cap: 'day-late', hireYear: 2017 },
+  { name: '吉田 心',     cap: 'day-late', hireYear: 2020 },
+  { name: '佐藤 彩',     cap: 'all',      hireYear: 2006 },
+  { name: '松本 菜々',   cap: 'all',      hireYear: 2009 },
+  { name: '井上 あい',   cap: 'all',      hireYear: 2010 },
+  { name: '木村 春香',   cap: 'all',      hireYear: 2013 },
+  { name: '林 翠',       cap: 'all',      hireYear: 2013 },
+  { name: '清水 舞',     cap: 'all',      hireYear: 2015 },
+  { name: '山田 桃花',   cap: 'all',      hireYear: 2016 },
+  { name: '斎藤 ひかり', cap: 'all',      hireYear: 2017 },
+  { name: '藤田 夕佳',   cap: 'all',      hireYear: 2018 },
+  { name: '岡田 みほ',   cap: 'all',      hireYear: 2018 },
+  { name: '池田 恵',     cap: 'all',      hireYear: 2019 },
+  { name: '橋本 ともみ', cap: 'all',      hireYear: 2020 },
+  { name: '石川 まい',   cap: 'all',      hireYear: 2021 },
+  { name: '前田 萌',     cap: 'all',      hireYear: 2021 },
+  { name: '藤原 悠',     cap: 'all',      hireYear: 2022 },
+  { name: '小川 里奈',   cap: 'all',      hireYear: 2022 },
+  { name: '岩田 朱音',   cap: 'all',      hireYear: 2023 },
+  { name: '坂本 遥',     cap: 'all',      hireYear: 2023 },
+  { name: '村田 玲',     cap: 'all',      hireYear: 2024 },
+  { name: '中島 由衣',   cap: 'all',      hireYear: 2025 },
 ];
 
 // テスト用ダミーデータをLocalStorageに書き込む（nurse_input.js と同一形式）
 function writeDummyToLocalStorage(year, month) {
-  const dateCols = getMonthDates(year, month); // common.js: ["5/1","5/2",...]
+  const dateCols = getMonthDates(year, month);
   const seeded = createSeededRandom(20260428);
+
+  // ユーザープロファイルにhireYearを書き込む
+  let userProfiles = {};
+  try { userProfiles = JSON.parse(localStorage.getItem(USER_STORAGE_KEY) || '{}'); } catch (e) {}
+  DUMMY_PROFILES.forEach(({ name, cap, hireYear }) => {
+    const userKey = name.replace(/\s/g, '_');
+    userProfiles[userKey] = Object.assign(userProfiles[userKey] || {}, {
+      fullName: name, shiftCapability: cap, hireYear: hireYear ?? null,
+    });
+  });
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userProfiles));
 
   DUMMY_PROFILES.forEach(({ name, cap }) => {
     const userKey = name.replace(/\s/g, '_');
@@ -1259,6 +1419,9 @@ function loadNursesFromLocalStorage(year, month) {
   const prefix = STORAGE_KEY_PREFIX;
   const result = [];
 
+  let userProfiles = {};
+  try { userProfiles = JSON.parse(localStorage.getItem(USER_STORAGE_KEY) || '{}'); } catch (e) {}
+
   Object.keys(localStorage).forEach(key => {
     if (!key.startsWith(prefix)) return;
     const tail = key.slice(prefix.length);
@@ -1269,11 +1432,14 @@ function loadNursesFromLocalStorage(year, month) {
 
     try {
       const data = JSON.parse(localStorage.getItem(key));
+      const userKey = match[1];
+      const profile = userProfiles[userKey] || {};
       const nurse = {
-        name: data.nurseName || match[1].replace(/_/g, ' '),
+        name: data.nurseName || userKey.replace(/_/g, ' '),
         note: data.note || '',
         requests: {},
-        shiftCapability: data.shiftCapability || null
+        shiftCapability: data.shiftCapability || null,
+        hireYear: profile.hireYear ?? data.hireYear ?? null,
       };
       dateColumns.forEach(date => {
         nurse.requests[date] = data.requests?.[date] || REQUEST_TYPES.AVAILABLE;
@@ -1307,6 +1473,18 @@ function processNursesLoaded(loadedNurses) {
 document.addEventListener('DOMContentLoaded', () => {
   const generateBtn = document.getElementById('generateBtn');
   const exportBtn = document.getElementById('exportBtn');
+
+  // 相性表アコーディオン
+  const pairToggleBtn = document.getElementById('pairMatrixToggle');
+  if (pairToggleBtn) {
+    pairToggleBtn.addEventListener('click', () => {
+      const body = document.getElementById('pairMatrixBody');
+      if (!body) return;
+      const open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : 'block';
+      pairToggleBtn.textContent = open ? '▼ 表示' : '▲ 閉じる';
+    });
+  }
 
   // テスト用ダミーデータ読み込み（LocalStorageに書き込んでから読み込む）
   const dummyBtn = document.getElementById('dummyLoadBtn');
@@ -1357,7 +1535,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('loadingContainer').style.display = 'block';
     document.getElementById('tableContainer').style.display = 'none';
     document.getElementById('statsContainer').style.display = 'none';
-    document.getElementById('legendContainer').style.display = 'none';
     document.getElementById('draftContainer').style.display = 'none';
     document.getElementById('selectionNotice').style.display = 'none';
     exportBtn.disabled = true;

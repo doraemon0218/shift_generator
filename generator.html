@@ -299,14 +299,20 @@
 
     <div id="errorContainer"></div>
 
-    <!-- ステップ2: 夜勤相性表（読み込み後に表示） -->
+    <!-- ステップ2: 夜勤相性表（管理者設定・非公開） -->
     <div id="pairMatrixSection" style="display: none; margin-top: 32px;">
-      <h2 style="margin: 0 0 12px; font-size: 20px; color: #333;">🤝 夜勤ペア相性表</h2>
-      <p style="color: #666; margin-bottom: 12px;">
-        夜勤可能なスタッフ同士の相性を設定します。前回の設定が自動的に引き継がれます。<br>
-        ○：問題なし（デフォルト）、△：極力避けたい、×：禁忌
-      </p>
-      <div id="nightPairMatrix" class="pair-matrix"></div>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+        <h2 style="margin:0; font-size: 20px; color: #333;">🔒 夜勤ペア相性設定</h2>
+        <button type="button" id="pairMatrixToggle" style="font-size:12px;padding:4px 10px;background:#6c757d;">▼ 表示</button>
+        <span style="font-size:12px;color:#888;">この設定はシフト生成のみに使用されます（非公開）</span>
+      </div>
+      <div id="pairMatrixBody" style="display:none;">
+        <p style="color: #666; margin-bottom: 12px; font-size:13px;">
+          夜勤可能なスタッフ同士の相性を設定します。前回の設定が自動的に引き継がれます。<br>
+          ○：問題なし（デフォルト）、△：極力避けたい、×：夜勤2人体制では禁忌（3人以上なら可）
+        </p>
+        <div id="nightPairMatrix" class="pair-matrix"></div>
+      </div>
     </div>
 
     <!-- ステップ3: シフト条件入力 -->
@@ -359,18 +365,11 @@
     <div id="selectionNotice" class="draft-note" style="display: none;">
       3つの下書きから1つを選択してください（採用ボタンで確定）。
     </div>
-    <div id="tableContainer" style="display: none;"></div>
-    <div id="statsContainer" style="display: none;" class="stats"></div>
-    <div id="legendContainer" style="display: none; margin-top: 24px;">
-      <h3>凡例</h3>
-      <ul>
-        <li><span class="day-shift" style="padding:2px 6px;">日勤</span></li>
-        <li><span class="late-shift" style="padding:2px 6px;">遅出</span></li>
-        <li><span class="night-shift" style="padding:2px 6px;">夜勤</span></li>
-        <li><span class="off-day" style="padding:2px 6px;">休</span></li>
-        <li><span class="violation" style="padding:2px 6px;">赤背景</span>: 希望違反</li>
-        <li><strong>太字</strong>: 週末（土日）</li>
-      </ul>
+    <div id="tableContainer" style="display: none; margin-top: 24px;">
+      <h2 style="font-size:18px;margin-bottom:8px;">📋 採用シフト表</h2>
+    </div>
+    <div id="statsContainer" style="display: none; margin-top: 24px;">
+      <h2 style="font-size:18px;margin-bottom:12px;">📊 公平性レポート</h2>
     </div>
 
     <div id="exportSection" style="margin-top: 24px; display: none;">
