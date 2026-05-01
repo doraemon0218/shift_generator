@@ -13,6 +13,18 @@ function initAdminSelectedMonth() {
   adminSelectedMonth = target.month;
 }
 
+function updateGeneratorLink() {
+  const link = document.getElementById('generatorLink');
+  if (!link) return;
+  if (adminSelectedYear && adminSelectedMonth) {
+    link.href = `generator.html?year=${adminSelectedYear}&month=${adminSelectedMonth}`;
+    link.textContent = `⚙️ ${adminSelectedYear}年${adminSelectedMonth}月のシフト表を生成する`;
+  } else {
+    link.href = 'generator.html';
+    link.textContent = '⚙️ シフト表生成ページへ';
+  }
+}
+
 function adminSwitchToMonth(year, month) {
   adminSelectedYear = year;
   adminSelectedMonth = month;
@@ -23,6 +35,7 @@ function adminSwitchToMonth(year, month) {
     loadAllNurseRequests();
   }
   renderFixManagement();
+  updateGeneratorLink();
 }
 
 function buildAllMonthsList() {
@@ -1056,6 +1069,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadAdminRequestList();
   loadAdminList();
   loadIntegratedBoard();
+  updateGeneratorLink();
 });
 
 // 毎月15日23:59に設定

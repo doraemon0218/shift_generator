@@ -1428,10 +1428,12 @@ function loadNursesFromLocalStorage(year, month) {
   dateColumns = getMonthDates(year, month);
   const prefix = STORAGE_KEY_PREFIX;
   const result = [];
+  const loadedUserKeys = new Set();
 
   let userProfiles = {};
   try { userProfiles = JSON.parse(localStorage.getItem(USER_STORAGE_KEY) || '{}'); } catch (e) {}
 
+  // 月別キーを優先ロード
   Object.keys(localStorage).forEach(key => {
     if (!key.startsWith(prefix)) return;
     const tail = key.slice(prefix.length);
@@ -1445,17 +1447,40 @@ function loadNursesFromLocalStorage(year, month) {
       const userKey = match[1];
       const profile = userProfiles[userKey] || {};
       const nurse = {
-        name: data.nurseName || userKey.replace(/_/g, ' '),
+        name: data.nurseName || profile.fullName || userKey.replace(/_/g, ' '),
         note: data.note || '',
         requests: {},
-        shiftCapability: data.shiftCapability || null,
+        shiftCapability: normalizeShiftCapability(data.shiftCapability) ?? normalizeShiftCapability(profile.initialShiftCapability) ?? null,
         hireYear: profile.hireYear ?? data.hireYear ?? null,
       };
       dateColumns.forEach(date => {
         nurse.requests[date] = data.requests?.[date] || REQUEST_TYPES.AVAILABLE;
       });
       result.push(nurse);
+      loadedUserKeys.add(userKey);
     } catch (e) {}
+  });
+
+  // 登録済みユーザーで未ロードの人を追加（未提出でも「全日出勤可」として含める）
+  Object.entries(userProfiles).forEach(([userKey, profile]) => {
+    if (loadedUserKeys.has(userKey)) return;
+
+    // レガシーキーを試みる
+    let data = null;
+    try { data = JSON.parse(localStorage.getItem(prefix + userKey)); } catch (e) {}
+
+    const nurse = {
+      name: data?.nurseName || profile.fullName || userKey.replace(/_/g, ' '),
+      note: data?.note || '',
+      requests: {},
+      shiftCapability: normalizeShiftCapability(data?.shiftCapability) ?? normalizeShiftCapability(profile.initialShiftCapability) ?? null,
+      hireYear: profile.hireYear ?? data?.hireYear ?? null,
+      _unsubmitted: true,
+    };
+    dateColumns.forEach(date => {
+      nurse.requests[date] = data?.requests?.[date] || REQUEST_TYPES.AVAILABLE;
+    });
+    result.push(nurse);
   });
 
   return result;
@@ -1475,7 +1500,14 @@ function processNursesLoaded(loadedNurses) {
   if (generateSection) generateSection.style.display = 'block';
   loadNightPairMatrix();
   const nightShiftCount = getPairMatrixCandidatesFromNurses().length;
-  alert(`データを読み込みました。\n看護師数: ${nurses.length}名\n期間: ${dateColumns.length}日\n夜勤する人: ${nightShiftCount}名\n\n夜勤ペア相性表が前回の設定を引き継ぎました。\n確認後、「シフト表を生成」ボタンを押してください。`);
+  const submittedCount = nurses.filter(n => !n._unsubmitted).length;
+  const unsubmittedCount = nurses.filter(n => n._unsubmitted).length;
+  let msg = `データを読み込みました。\n看護師数: ${nurses.length}名\n期間: ${dateColumns.length}日\n夜勤する人: ${nightShiftCount}名`;
+  if (unsubmittedCount > 0) {
+    msg += `\n\n⚠️ 希望提出済み: ${submittedCount}名 / 未提出（全日出勤可扱い）: ${unsubmittedCount}名`;
+  }
+  msg += '\n\n夜勤ペア相性表が前回の設定を引き継ぎました。\n確認後、「シフト表を生成」ボタンを押してください。';
+  alert(msg);
 }
 
 

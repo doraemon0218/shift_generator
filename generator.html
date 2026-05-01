@@ -264,12 +264,15 @@
   <script src="./script.js" defer></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
       const now = new Date();
       const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      const yearEl = document.getElementById('lsYear');
+      const paramYear  = parseInt(params.get('year'))  || next.getFullYear();
+      const paramMonth = parseInt(params.get('month')) || next.getMonth() + 1;
+      const yearEl  = document.getElementById('lsYear');
       const monthEl = document.getElementById('lsMonth');
-      if (yearEl) yearEl.value = next.getFullYear();
-      if (monthEl) monthEl.value = next.getMonth() + 1;
+      if (yearEl)  yearEl.value  = paramYear;
+      if (monthEl) monthEl.value = paramMonth;
     });
   </script>
 </head>
