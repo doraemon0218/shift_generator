@@ -133,6 +133,8 @@
     .conditions-table th { background: #f8f9fa; font-weight: 600; }
     .conditions-table .weekday-row td:first-child { font-weight: 600; color: #1a1a1a; }
     .conditions-table .weekend-row td:first-child { font-weight: 600; color: #d32f2f; }
+    .conditions-table .holiday-row td:first-child { font-weight: 600; color: #7c3aed; }
+    .conditions-table .holiday-row { background: #f5f3ff; }
     .cond-input {
       width: 60px;
       padding: 4px 6px;
@@ -337,6 +339,7 @@
           <tr class="weekday-row"><td>金</td><td><input type="number" id="cfg_surgery_5" value="10" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_5" value="20" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_5" value="1" min="0" class="cond-input"></td><td><input type="number" id="cfg_night_5" value="2" min="0" class="cond-input"></td></tr>
           <tr class="weekend-row"><td>土</td><td><input type="number" id="cfg_surgery_6" value="0" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_6" value="2" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_6" value="0" min="0" class="cond-input"></td><td><input type="number" id="cfg_night_6" value="2" min="0" class="cond-input"></td></tr>
           <tr class="weekend-row"><td>日</td><td><input type="number" id="cfg_surgery_0" value="0" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_0" value="2" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_0" value="0" min="0" class="cond-input"></td><td><input type="number" id="cfg_night_0" value="2" min="0" class="cond-input"></td></tr>
+          <tr class="holiday-row"><td>祝日</td><td><input type="number" id="cfg_surgery_holiday" value="0" min="0" class="cond-input"></td><td><input type="number" id="cfg_day_holiday" value="2" min="0" class="cond-input"></td><td><input type="number" id="cfg_late_holiday" value="0" min="0" class="cond-input"></td><td><input type="number" id="cfg_night_holiday" value="2" min="0" class="cond-input"></td></tr>
         </tbody>
       </table>
 
@@ -345,7 +348,12 @@
           <label for="standardHolidayDays" style="display:block; margin-bottom:4px; font-weight:600;">公休の日数:</label>
           <input type="number" id="standardHolidayDays" value="8" min="0" style="width:80px; padding:8px; border:1px solid #ddd; border-radius:4px;" />
         </div>
-        <div style="margin-top:8px; padding:8px 12px; background:#fff3e0; border-left:4px solid #ff9800; border-radius:4px; font-size:13px; color:#555;">
+        <div style="margin-top:12px;">
+          <label style="font-weight:600; display:block; margin-bottom:4px;">祝日の指定:</label>
+          <input type="text" id="holidayDates" placeholder="例: 5/3,5/4,5/5" style="padding:6px 10px; border:1px solid #ddd; border-radius:4px; font-size:13px; width:280px;" />
+          <span style="font-size:12px; color:#666; margin-left:8px;">月/日 形式でカンマ区切り</span>
+        </div>
+        <div style="margin-top:10px; padding:8px 12px; background:#fff3e0; border-left:4px solid #ff9800; border-radius:4px; font-size:13px; color:#555;">
           夜勤明け（夜勤入りの翌日）は<strong>夜勤明け休</strong>、さらにその翌日も<strong>必ず公休</strong>とします。
         </div>
       </div>

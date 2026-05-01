@@ -321,17 +321,13 @@ function clearNightPairMatrix() {
   renderNightPairMatrix();
 }
 
-// × は夜勤2人のみ編成時のみ禁忌。3人以上なら△と同じ扱い
-function isNightPairBlocked(candidateName, selectedNames, nightShiftRequired) {
-  if (nightShiftRequired !== 2) return false;
+// × は常に禁忌（夜勤は必ず2人）
+function isNightPairBlocked(candidateName, selectedNames) {
   return selectedNames.some(name => getMixingStatus(candidateName, name) === 'block');
 }
 
-function isNightPairAvoid(candidateName, selectedNames, nightShiftRequired) {
-  return selectedNames.some(name => {
-    const status = getMixingStatus(candidateName, name);
-    return status === 'avoid' || (status === 'block' && nightShiftRequired !== 2);
-  });
+function isNightPairAvoid(candidateName, selectedNames) {
+  return selectedNames.some(name => getMixingStatus(candidateName, name) === 'avoid');
 }
 
 // ×関係の件数を返す
@@ -522,8 +518,18 @@ function getShiftConfigFromUI() {
       nightShift:   parseInt(document.getElementById(`cfg_night_${d}`)?.value)   ?? 2,
     };
   });
+  const holidayConfig = {
+    surgeryLines: parseInt(document.getElementById('cfg_surgery_holiday')?.value) || 0,
+    dayShift:     parseInt(document.getElementById('cfg_day_holiday')?.value)     || 2,
+    lateShift:    parseInt(document.getElementById('cfg_late_holiday')?.value)    || 0,
+    nightShift:   parseInt(document.getElementById('cfg_night_holiday')?.value)   ?? 2,
+  };
+  const holidayDatesRaw = document.getElementById('holidayDates')?.value || '';
+  const holidays = holidayDatesRaw.split(/[,、\s]+/).map(s => s.trim()).filter(s => /^\d{1,2}\/\d{1,2}$/.test(s));
   return {
     dow,
+    holidayConfig,
+    holidays,
     holidayDays:      parseInt(document.getElementById('standardHolidayDays')?.value) || 8,
     dayAfterNightOff: true,
   };
@@ -626,8 +632,9 @@ function generateShiftSchedule(nurses, shiftConfig, targetWorkDays, options = {}
         if (request === REQUEST_TYPES.NIGHT_ONLY || request === REQUEST_TYPES.PAID_LEAVE) {
           return false;
         }
-        // 夜勤をしない人は週末は日勤も不可
-        if (!isNightShiftEligible(n) && isWeekend(day.date)) {
+        // 夜勤をしない人は週末・祝日は日勤も不可
+        const isHol = Array.isArray(shiftConfig.holidays) && shiftConfig.holidays.includes(day.date);
+        if (!isNightShiftEligible(n) && (isWeekend(day.date) || isHol)) {
           return false;
         }
         // 5日以上連続勤務は避ける（師長の配慮を自動化）
@@ -662,7 +669,10 @@ function generateShiftSchedule(nurses, shiftConfig, targetWorkDays, options = {}
       });
     
     const dow = getDateDow(day.date);
-    const dowCfg = shiftConfig.dow[dow] || { dayShift: 0, lateShift: 0, nightShift: 2 };
+    const isHoliday = Array.isArray(shiftConfig.holidays) && shiftConfig.holidays.includes(day.date);
+    const dowCfg = isHoliday
+      ? (shiftConfig.holidayConfig || { surgeryLines: 0, dayShift: 2, lateShift: 0, nightShift: 2 })
+      : (shiftConfig.dow[dow] || { dayShift: 0, lateShift: 0, nightShift: 2 });
 
     for (let i = 0; i < dowCfg.dayShift && i < dayShiftCandidates.length; i++) {
       const nurse = dayShiftCandidates[i];
@@ -745,8 +755,8 @@ function generateShiftSchedule(nurses, shiftConfig, targetWorkDays, options = {}
 
       for (const candidate of nightShiftCandidates) {
         if (usedNight.has(candidate.name)) continue;
-        if (isNightPairBlocked(candidate.name, selectedNight, nightShiftRequired)) continue;
-        if (!isNightPairAvoid(candidate.name, selectedNight, nightShiftRequired)) {
+        if (isNightPairBlocked(candidate.name, selectedNight)) continue;
+        if (!isNightPairAvoid(candidate.name, selectedNight)) {
           picked = candidate;
           break;
         }
@@ -755,7 +765,7 @@ function generateShiftSchedule(nurses, shiftConfig, targetWorkDays, options = {}
       if (!picked) {
         for (const candidate of nightShiftCandidates) {
           if (usedNight.has(candidate.name)) continue;
-          if (isNightPairBlocked(candidate.name, selectedNight, nightShiftRequired)) continue;
+          if (isNightPairBlocked(candidate.name, selectedNight)) continue;
           picked = candidate;
           break;
         }
