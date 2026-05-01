@@ -33,19 +33,72 @@ function adminSwitchToMonth(year, month) {
 function renderAdminMonthSelector() {
   const container = document.getElementById('adminMonthSelector');
   if (!container) return;
-  const now = new Date();
   container.innerHTML = '';
-  for (let offset = -2; offset <= 3; offset++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-    const y = d.getFullYear(), m = d.getMonth() + 1;
+  const now = new Date();
+
+  function makeBtn(y, m, extraStyle = '') {
     const locked = isMonthLocked(y, m);
     const isSelected = y === adminSelectedYear && m === adminSelectedMonth;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'month-tab-admin' + (isSelected ? ' active' : '');
+    if (extraStyle && !isSelected) btn.style.cssText = extraStyle;
     btn.textContent = `${y}年${m}月` + (locked ? ' 🔒' : '');
     btn.addEventListener('click', () => adminSwitchToMonth(y, m));
-    container.appendChild(btn);
+    return btn;
+  }
+
+  function makeGroup(labelText, labelStyle) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'margin-bottom: 10px;';
+    const label = document.createElement('div');
+    label.style.cssText = `font-size: 11px; font-weight: 700; margin-bottom: 6px; color: #555; ${labelStyle || ''}`;
+    label.textContent = labelText;
+    wrap.appendChild(label);
+    const row = document.createElement('div');
+    row.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap;';
+    wrap.appendChild(row);
+    return { wrap, row };
+  }
+
+  // ── 直近3ヶ月（来月・再来月・その次）──
+  const upcomingGroup = makeGroup('📅 直近3ヶ月（シフト入力対象）');
+  for (let offset = 1; offset <= 3; offset++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    upcomingGroup.row.appendChild(makeBtn(d.getFullYear(), d.getMonth() + 1));
+  }
+  container.appendChild(upcomingGroup.wrap);
+
+  // ── 過去のfix済み（LocalStorageをスキャン）──
+  const fixedMonths = [];
+  Object.keys(localStorage).forEach(key => {
+    const match = key.match(/^shift_month_locked_(\d{4})_(\d{1,2})$/);
+    if (match && localStorage.getItem(key) === 'true') {
+      fixedMonths.push({ y: parseInt(match[1]), m: parseInt(match[2]) });
+    }
+  });
+  fixedMonths.sort((a, b) => b.y !== a.y ? b.y - a.y : b.m - a.m); // 新しい順
+
+  if (fixedMonths.length > 0) {
+    const fixedGroup = makeGroup('🔒 過去のfix済み', 'color: #5c6bc0;');
+    fixedMonths.forEach(({ y, m }) => {
+      fixedGroup.row.appendChild(makeBtn(y, m, 'background:#e8eaf6; border-color:#9fa8da; color:#3949ab;'));
+    });
+    container.appendChild(fixedGroup.wrap);
+  }
+
+  // ── 現在選択中の月が上記いずれにも含まれない場合、単独で表示 ──
+  if (adminSelectedYear && adminSelectedMonth) {
+    const inUpcoming = [1,2,3].some(o => {
+      const d = new Date(now.getFullYear(), now.getMonth() + o, 1);
+      return d.getFullYear() === adminSelectedYear && d.getMonth() + 1 === adminSelectedMonth;
+    });
+    const inFixed = fixedMonths.some(({ y, m }) => y === adminSelectedYear && m === adminSelectedMonth);
+    if (!inUpcoming && !inFixed) {
+      const otherGroup = makeGroup('📌 現在選択中');
+      otherGroup.row.appendChild(makeBtn(adminSelectedYear, adminSelectedMonth));
+      container.appendChild(otherGroup.wrap);
+    }
   }
 }
 
