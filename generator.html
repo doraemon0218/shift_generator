@@ -273,25 +273,32 @@
       const monthEl = document.getElementById('lsMonth');
       if (yearEl)  yearEl.value  = paramYear;
       if (monthEl) monthEl.value = paramMonth;
+      // ページタイトル更新
+      const titleEl = document.getElementById('generatorPageTitle');
+      if (titleEl) titleEl.textContent = `${paramYear}年${paramMonth}月 シフト作成`;
+      document.title = `${paramYear}年${paramMonth}月 シフト作成`;
+      // URL paramsがある場合はmanualLoadSectionを非表示
+      if (params.get('year') && params.get('month')) {
+        const ms = document.getElementById('manualLoadSection');
+        if (ms) ms.style.display = 'none';
+      }
     });
   </script>
 </head>
 <body>
   <a href="top.html" class="global-top-button">トップページへ戻る</a>
   <div class="container">
-    <div class="header">
-      <h1>⚙️ シフト表生成</h1>
-      <button onclick="window.location.href='top.html'">トップページに戻る</button>
+    <div style="display:flex; align-items:center; gap:16px; margin-bottom:24px; flex-wrap:wrap;">
+      <a href="admin.html" style="color:#4a90e2; text-decoration:none; font-size:13px; white-space:nowrap;">← 管理画面に戻る</a>
+      <div>
+        <div id="generatorPageTitle" style="font-size:26px; font-weight:800; color:#333;">シフト表作成</div>
+        <div style="font-size:13px; color:#888; margin-top:2px;">夜勤明けの翌日は必ず公休として自動付与されます</div>
+      </div>
     </div>
-    
-    <p style="color: #666; margin-bottom: 24px;">
-      対象月を選択してデータを読み込むと夜勤ペア相性表が表示されます。<br>
-      相性表を確認後、勤務配置人数を入力して「シフト表を生成」をクリックすると3つの候補が表示されます。<br>
-      ※ 夜勤明けの翌日は基本的に休みとして自動付与されます（生成ルール）。
-    </p>
+    <div id="loadStatusBanner" style="display:none; padding:12px 16px; background:#e8f5e9; border-left:4px solid #28a745; border-radius:6px; margin-bottom:16px; font-size:13px;"></div>
 
-    <!-- ステップ1: データ読み込み -->
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:16px;">
+    <!-- データ読み込み（URL paramsがない場合のフォールバック） -->
+    <div id="manualLoadSection" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:16px;">
       <label style="margin:0; font-weight:600;">対象月：</label>
       <input type="number" id="lsYear" style="width:80px; padding:8px; border:1px solid #ddd; border-radius:4px; font-size:14px;" placeholder="年" />
       <span>年</span>
@@ -300,7 +307,6 @@
       <button id="lsLoadBtn" class="btn-primary">データを読み込む</button>
       <button id="dummyLoadBtn" style="background:#8b5cf6;">テスト用ダミーデータ（30名）</button>
     </div>
-    <p style="margin:0 0 16px; font-size:12px; color:#666;">※ 看護師が勤務希望入力画面で入力したデータを読み込みます。ダミーボタンは来月分30名のテストデータを書き込んでから読み込みます。</p>
 
     <div id="errorContainer"></div>
 

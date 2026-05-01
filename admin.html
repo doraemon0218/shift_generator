@@ -386,6 +386,17 @@
         <button onclick="loadAllNurseRequests()" class="btn-secondary" id="allNurseRequestsBtn">一括管理画面を表示</button>
         <div id="allNurseRequestsContainer" style="margin-top: 16px; display: none;"></div>
       </div>
+
+      <!-- シフト作成に進む CTA -->
+      <div style="margin-top:28px; padding:20px; background:linear-gradient(135deg,#4a90e2,#357abd); border-radius:12px; text-align:center;">
+        <div style="color:rgba(255,255,255,0.85); font-size:13px; margin-bottom:10px;">提出状況と希望データを確認したら、シフト作成に進みましょう</div>
+        <a id="generatorLink" href="generator.html"
+           style="display:inline-block; padding:14px 36px; background:white; color:#357abd;
+                  border-radius:8px; text-decoration:none; font-weight:800; font-size:17px;
+                  box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+          ⚙️ シフト表を作成する →
+        </a>
+      </div>
     </div>
 
     <!-- 管理者設定セクション -->
@@ -417,19 +428,6 @@
       <div id="exportStatus" style="margin-top: 16px;"></div>
     </div>
 
-    <!-- シフト生成セクション -->
-    <div class="section">
-      <div class="section-title">⚙️ シフト表生成</div>
-      <p style="color:#666; font-size:13px; margin-bottom:16px;">
-        看護師の勤務希望・相性表・配置人数をもとにシフト表の下書きを3案生成します。<br>
-        「看護師管理ボード」で月を選択してから移動すると、その月のデータが自動的に読み込まれます。
-      </p>
-      <a id="generatorLink" href="generator.html"
-         style="display:inline-block; padding:12px 24px; background:#4a90e2; color:white;
-                border-radius:8px; text-decoration:none; font-weight:700; font-size:15px;">
-        ⚙️ シフト表生成ページへ
-      </a>
-    </div>
   </div>
 </body>
 </html>

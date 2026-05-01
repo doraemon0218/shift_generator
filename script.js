@@ -1563,6 +1563,35 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // URL paramsから自動ロード（adminページからの遷移時）
+  const autoParams = new URLSearchParams(window.location.search);
+  const autoYear  = parseInt(autoParams.get('year'));
+  const autoMonth = parseInt(autoParams.get('month'));
+  if (autoYear && autoMonth && autoMonth >= 1 && autoMonth <= 12) {
+    clearError();
+    const loaded = loadNursesFromLocalStorage(autoYear, autoMonth);
+    if (loaded.length > 0) {
+      nurses = loaded;
+      const pairMatrixSection = document.getElementById('pairMatrixSection');
+      const shiftConditionsSection = document.getElementById('shiftConditionsSection');
+      const generateSection = document.getElementById('generateSection');
+      if (pairMatrixSection) pairMatrixSection.style.display = 'block';
+      if (shiftConditionsSection) shiftConditionsSection.style.display = 'block';
+      if (generateSection) generateSection.style.display = 'block';
+      loadNightPairMatrix();
+      const nightShiftCount = getPairMatrixCandidatesFromNurses().length;
+      const submittedCount = nurses.filter(n => !n._unsubmitted).length;
+      const unsubmittedCount = nurses.filter(n => n._unsubmitted).length;
+      const banner = document.getElementById('loadStatusBanner');
+      if (banner) {
+        let msg = `✅ ${nurses.length}名のデータを読み込みました（夜勤可能: ${nightShiftCount}名）`;
+        if (unsubmittedCount > 0) msg += ` ／ ⚠️ 未提出（全日出勤可扱い）: ${unsubmittedCount}名`;
+        banner.textContent = msg;
+        banner.style.display = 'block';
+      }
+    }
+  }
+
   // シフト表を生成
   generateBtn.addEventListener('click', () => {
     clearError();
