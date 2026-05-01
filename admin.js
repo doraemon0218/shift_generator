@@ -22,84 +22,111 @@ function adminSwitchToMonth(year, month) {
   if (container && container.style.display !== 'none') {
     loadAllNurseRequests();
   }
-  // fixパネルの年月入力も同期
-  const fy = document.getElementById('fixYearInput');
-  const fm = document.getElementById('fixMonthInput');
-  if (fy) fy.value = year;
-  if (fm) fm.value = month;
   renderFixManagement();
+}
+
+function buildAllMonthsList() {
+  const now = new Date();
+  const keys = new Set();
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    const match = key && key.match(/^shift_month_locked_(\d{4})_(\d{1,2})$/);
+    if (match && localStorage.getItem(key) === 'true') {
+      keys.add(`${match[1]}_${match[2]}`);
+    }
+  }
+  for (let i = 1; i <= 3; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    keys.add(`${d.getFullYear()}_${d.getMonth() + 1}`);
+  }
+  if (adminSelectedYear && adminSelectedMonth) {
+    keys.add(`${adminSelectedYear}_${adminSelectedMonth}`);
+  }
+  return [...keys]
+    .map(k => { const [y, m] = k.split('_').map(Number); return { y, m }; })
+    .sort((a, b) => a.y - b.y || a.m - b.m);
+}
+
+function getMonthSubmissionStats(y, m) {
+  const users = getUserDirectory();
+  const total = Object.keys(users).length;
+  let submitted = 0;
+  Object.keys(users).forEach(userKey => {
+    if (localStorage.getItem(getMonthSubmittedKey(userKey, y, m)) === 'true') submitted++;
+  });
+  return { submitted, total };
+}
+
+function adminNavPrevMonth() {
+  const months = buildAllMonthsList();
+  const idx = months.findIndex(x => x.y === adminSelectedYear && x.m === adminSelectedMonth);
+  if (idx > 0) adminSwitchToMonth(months[idx - 1].y, months[idx - 1].m);
+}
+
+function adminNavNextMonth() {
+  const months = buildAllMonthsList();
+  const idx = months.findIndex(x => x.y === adminSelectedYear && x.m === adminSelectedMonth);
+  if (idx >= 0 && idx < months.length - 1) adminSwitchToMonth(months[idx + 1].y, months[idx + 1].m);
+}
+
+function updateSelectedMonthHeader() {
+  const el = document.getElementById('selectedMonthHeader');
+  if (!el || !adminSelectedYear || !adminSelectedMonth) return;
+  const locked = isMonthLocked(adminSelectedYear, adminSelectedMonth);
+  const statusHtml = locked
+    ? '<span style="color:#dc3545; font-weight:700; font-size:14px;">🔒 確定済み</span>'
+    : '<span style="color:#28a745; font-weight:700; font-size:14px;">🔓 未確定（編集可）</span>';
+  const fixBtns = isReadOnlyAdminView ? '<span style="color:#999; font-size:12px;">閲覧モード</span>' : `
+    <button onclick="lockMonthFix()" style="padding:7px 16px; background:#dc3545; color:white; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600;">Fix確定</button>
+    <button onclick="unlockMonthFix()" style="padding:7px 16px; background:#6c757d; color:white; border:none; border-radius:6px; cursor:pointer; font-size:13px;">Fix解除</button>
+  `;
+  el.innerHTML = `
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+      <div style="display:flex; align-items:center; gap:14px;">
+        <span style="font-size:24px; font-weight:800; color:#333;">📅 ${adminSelectedYear}年${adminSelectedMonth}月</span>
+        ${statusHtml}
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">${fixBtns}</div>
+    </div>
+  `;
 }
 
 function renderAdminMonthSelector() {
   const container = document.getElementById('adminMonthSelector');
   if (!container) return;
   container.innerHTML = '';
-  const now = new Date();
 
-  function makeBtn(y, m, extraStyle = '') {
+  const months = buildAllMonthsList();
+
+  months.forEach(({ y, m }) => {
     const locked = isMonthLocked(y, m);
     const isSelected = y === adminSelectedYear && m === adminSelectedMonth;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'month-tab-admin' + (isSelected ? ' active' : '');
-    if (extraStyle && !isSelected) btn.style.cssText = extraStyle;
-    btn.textContent = `${y}年${m}月` + (locked ? ' 🔒' : '');
-    btn.addEventListener('click', () => adminSwitchToMonth(y, m));
-    return btn;
-  }
+    const stats = getMonthSubmissionStats(y, m);
 
-  function makeGroup(labelText, labelStyle) {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'margin-bottom: 10px;';
-    const label = document.createElement('div');
-    label.style.cssText = `font-size: 11px; font-weight: 700; margin-bottom: 6px; color: #555; ${labelStyle || ''}`;
-    label.textContent = labelText;
-    wrap.appendChild(label);
-    const row = document.createElement('div');
-    row.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap;';
-    wrap.appendChild(row);
-    return { wrap, row };
-  }
+    const card = document.createElement('div');
+    card.className = 'month-card-admin' + (isSelected ? ' active' : '') + (locked ? ' locked' : '');
 
-  // ── 直近3ヶ月（来月・再来月・その次）──
-  const upcomingGroup = makeGroup('📅 直近3ヶ月（シフト入力対象）');
-  for (let offset = 1; offset <= 3; offset++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-    upcomingGroup.row.appendChild(makeBtn(d.getFullYear(), d.getMonth() + 1));
-  }
-  container.appendChild(upcomingGroup.wrap);
+    const countClass = stats.total > 0 && stats.submitted === stats.total ? 'all-submitted' : '';
+    card.innerHTML = `
+      <div class="card-ym">${y}年${m}月</div>
+      <div class="card-fix ${locked ? 'is-locked' : 'is-unlocked'}">${locked ? '🔒 確定済み' : '🔓 未確定'}</div>
+      <div class="card-count ${countClass}">${stats.submitted}/${stats.total}名</div>
+    `;
+    card.addEventListener('click', () => adminSwitchToMonth(y, m));
+    container.appendChild(card);
 
-  // ── 過去のfix済み（LocalStorageをスキャン）──
-  const fixedMonths = [];
-  Object.keys(localStorage).forEach(key => {
-    const match = key.match(/^shift_month_locked_(\d{4})_(\d{1,2})$/);
-    if (match && localStorage.getItem(key) === 'true') {
-      fixedMonths.push({ y: parseInt(match[1]), m: parseInt(match[2]) });
+    if (isSelected) {
+      requestAnimationFrame(() => card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }));
     }
   });
-  fixedMonths.sort((a, b) => b.y !== a.y ? b.y - a.y : b.m - a.m); // 新しい順
 
-  if (fixedMonths.length > 0) {
-    const fixedGroup = makeGroup('🔒 過去のfix済み', 'color: #5c6bc0;');
-    fixedMonths.forEach(({ y, m }) => {
-      fixedGroup.row.appendChild(makeBtn(y, m, 'background:#e8eaf6; border-color:#9fa8da; color:#3949ab;'));
-    });
-    container.appendChild(fixedGroup.wrap);
-  }
+  const idx = months.findIndex(x => x.y === adminSelectedYear && x.m === adminSelectedMonth);
+  const prevBtn = document.getElementById('adminMonthPrev');
+  const nextBtn = document.getElementById('adminMonthNext');
+  if (prevBtn) prevBtn.disabled = idx <= 0;
+  if (nextBtn) nextBtn.disabled = idx < 0 || idx >= months.length - 1;
 
-  // ── 現在選択中の月が上記いずれにも含まれない場合、単独で表示 ──
-  if (adminSelectedYear && adminSelectedMonth) {
-    const inUpcoming = [1,2,3].some(o => {
-      const d = new Date(now.getFullYear(), now.getMonth() + o, 1);
-      return d.getFullYear() === adminSelectedYear && d.getMonth() + 1 === adminSelectedMonth;
-    });
-    const inFixed = fixedMonths.some(({ y, m }) => y === adminSelectedYear && m === adminSelectedMonth);
-    if (!inUpcoming && !inFixed) {
-      const otherGroup = makeGroup('📌 現在選択中');
-      otherGroup.row.appendChild(makeBtn(adminSelectedYear, adminSelectedMonth));
-      container.appendChild(otherGroup.wrap);
-    }
-  }
+  updateSelectedMonthHeader();
 }
 
 // getSageImageUri, normalizeShiftCapability, getCurrentUser, getUsers, saveUsers, getAdminUsers, saveAdminUsers, getAdminRequests, saveAdminRequests は common.js から継承
@@ -1193,26 +1220,27 @@ function updateShiftTargetDisplay() { updateUnifiedDisplay(); }
 
 function lockMonthFix() {
   if (isReadOnlyAdminView) { alert('閲覧モードでは操作できません'); return; }
-  const year  = parseInt(document.getElementById('fixYearInput').value, 10);
-  const month = parseInt(document.getElementById('fixMonthInput').value, 10);
-  if (!year || !month || month < 1 || month > 12) { alert('年・月を正しく入力してください'); return; }
+  const year  = adminSelectedYear;
+  const month = adminSelectedMonth;
+  if (!year || !month) { alert('月を選択してください'); return; }
   if (!confirm(`${year}年${month}月のシフトを確定（fix）しますか？\n全員の編集が不可になります。`)) return;
   localStorage.setItem(getMonthLockedKey(year, month), 'true');
+  renderAdminMonthSelector();
   renderFixManagement();
   alert(`${year}年${month}月を確定しました`);
 }
 
 function unlockMonthFix() {
   if (isReadOnlyAdminView) { alert('閲覧モードでは操作できません'); return; }
-  const year  = parseInt(document.getElementById('fixYearInput').value, 10);
-  const month = parseInt(document.getElementById('fixMonthInput').value, 10);
-  if (!year || !month || month < 1 || month > 12) { alert('年・月を正しく入力してください'); return; }
+  const year  = adminSelectedYear;
+  const month = adminSelectedMonth;
+  if (!year || !month) { alert('月を選択してください'); return; }
   if (!confirm(`${year}年${month}月の確定を解除しますか？全員が編集可能になります。`)) return;
   localStorage.removeItem(getMonthLockedKey(year, month));
-  // 個別ロック解除もすべてクリア
   Object.keys(localStorage)
     .filter(k => k.startsWith(`shift_month_unlocked_`) && k.endsWith(`_${year}_${month}`))
     .forEach(k => localStorage.removeItem(k));
+  renderAdminMonthSelector();
   renderFixManagement();
   alert(`${year}年${month}月の確定を解除しました`);
 }
@@ -1233,8 +1261,8 @@ function renderFixManagement() {
   const container = document.getElementById('fixManagementDetail');
   if (!container) return;
 
-  const year  = parseInt(document.getElementById('fixYearInput').value, 10);
-  const month = parseInt(document.getElementById('fixMonthInput').value, 10);
+  const year  = adminSelectedYear;
+  const month = adminSelectedMonth;
   if (!year || !month) { container.innerHTML = ''; return; }
 
   const locked = isMonthLocked(year, month);

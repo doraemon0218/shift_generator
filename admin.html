@@ -284,20 +284,34 @@
       color: #999;
       font-weight: 600;
     }
-    .month-tab-admin {
-      padding: 7px 14px;
-      background: #f0f0f0;
-      color: #333;
-      border: 2px solid #ddd;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s;
-      white-space: nowrap;
+    .month-nav-arrow {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: #e3f2fd; border: 2px solid #90caf9;
+      color: #1565c0; font-size: 20px; font-weight: 700;
+      cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; padding: 0; line-height: 1;
     }
-    .month-tab-admin:hover { background: #e3f2fd; border-color: #4a90e2; }
-    .month-tab-admin.active { background: #4a90e2; color: white; border-color: #4a90e2; }
+    .month-nav-arrow:hover:not(:disabled) { background: #bbdefb; border-color: #4a90e2; }
+    .month-nav-arrow:disabled { opacity: 0.35; cursor: not-allowed; }
+    .month-card-admin {
+      flex-shrink: 0; width: 88px; padding: 8px 6px;
+      text-align: center; background: #f9f9f9;
+      border: 2px solid #ddd; border-radius: 10px;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .month-card-admin:hover { background: #e3f2fd; border-color: #4a90e2; transform: translateY(-1px); }
+    .month-card-admin.active { background: #4a90e2; color: white; border-color: #2c7be5; box-shadow: 0 2px 8px rgba(74,144,226,0.4); }
+    .month-card-admin.locked:not(.active) { background: #e8eaf6; border-color: #9fa8da; }
+    .card-ym { font-weight: 700; font-size: 12px; margin-bottom: 4px; white-space: nowrap; }
+    .card-fix { font-size: 10px; margin-bottom: 3px; }
+    .card-fix.is-locked { color: #dc3545; }
+    .card-fix.is-unlocked { color: #22c55e; }
+    .month-card-admin.active .card-fix { color: rgba(255,255,255,0.9); }
+    .card-count { font-size: 10px; color: #666; }
+    .card-count.all-submitted { color: #22c55e; font-weight: 700; }
+    .month-card-admin.active .card-count { color: rgba(255,255,255,0.85); }
+    .month-card-admin.active .card-count.all-submitted { color: #bbf7d0; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="./common.js"></script>
@@ -341,11 +355,19 @@
     <div class="section">
       <div class="section-title">📊 看護師管理ボード</div>
 
-      <!-- 月セレクタ -->
+      <!-- 月ナビゲーション -->
       <div style="margin-bottom: 16px;">
-        <label style="font-weight:600; display:block; margin-bottom:8px;">対象月を選択</label>
-        <div id="adminMonthSelector" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+        <label style="font-weight:600; display:block; margin-bottom:10px;">対象月を選択</label>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button id="adminMonthPrev" class="month-nav-arrow" onclick="adminNavPrevMonth()">&#8592;</button>
+          <div id="adminMonthSelector" style="flex:1; overflow-x:auto; display:flex; gap:8px; padding:4px 2px; scroll-behavior:smooth;"></div>
+          <button id="adminMonthNext" class="month-nav-arrow" onclick="adminNavNextMonth()">&#8594;</button>
+        </div>
       </div>
+
+      <!-- 選択月ヘッダー + Fix管理 -->
+      <div id="selectedMonthHeader" style="margin-bottom:16px; padding:14px 18px; background:#f0f4ff; border-radius:10px; border:1px solid #c5cae9;"></div>
+      <div id="fixManagementDetail" style="margin-bottom:16px;"></div>
 
       <!-- 提出状況サマリー -->
       <div class="status-grid" id="statusGrid"></div>
@@ -355,26 +377,6 @@
           <span id="selectedCount" style="font-weight: 600; color: #856404;">選択中: 0名</span>
           <button onclick="deleteSelectedAccounts()" class="btn-danger" style="padding: 8px 16px;">選択したアカウントを削除</button>
         </div>
-      </div>
-
-      <!-- シフトFix管理 -->
-      <div style="margin-top: 24px; padding: 16px; background: #f0f4ff; border-radius: 8px; border: 1px solid #c5cae9;">
-        <div style="font-size:16px; font-weight:700; margin-bottom:12px; color:#333;">🔒 シフトFix（確定・ロック）管理</div>
-        <p style="color:#666; font-size:13px; margin-bottom:12px;">
-          月を確定（Fix）すると、全看護師の編集が不可になります。個別にロック解除して再編集させることもできます。
-        </p>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:16px;">
-          <input type="number" id="fixYearInput" placeholder="年" min="2024" max="2099"
-                 style="width:110px; padding:8px; border:1px solid #ddd; border-radius:6px; font-size:14px;" class="admin-action" />
-          <span style="font-weight:600;">年</span>
-          <input type="number" id="fixMonthInput" placeholder="月" min="1" max="12"
-                 style="width:72px; padding:8px; border:1px solid #ddd; border-radius:6px; font-size:14px;" class="admin-action" />
-          <span style="font-weight:600;">月</span>
-          <button onclick="lockMonthFix()" class="btn-danger admin-action">Fix（確定）</button>
-          <button onclick="unlockMonthFix()" class="btn-secondary admin-action">Fix解除</button>
-          <button onclick="renderFixManagement()" class="btn-secondary">状態確認</button>
-        </div>
-        <div id="fixManagementDetail"></div>
       </div>
 
       <!-- 勤務希望一括管理 -->
