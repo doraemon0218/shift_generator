@@ -740,22 +740,22 @@ function loadAllNurseRequests() {
   // 名前順にソート
   nurseDataList.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
 
-  let html = '<div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 16px; overflow-x: auto;">';
-  html += '<table style="width: 100%; border-collapse: collapse; min-width: 1200px; font-size: 13px;">';
-  html += '<thead><tr style="background: #f8f9fa; border-bottom: 2px solid #ddd; position: sticky; top: 0;">';
-  html += '<th style="padding: 10px; text-align: left; width: 120px;">看護師名</th>';
-  html += '<th style="padding: 10px; text-align: center; width: 80px;">提出</th>';
-  html += '<th style="padding: 10px; text-align: left; width: 150px;">価値観</th>';
-  
-  dates.forEach((date, idx) => {
-    const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][new Date(targetYear, targetMonth - 1, idx + 1).getDay()];
-    const isWeekend = dayOfWeek === '日' || dayOfWeek === '土';
-    html += `<th style="padding: 8px 4px; text-align: center; width: 35px; ${isWeekend ? 'background: #fff3cd;' : ''}" title="${date}">${idx + 1}<br><small style="color: #666;">${dayOfWeek}</small></th>`;
+  // 日付ごとの休日希望数を集計（確定済み / 全員）
+  const confirmedOffPerDate = {};
+  const totalOffPerDate = {};
+  dates.forEach(date => { confirmedOffPerDate[date] = 0; totalOffPerDate[date] = 0; });
+  nurseDataList.forEach(nurse => {
+    dates.forEach(date => {
+      const req = nurse.data.requests?.[date];
+      if (req === REQUEST_TYPES.PAID_LEAVE) {
+        totalOffPerDate[date]++;
+        if (nurse.isSubmitted) confirmedOffPerDate[date]++;
+      }
+    });
   });
-  
-  html += '<th style="padding: 10px; text-align: left; width: 200px;">備考</th>';
-  html += '<th style="padding: 10px; text-align: center; width: 100px;">操作</th>';
-  html += '</tr></thead><tbody>';
+
+  const submittedCount = nurseDataList.filter(n => n.isSubmitted).length;
+  const totalCount = nurseDataList.length;
 
   const requestTypeColors = {
     [REQUEST_TYPES.AVAILABLE]: '#d4edda',
@@ -764,7 +764,13 @@ function loadAllNurseRequests() {
     [REQUEST_TYPES.NIGHT_ONLY]: '#e4ddff',
     [REQUEST_TYPES.PAID_LEAVE]: '#f8d7da'
   };
-
+  const requestTypeLightColors = {
+    [REQUEST_TYPES.AVAILABLE]: '#f0faf2',
+    [REQUEST_TYPES.DAY_ONLY]: '#fffdf0',
+    [REQUEST_TYPES.DAY_LATE]: '#f0f9fc',
+    [REQUEST_TYPES.NIGHT_ONLY]: '#f6f2ff',
+    [REQUEST_TYPES.PAID_LEAVE]: '#fdf4f5'
+  };
   const requestTypeLabels = {
     [REQUEST_TYPES.AVAILABLE]: '可',
     [REQUEST_TYPES.DAY_ONLY]: '日',
@@ -773,59 +779,118 @@ function loadAllNurseRequests() {
     [REQUEST_TYPES.PAID_LEAVE]: '休'
   };
 
+  // 集計行のセル背景色（休日希望の重複度に応じて）
+  function offCountColor(confirmed, total) {
+    if (confirmed === 0 && total === 0) return '#f9f9f9';
+    if (confirmed >= 5) return '#fee2e2';
+    if (confirmed >= 3) return '#fef9c3';
+    if (confirmed >= 1) return '#dcfce7';
+    return '#f0f9ff'; // 未確定のみ
+  }
+
+  let html = `
+    <div style="display:flex; gap:16px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+      <div style="font-size:13px; color:#333;">
+        提出済み: <strong style="color:#22c55e;">${submittedCount}名</strong> ／ 未提出: <strong style="color:#f59e0b;">${totalCount - submittedCount}名</strong> ／ 計 ${totalCount}名
+      </div>
+      <div style="display:flex; gap:8px; font-size:11px; align-items:center; flex-wrap:wrap;">
+        <span style="display:inline-block; width:12px; height:12px; background:#22c55e; border-radius:2px; vertical-align:middle;"></span>提出済み（確定）
+        <span style="display:inline-block; width:12px; height:12px; background:#f59e0b; border-radius:2px; vertical-align:middle;"></span>未提出（暫定）
+        <span style="display:inline-block; width:12px; height:12px; background:#fee2e2; border:1px solid #fca5a5; border-radius:2px; vertical-align:middle;"></span>休日希望5名以上
+        <span style="display:inline-block; width:12px; height:12px; background:#fef9c3; border:1px solid #fde047; border-radius:2px; vertical-align:middle;"></span>3〜4名
+      </div>
+    </div>
+    <div style="background: white; border: 1px solid #ddd; border-radius: 8px; overflow-x: auto;">
+    <table style="width: 100%; border-collapse: collapse; min-width: 1200px; font-size: 13px;">`;
+
+  html += '<thead>';
+  // 1行目：日付ヘッダー
+  html += '<tr style="background: #f8f9fa; border-bottom: 1px solid #ddd;">';
+  html += '<th style="padding: 8px 10px; text-align: left; width: 120px; position:sticky; left:0; background:#f8f9fa; z-index:2;">看護師名</th>';
+  html += '<th style="padding: 8px; text-align: center; width: 40px;">状態</th>';
+  html += '<th style="padding: 8px; text-align: left; width: 130px;">価値観</th>';
+  dates.forEach((date, idx) => {
+    const dow = ['日', '月', '火', '水', '木', '金', '土'][new Date(targetYear, targetMonth - 1, idx + 1).getDay()];
+    const isWE = dow === '日' || dow === '土';
+    html += `<th style="padding: 4px 2px; text-align: center; width: 30px; ${isWE ? 'background:#fff3cd;' : ''} font-size:11px;" title="${date}">${idx + 1}<br><span style="color:#888;">${dow}</span></th>`;
+  });
+  html += '<th style="padding: 8px; text-align: left; width: 180px;">備考</th>';
+  html += '<th style="padding: 8px; text-align: center; width: 90px;">操作</th>';
+  html += '</tr>';
+
+  // 2行目：確定済み休日希望数の集計行
+  html += '<tr style="background:#f0f4ff; border-bottom: 2px solid #ddd;">';
+  html += '<td style="padding: 5px 10px; font-size:11px; font-weight:700; color:#555; position:sticky; left:0; background:#f0f4ff; z-index:2;">確定済み休日希望数</td>';
+  html += '<td></td><td></td>';
+  dates.forEach(date => {
+    const confirmed = confirmedOffPerDate[date];
+    const total = totalOffPerDate[date];
+    const bg = offCountColor(confirmed, total);
+    const tentative = total - confirmed;
+    let label = confirmed > 0 ? `<strong>${confirmed}</strong>` : '—';
+    if (tentative > 0) label += `<span style="color:#f59e0b; font-size:9px;">+${tentative}</span>`;
+    html += `<td style="padding:3px 1px; text-align:center; background:${bg}; font-size:11px;" title="${date} 確定${confirmed}名 / 暫定${tentative}名">${label}</td>`;
+  });
+  html += '<td colspan="2" style="padding:5px 8px; font-size:10px; color:#666;">太字=確定 +数字=未提出分</td>';
+  html += '</tr>';
+  html += '</thead><tbody>';
+
   nurseDataList.forEach(nurse => {
-    html += '<tr style="border-bottom: 1px solid #eee;">';
-    html += `<td style="padding: 10px; font-weight: 600;">${nurse.name}</td>`;
-    html += `<td style="padding: 10px; text-align: center;">`;
-    html += nurse.isSubmitted 
-      ? '<span style="background: #28a745; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">済</span>'
-      : '<span style="background: #ffc107; color: #856404; padding: 4px 8px; border-radius: 4px; font-size: 11px;">未</span>';
+    const borderColor = nurse.isSubmitted ? '#22c55e' : '#f59e0b';
+    const rowBg = nurse.isSubmitted ? 'white' : '#fffde7';
+    html += `<tr style="border-bottom: 1px solid #eee; background: ${rowBg}; border-left: 4px solid ${borderColor};">`;
+
+    // 氏名
+    html += `<td style="padding: 8px 10px; font-weight: 600; position:sticky; left:0; background:${rowBg}; z-index:1; white-space:nowrap; ${nurse.isSubmitted ? '' : 'color:#6b7280;'}">${nurse.name}</td>`;
+
+    // 状態バッジ
+    html += `<td style="padding: 6px; text-align: center;">`;
+    html += nurse.isSubmitted
+      ? '<span style="background:#22c55e; color:white; padding:3px 7px; border-radius:10px; font-size:10px; font-weight:700;">確定</span>'
+      : '<span style="background:#f59e0b; color:white; padding:3px 7px; border-radius:10px; font-size:10px; font-weight:700;">暫定</span>';
     html += '</td>';
-    
+
     // 価値観
-    html += '<td style="padding: 10px;">';
-    if (nurse.data.preferences && nurse.data.preferences.valuePreference) {
-      const pref = VALUE_PREFERENCE_OPTIONS[nurse.data.preferences.valuePreference];
-      if (pref) {
-        html += `<span title="${pref.description}">${pref.icon} ${pref.label}</span>`;
-      } else {
-        html += '<span style="color: #999;">未設定</span>';
-      }
-    } else {
-      html += '<span style="color: #999;">未設定</span>';
-    }
+    html += '<td style="padding: 8px; font-size: 12px;">';
+    const pref = nurse.data.preferences?.valuePreference && VALUE_PREFERENCE_OPTIONS[nurse.data.preferences.valuePreference];
+    html += pref ? `<span title="${pref.description}">${pref.icon} ${pref.label}</span>` : '<span style="color:#bbb;">—</span>';
     html += '</td>';
 
-    // 各日の希望
+    // 各日の希望セル
     dates.forEach((date, idx) => {
-      const requestType = nurse.data.requests && nurse.data.requests[date] 
-        ? nurse.data.requests[date] 
-        : REQUEST_TYPES.AVAILABLE;
-      const color = requestTypeColors[requestType] || '#f0f0f0';
+      const requestType = nurse.data.requests?.[date] || REQUEST_TYPES.AVAILABLE;
+      const colorMap = nurse.isSubmitted ? requestTypeColors : requestTypeLightColors;
+      const color = colorMap[requestType] || '#f0f0f0';
       const label = requestTypeLabels[requestType] || '?';
-      const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][new Date(targetYear, targetMonth - 1, idx + 1).getDay()];
-      const isWeekend = dayOfWeek === '日' || dayOfWeek === '土';
+      const dow = ['日', '月', '火', '水', '木', '金', '土'][new Date(targetYear, targetMonth - 1, idx + 1).getDay()];
+      const isWE = dow === '日' || dow === '土';
 
-      html += `<td style="padding: 4px; text-align: center; background: ${color}; ${isWeekend ? 'border-left: 2px solid #ffc107; border-right: 2px solid #ffc107;' : ''}" title="${date} (${requestType})">${label}</td>`;
+      // 未提出のセルは斜線パターンを追加
+      const stripeStyle = nurse.isSubmitted
+        ? ''
+        : 'background-image: repeating-linear-gradient(-45deg, rgba(0,0,0,0.04) 0, rgba(0,0,0,0.04) 1px, transparent 0, transparent 50%); background-size: 6px 6px;';
+      const weekendStyle = isWE ? 'border-left: 1px solid #fbbf24; border-right: 1px solid #fbbf24;' : '';
+
+      html += `<td style="padding: 3px 1px; text-align: center; background-color: ${color}; ${stripeStyle} ${weekendStyle} font-size: 11px;" title="${date}${nurse.isSubmitted ? '（確定）' : '（暫定）'}: ${requestType}">${label}</td>`;
     });
 
     // 備考
-    html += `<td style="padding: 10px; font-size: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${nurse.data.note || ''}">${(nurse.data.note || '').substring(0, 30)}${(nurse.data.note || '').length > 30 ? '...' : ''}</td>`;
+    const noteText = nurse.data.note || '';
+    html += `<td style="padding: 8px; font-size: 11px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: ${nurse.isSubmitted ? '#333' : '#9ca3af'};" title="${noteText}">${noteText.substring(0, 25)}${noteText.length > 25 ? '…' : ''}</td>`;
 
     // 操作
-    html += '<td style="padding: 10px; text-align: center;">';
+    html += '<td style="padding: 6px; text-align: center;">';
     if (!isReadOnlyAdminView) {
-      html += `<button onclick="editNurseRequest('${nurse.userKey}')" style="padding: 4px 8px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin: 2px;">編集</button>`;
-      html += `<button onclick="deleteNurseData('${nurse.userKey}')" style="padding: 4px 8px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin: 2px;">希望削除</button>`;
+      html += `<button onclick="editNurseRequest('${nurse.userKey}')" style="padding: 3px 7px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin: 1px;">編集</button>`;
+      html += `<button onclick="deleteNurseData('${nurse.userKey}')" style="padding: 3px 7px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin: 1px;">削除</button>`;
     } else {
-      html += '<span style="color: #999;">閲覧のみ</span>';
+      html += '<span style="color: #999; font-size: 11px;">閲覧のみ</span>';
     }
     html += '</td>';
     html += '</tr>';
   });
 
   html += '</tbody></table></div>';
-
   container.innerHTML = html;
 }
 
