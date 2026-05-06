@@ -335,7 +335,7 @@
           <tr>
             <th>曜日</th>
             <th>手術列数</th>
-            <th>日勤</th>
+            <th>日勤（最低人数）</th>
             <th>遅出</th>
             <th>夜勤</th>
           </tr>
@@ -354,8 +354,12 @@
 
       <div style="display:flex; gap:24px; align-items:center; flex-wrap:wrap; margin-top:16px;">
         <div>
-          <label for="standardHolidayDays" style="display:block; margin-bottom:4px; font-weight:600;">公休の日数:</label>
+          <label for="standardHolidayDays" style="display:block; margin-bottom:4px; font-weight:600;">公休の日数（4週8休）:</label>
           <input type="number" id="standardHolidayDays" value="8" min="0" style="width:80px; padding:8px; border:1px solid #ddd; border-radius:4px;" />
+        </div>
+        <div>
+          <label for="maxNightShifts" style="display:block; margin-bottom:4px; font-weight:600;">夜勤上限（回/月）:</label>
+          <input type="number" id="maxNightShifts" value="5" min="1" max="15" style="width:80px; padding:8px; border:1px solid #ddd; border-radius:4px;" />
         </div>
         <div style="margin-top:12px;">
           <label style="font-weight:600; display:block; margin-bottom:4px;">祝日の指定:</label>

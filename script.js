@@ -531,6 +531,7 @@ function getShiftConfigFromUI() {
     holidayConfig,
     holidays,
     holidayDays:      parseInt(document.getElementById('standardHolidayDays')?.value) || 8,
+    maxNightShifts:   parseInt(document.getElementById('maxNightShifts')?.value)      || 5,
     dayAfterNightOff: true,
   };
 }
@@ -541,377 +542,210 @@ function generateShiftSchedule(nurses, shiftConfig, targetWorkDays, options = {}
     const dayReq = shiftConfig;
     const nightReq = targetWorkDays;
     const twDays = options;
-    shiftConfig = { dow: {}, holidayDays: 8, dayAfterNightOff: true };
+    shiftConfig = { dow: {}, holidayDays: 8, dayAfterNightOff: true, maxNightShifts: 5 };
     [0,1,2,3,4,5,6].forEach(d => {
       shiftConfig.dow[d] = { surgeryLines: 0, dayShift: (d===0||d===6)?0:dayReq, lateShift: 0, nightShift: nightReq };
     });
     targetWorkDays = typeof twDays === 'number' ? twDays : 20;
     options = {};
   }
+
   const standardHolidayDays = shiftConfig.holidayDays || 8;
+  const maxNightShifts = shiftConfig.maxNightShifts || 5;
+  const totalDays = dateColumns.length;
   const schedule = [];
   const random = options.randomFn || Math.random;
-  const targetPublicHolidays = standardHolidayDays || null; // 標準公休日数
-  
-  // 初期化：各日のスケジュール
-  dateColumns.forEach(date => {
-    schedule.push({
-      date,
-      nurses: []
-    });
-  });
 
-  // 各看護師の初期統計
-  const nurseStats = {};
-  nurses.forEach(nurse => {
-    nurseStats[nurse.name] = {
-      workDays: 0,
-      nightShifts: 0,
-      weekendOffDays: 0,
-      violations: 0
-    };
-  });
+  // 初期化
+  dateColumns.forEach(date => schedule.push({ date, nurses: [] }));
 
-  // 優先度の高い看護師から割り当て（有給希望など）
-  const sortedNurses = shuffleArray(nurses, random).sort((a, b) => {
-    // 備考に有給や希望がある場合を優先
-    const aPriority = (a.note.includes('有給') || a.note.includes('旅行') || a.note.includes('通院')) ? 1 : 0;
-    const bPriority = (b.note.includes('有給') || b.note.includes('旅行') || b.note.includes('通院')) ? 1 : 0;
-    return bPriority - aPriority;
-  });
+  // 各看護師の確定済み公休日数（明け休みは含まない）
+  // PAID_LEAVE + 夜勤後の afterNext が加算される
+  const nurseOffDays = {};
+  nurses.forEach(n => { nurseOffDays[n.name] = 0; });
 
-  // まず有給希望の日を割り当て
+  // Phase 1: 公休希望（PAID_LEAVE）を先に割り当て
   schedule.forEach(day => {
-    sortedNurses.forEach(nurse => {
+    nurses.forEach(nurse => {
       if (nurse.requests[day.date] === REQUEST_TYPES.PAID_LEAVE) {
-        day.nurses.push({
-          name: nurse.name,
-          shift: SHIFT_TYPES.OFF,
-          violation: false
-        });
-        if (isWeekend(day.date)) {
-          nurseStats[nurse.name].weekendOffDays++;
-        }
+        day.nurses.push({ name: nurse.name, shift: SHIFT_TYPES.OFF, violation: false });
+        nurseOffDays[nurse.name]++;
       }
     });
   });
 
-  // 各日についてシフトを割り当て
+  // Phase 2: 日ごとにシフトを割り当て（夜勤→遅出→日勤→残りOFF）
   schedule.forEach((day, dayIndex) => {
-    const assigned = new Set(day.nurses.map(n => n.name));
-    const available = sortedNurses.filter(n => !assigned.has(n.name));
-    
-    // 前日のシフトを確認（明け休みチェック用）
-    const prevDay = getPreviousDayShift(schedule, dayIndex);
-    
-    // 現在の日までに割り当てられた看護師の統計を計算
-    const currentSchedule = schedule.slice(0, dayIndex + 1);
-    
-    // 前日が明け休みの人は除外（当直明け翌日休暇オプションが有効な場合）
-    const prevDayAssignments = prevDay ? prevDay.nurses : [];
-    const prevDayOffAfterNight = new Set(
-      shiftConfig.dayAfterNightOff !== false
-        ? prevDayAssignments.filter(a => a.isDayOffAfterNight).map(a => a.name)
-        : []
-    );
-    
-    // 日勤を割り当て
-    const dayShiftCandidates = shuffleArray(available
-      .filter(n => {
-        // 明け休みの翌日は除外（必ず公休）
-        if (prevDayOffAfterNight.has(n.name)) {
-          return false;
-        }
-        // 既に明け休みとして設定されている人は除外
-        const existingAssignment = day.nurses.find(a => a.name === n.name);
-        if (existingAssignment && existingAssignment.isDayOffAfterNight) {
-          return false;
-        }
-        // 希望チェック（希望データがない場合はOK）
-        const request = n.requests[day.date];
-        if (request === REQUEST_TYPES.NIGHT_ONLY || request === REQUEST_TYPES.PAID_LEAVE) {
-          return false;
-        }
-        // 夜勤をしない人は週末・祝日は日勤も不可
-        const isHol = Array.isArray(shiftConfig.holidays) && shiftConfig.holidays.includes(day.date);
-        if (!isNightShiftEligible(n) && (isWeekend(day.date) || isHol)) {
-          return false;
-        }
-        // 5日以上連続勤務は避ける（師長の配慮を自動化）
-        if (countConsecutiveWorkDays(n.name, schedule, dayIndex) >= 5) {
-          return false;
-        }
-        return true;
-      })
-      , random).sort((a, b) => {
-        const aStats = getNurseStats(a.name, currentSchedule);
-        const bStats = getNurseStats(b.name, currentSchedule);
-        
-        // 夜勤をする人の希望を最優先（希望違反の少ない夜勤者を優先）
-        const aIsNight = doesNightShift(a);
-        const bIsNight = doesNightShift(b);
-        if (aIsNight !== bIsNight) {
-          return bIsNight ? -1 : 1; // 夜勤者を優先
-        }
-        
-        // 夜勤者の場合、希望違反が少ない人を優先
-        if (aIsNight && bIsNight) {
-          if (aStats.violations !== bStats.violations) {
-            return aStats.violations - bStats.violations;
-          }
-        }
-        
-        // 勤務日数が少ない人、希望違反が少ない人を優先
-        if (aStats.workDays !== bStats.workDays) {
-          return aStats.workDays - bStats.workDays;
-        }
-        return aStats.violations - bStats.violations;
-      });
-    
-    const dow = getDateDow(day.date);
     const isHoliday = Array.isArray(shiftConfig.holidays) && shiftConfig.holidays.includes(day.date);
+    const dow = getDateDow(day.date);
     const dowCfg = isHoliday
       ? (shiftConfig.holidayConfig || { surgeryLines: 0, dayShift: 2, lateShift: 0, nightShift: 2 })
       : (shiftConfig.dow[dow] || { dayShift: 0, lateShift: 0, nightShift: 2 });
 
-    for (let i = 0; i < dowCfg.dayShift && i < dayShiftCandidates.length; i++) {
-      const nurse = dayShiftCandidates[i];
-      const violation = checkViolation(nurse, day.date, SHIFT_TYPES.DAY, schedule, dayIndex);
-      day.nurses.push({ name: nurse.name, shift: SHIFT_TYPES.DAY, violation });
-      nurseStats[nurse.name].workDays++;
-      if (violation) nurseStats[nurse.name].violations++;
+    // 今日の残り日数（今日を含む）
+    const daysLeft = totalDays - dayIndex;
+
+    // 4週8休チェック：今日必ず公休にすべき看護師
+    function mustBeOffForTarget(nurse) {
+      const offNeeded = standardHolidayDays - nurseOffDays[nurse.name];
+      return offNeeded >= daysLeft; // 残り全日 OFF にしないと間に合わない
     }
 
-    // 遅出を割り当て
-    const assignedAfterDay = new Set(day.nurses.map(n => n.name));
-    const lateShiftCandidates = shuffleArray(available.filter(n => {
-      if (assignedAfterDay.has(n.name)) return false;
-      if (prevDayOffAfterNight.has(n.name)) return false;
-      const req = n.requests[day.date];
-      if (req === REQUEST_TYPES.PAID_LEAVE || req === REQUEST_TYPES.NIGHT_ONLY || req === REQUEST_TYPES.DAY_ONLY) return false;
-      if (!isLateShiftEligible(n)) return false;
-      if (countConsecutiveWorkDays(n.name, schedule, dayIndex) >= 5) return false;
-      return true;
-    }), random).sort((a, b) => {
-      const aStats = getNurseStats(a.name, schedule.slice(0, dayIndex + 1));
-      const bStats = getNurseStats(b.name, schedule.slice(0, dayIndex + 1));
-      return aStats.workDays - bStats.workDays;
-    });
-    for (let i = 0; i < (dowCfg.lateShift || 0) && i < lateShiftCandidates.length; i++) {
-      const nurse = lateShiftCandidates[i];
-      const violation = checkViolation(nurse, day.date, SHIFT_TYPES.LATE, schedule, dayIndex);
-      day.nurses.push({ name: nurse.name, shift: SHIFT_TYPES.LATE, violation });
-      nurseStats[nurse.name].workDays++;
-      if (violation) nurseStats[nurse.name].violations++;
-    }
+    // 未割り当ての看護師
+    const getUnassigned = () => nurses.filter(n => !day.nurses.some(a => a.name === n.name));
 
-    // 夜勤を割り当て
-    const assignedForDay = new Set(day.nurses.map(n => n.name));
-    const availableForNight = available.filter(n => !assignedForDay.has(n.name));
-    const nightShiftCandidates = shuffleArray(availableForNight
-      .filter(n => {
-        // 希望チェック
-        const request = n.requests[day.date];
-        if (request === REQUEST_TYPES.DAY_ONLY || request === REQUEST_TYPES.DAY_LATE || request === REQUEST_TYPES.PAID_LEAVE) {
-          return false;
-        }
-        // 夜勤をしない人は除外
-        if (!isNightShiftEligible(n)) {
-          return false;
-        }
-        // 5日以上連続勤務は避ける
-        if (countConsecutiveWorkDays(n.name, schedule, dayIndex) >= 5) {
-          return false;
-        }
+    // --- 夜勤割り当て（最優先） ---
+    const nightRequired = dowCfg.nightShift ?? 2;
+    const nightCandidates = shuffleArray(
+      getUnassigned().filter(n => {
+        if (mustBeOffForTarget(n)) return false;
+        if (!isNightShiftEligible(n)) return false;
+        const req = n.requests[day.date];
+        if (req === REQUEST_TYPES.DAY_ONLY || req === REQUEST_TYPES.DAY_LATE) return false;
+        if (countConsecutiveWorkDays(n.name, schedule, dayIndex) >= 5) return false;
+        // 月の夜勤上限チェック
+        const stats = getNurseStats(n.name, schedule.slice(0, dayIndex));
+        if (stats.nightShifts >= maxNightShifts) return false;
         return true;
-      })
-      , random).sort((a, b) => {
-        const aStats = getNurseStats(a.name, currentSchedule);
-        const bStats = getNurseStats(b.name, currentSchedule);
-        
-        // 夜勤をする人の希望を最優先（希望違反の少ない夜勤者を優先）
-        const aIsNight = doesNightShift(a);
-        const bIsNight = doesNightShift(b);
-        if (aIsNight && !bIsNight) return -1;
-        if (!aIsNight && bIsNight) return 1;
-        
-        // 希望違反が少ない人を優先（特に夜勤者）
-        if (aIsNight && bIsNight && aStats.violations !== bStats.violations) {
-          return aStats.violations - bStats.violations;
-        }
-        
-        // 夜勤回数が少ない人、勤務日数が少ない人を優先
-        if (aStats.nightShifts !== bStats.nightShifts) {
-          return aStats.nightShifts - bStats.nightShifts;
-        }
-        return aStats.workDays - bStats.workDays;
-      });
-    
-    const nightShiftRequired = dowCfg.nightShift ?? 2;
+      }),
+      random
+    ).sort((a, b) => {
+      const as = getNurseStats(a.name, schedule.slice(0, dayIndex));
+      const bs = getNurseStats(b.name, schedule.slice(0, dayIndex));
+      if (as.nightShifts !== bs.nightShifts) return as.nightShifts - bs.nightShifts;
+      return as.workDays - bs.workDays;
+    });
+
     const selectedNight = [];
     const usedNight = new Set();
-    for (let i = 0; i < nightShiftRequired && i < nightShiftCandidates.length; i++) {
+    for (let i = 0; i < nightRequired; i++) {
       let picked = null;
-
-      for (const candidate of nightShiftCandidates) {
-        if (usedNight.has(candidate.name)) continue;
-        if (isNightPairBlocked(candidate.name, selectedNight)) continue;
-        if (!isNightPairAvoid(candidate.name, selectedNight)) {
-          picked = candidate;
-          break;
+      for (const c of nightCandidates) {
+        if (usedNight.has(c.name)) continue;
+        if (isNightPairBlocked(c.name, selectedNight)) continue;
+        if (!isNightPairAvoid(c.name, selectedNight)) { picked = c; break; }
+      }
+      if (!picked) {
+        for (const c of nightCandidates) {
+          if (usedNight.has(c.name)) continue;
+          if (isNightPairBlocked(c.name, selectedNight)) continue;
+          picked = c; break;
         }
       }
+      if (!picked) break;
 
-      if (!picked) {
-        for (const candidate of nightShiftCandidates) {
-          if (usedNight.has(candidate.name)) continue;
-          if (isNightPairBlocked(candidate.name, selectedNight)) continue;
-          picked = candidate;
-          break;
-        }
-      }
+      usedNight.add(picked.name);
+      selectedNight.push(picked.name);
+      const violation = checkViolation(picked, day.date, SHIFT_TYPES.NIGHT, schedule, dayIndex);
+      day.nurses.push({ name: picked.name, shift: SHIFT_TYPES.NIGHT, violation });
 
-      if (!picked) {
-        break;
-      }
-
-      const nurse = picked;
-      usedNight.add(nurse.name);
-      selectedNight.push(nurse.name);
-
-      const violation = checkViolation(nurse, day.date, SHIFT_TYPES.NIGHT, schedule, dayIndex);
-      day.nurses.push({
-        name: nurse.name,
-        shift: SHIFT_TYPES.NIGHT,
-        violation
-      });
-      nurseStats[nurse.name].workDays++;
-      nurseStats[nurse.name].nightShifts++;
-      if (violation) nurseStats[nurse.name].violations++;
-      
-      // 夜勤の翌日は明け休み（必ず設定、上書きされない）
-      if (dayIndex < dateColumns.length - 1) {
-        const nextDate = dateColumns[dayIndex + 1];
-        const nextDay = schedule.find(d => d.date === nextDate);
+      // 夜勤翌日：明け休み（公休にカウントしない）
+      if (dayIndex + 1 < totalDays) {
+        const nextDay = schedule[dayIndex + 1];
         if (nextDay) {
-          const existingIndex = nextDay.nurses.findIndex(n => n.name === nurse.name);
-          if (existingIndex >= 0) {
-            // 既存の割り当てを明け休みに上書き
-            nextDay.nurses[existingIndex] = {
-              name: nurse.name,
-              shift: SHIFT_TYPES.OFF,
-              violation: false,
-              isDayOffAfterNight: true // 明け休みフラグ
-            };
-          } else {
-            nextDay.nurses.push({
-              name: nurse.name,
-              shift: SHIFT_TYPES.OFF,
-              violation: false,
-              isDayOffAfterNight: true // 明け休みフラグ
-            });
-          }
-          
-          // 明け休みの翌日も公休にする（オプション）
-          if (shiftConfig.dayAfterNightOff !== false && dayIndex + 1 < dateColumns.length - 1) {
-            const afterNextDate = dateColumns[dayIndex + 2];
-            const afterNextDay = schedule.find(d => d.date === afterNextDate);
-            if (afterNextDay) {
-              const afterNextExistingIndex = afterNextDay.nurses.findIndex(n => n.name === nurse.name);
-              if (afterNextExistingIndex >= 0) {
-                // 既存の割り当てを公休に上書き（ただし明け休みではない）
-                afterNextDay.nurses[afterNextExistingIndex] = {
-                  name: nurse.name,
-                  shift: SHIFT_TYPES.OFF,
-                  violation: false,
-                  isDayOffAfterNight: false // 公休（明け休みではない）
-                };
-              } else {
-                afterNextDay.nurses.push({
-                  name: nurse.name,
-                  shift: SHIFT_TYPES.OFF,
-                  violation: false,
-                  isDayOffAfterNight: false // 公休（明け休みではない）
-                });
-              }
-            }
-          }
+          const entry = { name: picked.name, shift: SHIFT_TYPES.OFF, violation: false, isDayOffAfterNight: true };
+          const ei = nextDay.nurses.findIndex(a => a.name === picked.name);
+          if (ei >= 0) nextDay.nurses[ei] = entry; else nextDay.nurses.push(entry);
+        }
+      }
+
+      // 明け翌日（夜勤+2日目）：公休（4週8休にカウント）
+      if (shiftConfig.dayAfterNightOff !== false && dayIndex + 2 < totalDays) {
+        const afterDay = schedule[dayIndex + 2];
+        if (afterDay) {
+          const entry = { name: picked.name, shift: SHIFT_TYPES.OFF, violation: false, isDayOffAfterNight: false };
+          const ei = afterDay.nurses.findIndex(a => a.name === picked.name);
+          if (ei >= 0) afterDay.nurses[ei] = entry; else afterDay.nurses.push(entry);
+          nurseOffDays[picked.name]++; // 公休としてカウント
         }
       }
     }
 
-    // 残りは休日に（明け休みで既に割り当て済みの人はスキップ）
-    const allAssigned = new Set(day.nurses.map(n => n.name));
-    available.forEach(nurse => {
-      if (!allAssigned.has(nurse.name)) {
-        day.nurses.push({
-          name: nurse.name,
-          shift: SHIFT_TYPES.OFF,
-          violation: false
-        });
-        // 週末休日は、夜勤をしない人のみカウント（公休として）
-        if (isWeekend(day.date) && !isNightShiftEligible(nurse)) {
-          nurseStats[nurse.name].weekendOffDays++;
-        }
+    // --- 遅出割り当て ---
+    const lateRequired = dowCfg.lateShift || 0;
+    const lateCandidates = shuffleArray(
+      getUnassigned().filter(n => {
+        if (mustBeOffForTarget(n)) return false;
+        const req = n.requests[day.date];
+        if (req === REQUEST_TYPES.PAID_LEAVE || req === REQUEST_TYPES.NIGHT_ONLY || req === REQUEST_TYPES.DAY_ONLY) return false;
+        if (!isLateShiftEligible(n)) return false;
+        if (countConsecutiveWorkDays(n.name, schedule, dayIndex) >= 5) return false;
+        return true;
+      }),
+      random
+    ).sort((a, b) =>
+      getNurseStats(a.name, schedule.slice(0, dayIndex)).workDays -
+      getNurseStats(b.name, schedule.slice(0, dayIndex)).workDays
+    );
+    for (let i = 0; i < lateRequired && i < lateCandidates.length; i++) {
+      const nurse = lateCandidates[i];
+      const violation = checkViolation(nurse, day.date, SHIFT_TYPES.LATE, schedule, dayIndex);
+      day.nurses.push({ name: nurse.name, shift: SHIFT_TYPES.LATE, violation });
+    }
+
+    // --- 日勤割り当て（残り全員：最低人数以上を確保、余剰も全員日勤）---
+    getUnassigned().filter(n => {
+      if (mustBeOffForTarget(n)) return false;
+      const req = n.requests[day.date];
+      if (req === REQUEST_TYPES.NIGHT_ONLY || req === REQUEST_TYPES.PAID_LEAVE) return false;
+      if (!isNightShiftEligible(n) && (isWeekend(day.date) || isHoliday)) return false;
+      if (countConsecutiveWorkDays(n.name, schedule, dayIndex) >= 5) return false;
+      return true;
+    }).forEach(nurse => {
+      const violation = checkViolation(nurse, day.date, SHIFT_TYPES.DAY, schedule, dayIndex);
+      day.nurses.push({ name: nurse.name, shift: SHIFT_TYPES.DAY, violation });
+    });
+
+    // --- 残り全員を公休 ---
+    nurses.forEach(nurse => {
+      if (!day.nurses.some(a => a.name === nurse.name)) {
+        day.nurses.push({ name: nurse.name, shift: SHIFT_TYPES.OFF, violation: false });
+        nurseOffDays[nurse.name]++;
       }
     });
   });
 
-  // 公平性を向上させるための微調整（簡単な最適化）
+  // 公平性最適化（修正版）
+  const targetPublicHolidays = standardHolidayDays;
   for (let iteration = 0; iteration < 3; iteration++) {
-    schedule.forEach(day => {
+    schedule.forEach((day, dayIndex) => {
       day.nurses.forEach((assignment, idx) => {
         const nurse = nurses.find(n => n.name === assignment.name);
         if (!nurse) return;
-
-        // 現在のスコア
         const currentScore = calculateNurseScore(nurse, schedule, targetWorkDays, targetPublicHolidays);
-        
-        // 他の看護師と交換可能かチェック
+
         day.nurses.forEach((other, otherIdx) => {
           if (idx === otherIdx) return;
           const otherNurse = nurses.find(n => n.name === other.name);
           if (!otherNurse) return;
+          if (assignment.isDayOffAfterNight || other.isDayOffAfterNight) return;
 
-          // 明け休みやその翌日の公休は交換不可
-          if (assignment.isDayOffAfterNight || other.isDayOffAfterNight) {
-            return;
-          }
-
-          // 前日が明け休みの場合も交換不可（翌日は公休である必要がある）
           const prevDay = getPreviousDayShift(schedule, dayIndex);
           if (prevDay) {
-            const prevAssignment = prevDay.nurses.find(a => a.name === nurse.name);
-            const prevOtherAssignment = prevDay.nurses.find(a => a.name === otherNurse.name);
-            if ((prevAssignment && prevAssignment.isDayOffAfterNight) ||
-                (prevOtherAssignment && prevOtherAssignment.isDayOffAfterNight)) {
-              return;
-            }
+            const pa = prevDay.nurses.find(a => a.name === nurse.name);
+            const po = prevDay.nurses.find(a => a.name === otherNurse.name);
+            if ((pa && pa.isDayOffAfterNight) || (po && po.isDayOffAfterNight)) return;
           }
-          
-          // 交換して違反がないか確認
+
           const canSwap = !checkViolation(nurse, day.date, other.shift) &&
                          !checkViolation(otherNurse, day.date, assignment.shift) &&
                          assignment.shift !== other.shift;
 
           if (canSwap) {
-            // 一時的に交換
+            // スコア比較はスワップ前に両方計算
+            const otherCurrentScore = calculateNurseScore(otherNurse, schedule, targetWorkDays, targetPublicHolidays);
             const temp = assignment.shift;
             assignment.shift = other.shift;
             other.shift = temp;
-
             const newScore = calculateNurseScore(nurse, schedule, targetWorkDays, targetPublicHolidays);
             const otherNewScore = calculateNurseScore(otherNurse, schedule, targetWorkDays, targetPublicHolidays);
-            const otherCurrentScore = calculateNurseScore(otherNurse, schedule, targetWorkDays, targetPublicHolidays);
-
-            // スコアが改善しない場合は戻す
             if (newScore + otherNewScore >= currentScore + otherCurrentScore) {
               other.shift = assignment.shift;
               assignment.shift = temp;
             }
           }
         });
-  });
+      });
     });
   }
 
