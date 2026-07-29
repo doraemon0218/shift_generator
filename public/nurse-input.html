@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>シフト希望入力</title>
+<style>
+  :root {
+    --available:  #ffffff;
+    --no-late:    #fff3cd;
+    --no-night:   #e9d8fd;
+    --night-wish: #bee3f8;
+    --off-req:    #c6f6d5;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', sans-serif; background: #f0f4f8; min-height: 100vh; }
+
+  header { background: #1a365d; color: white; padding: 12px 16px; position: sticky; top: 0; z-index: 10; }
+  .header-top { display: flex; justify-content: space-between; align-items: center; }
+  .header-top h1 { font-size: 16px; font-weight: 700; }
+  .logout-btn { background: transparent; border: 1px solid #4299e1; color: #bee3f8; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+  .nurse-info { font-size: 12px; color: #90cdf4; margin-top: 3px; }
+
+  .month-nav { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 12px 16px; background: white; border-bottom: 1px solid #e2e8f0; }
+  .month-nav button { background: none; border: none; font-size: 20px; cursor: pointer; color: #4a5568; padding: 4px 8px; border-radius: 6px; }
+  .month-nav button:disabled { color: #cbd5e0; cursor: not-allowed; }
+  .month-nav h2 { font-size: 18px; font-weight: 700; color: #2d3748; min-width: 120px; text-align: center; }
+
+  .counters { display: flex; gap: 8px; padding: 10px 12px; background: white; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; }
+  .counter-chip { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
+  .counter-chip.off       { background: var(--off-req);    color: #276749; }
+  .counter-chip.night     { background: var(--night-wish); color: #2b6cb0; }
+  .counter-chip.warn      { background: #fed7d7;           color: #c53030; }
+  .counter-chip.submitted { background: #c6f6d5;           color: #276749; }
+
+  .calendar-wrap { padding: 12px; }
+  .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 3px; }
+  .weekday { text-align: center; font-size: 11px; font-weight: 700; padding: 4px 0; color: #718096; }
+  .weekday.sun { color: #e53e3e; }
+  .weekday.sat { color: #3182ce; }
+  .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+
+  .day-cell {
+    aspect-ratio: 1; border-radius: 8px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer; position: relative;
+    border: 2px solid transparent;
+    transition: transform 0.1s, box-shadow 0.1s;
+    min-height: 44px;
+    background: var(--available);
+    user-select: none;
+  }
+  .day-cell:active { transform: scale(0.92); }
+  .day-cell.empty  { background: transparent; cursor: default; border: none; }
+  .day-cell.today  { border-color: #4299e1 !important; }
+  .day-cell.sunday   .day-num { color: #e53e3e; }
+  .day-cell.saturday .day-num { color: #3182ce; }
+  .day-cell.submitted { opacity: 0.7; cursor: not-allowed; }
+
+  .day-cell[data-pref="no_late"]     { background: var(--no-late); }
+  .day-cell[data-pref="no_night"]    { background: var(--no-night); }
+  .day-cell[data-pref="night_wish"]  { background: var(--night-wish); border-color: #4299e1; }
+  .day-cell[data-pref="off_request"] { background: var(--off-req); }
+
+  .day-num   { font-size: 15px; font-weight: 700; line-height: 1; }
+  .day-label { font-size: 9px; font-weight: 600; margin-top: 2px; line-height: 1; }
+  .day-cell[data-pref="available"]   .day-label { display: none; }
+  .day-cell[data-pref="no_late"]     .day-label { color: #c05621; }
+  .day-cell[data-pref="no_night"]    .day-label { color: #6b46c1; }
+  .day-cell[data-pref="night_wish"]  .day-label { color: #2b6cb0; }
+  .day-cell[data-pref="off_request"] .day-label { color: #276749; }
+
+  /* ─── ホバーポップオーバー（デスクトップ用） ─── */
+  #popover {
+    position: fixed; z-index: 50;
+    background: white; border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1);
+    padding: 8px; min-width: 172px;
+    display: none; flex-direction: column; gap: 3px;
+    pointer-events: auto;
+  }
+  #popover.open { display: flex; }
+  #popover::before {
+    content: ''; position: absolute; bottom: -7px; left: 50%;
+    transform: translateX(-50%);
+    border: 7px solid transparent; border-bottom: none;
+    border-top-color: white; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.08));
+  }
+  #popover.below::before { bottom: auto; top: -7px; border-top: none; border-bottom-color: white; }
+
+  .pop-btn {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: 8px; border: none;
+    font-size: 13px; font-weight: 600; text-align: left;
+    cursor: pointer; width: 100%; transition: filter 0.1s;
+    background: #f7fafc; color: #4a5568;
+  }
+  .pop-btn:hover { filter: brightness(0.95); }
+  .pop-btn.selected { outline: 2px solid currentColor; }
+  .pop-btn.disabled { opacity: 0.35; cursor: not-allowed; }
+  .pop-btn .pop-icon { font-size: 16px; width: 22px; text-align: center; flex-shrink: 0; }
+  .pop-btn.p-no-late    { background: var(--no-late);    color: #c05621; }
+  .pop-btn.p-no-night   { background: var(--no-night);   color: #6b46c1; }
+  .pop-btn.p-night-wish { background: var(--night-wish); color: #2b6cb0; }
+  .pop-btn.p-off-req    { background: var(--off-req);    color: #276749; }
+  .pop-btn .pop-limit   { font-size: 10px; opacity: 0.7; margin-left: auto; }
+
+  /* ─── ボトムシート（タッチ端末用） ─── */
+  .sheet-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 50; }
+  .sheet-overlay.open { display: block; }
+  .sheet { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-radius: 20px 20px 0 0; padding: 0 0 env(safe-area-inset-bottom, 16px); z-index: 51; transform: translateY(100%); transition: transform 0.25s ease; }
+  .sheet.open { transform: translateY(0); }
+  .sheet-handle { width: 36px; height: 4px; background: #e2e8f0; border-radius: 2px; margin: 12px auto 4px; }
+  .sheet-date { text-align: center; font-size: 14px; font-weight: 700; color: #2d3748; padding: 4px 0 12px; border-bottom: 1px solid #f0f4f8; }
+  .sheet-options { padding: 8px 12px 4px; display: flex; flex-direction: column; gap: 8px; }
+  .option-btn {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px; border-radius: 12px; border: 2px solid transparent;
+    background: #f7fafc; cursor: pointer; width: 100%;
+    font-size: 15px; font-weight: 600; text-align: left; transition: all 0.15s;
+  }
+  .option-btn:active { transform: scale(0.97); }
+  .option-btn.selected { border-color: currentColor; }
+  .option-btn .opt-icon { font-size: 22px; width: 32px; text-align: center; flex-shrink: 0; }
+  .option-btn .opt-text .opt-name { font-size: 15px; font-weight: 700; }
+  .option-btn .opt-text .opt-desc { font-size: 12px; opacity: 0.7; margin-top: 1px; }
+  .option-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+  .option-btn.o-available  { color: #4a5568; }
+  .option-btn.o-no-late    { background: var(--no-late);    color: #c05621; }
+  .option-btn.o-no-night   { background: var(--no-night);   color: #6b46c1; }
+  .option-btn.o-night-wish { background: var(--night-wish); color: #2b6cb0; }
+  .option-btn.o-off-req    { background: var(--off-req);    color: #276749; }
+
+  .submit-bar { position: sticky; bottom: 0; padding: 12px 16px env(safe-area-inset-bottom, 12px); background: white; border-top: 1px solid #e2e8f0; }
+  .submit-btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-size: 16px; font-weight: 700; cursor: pointer; background: #2b6cb0; color: white; transition: background 0.2s; }
+  .submit-btn:disabled { background: #a0aec0; cursor: not-allowed; }
+  .submit-btn.submitted { background: #48bb78; }
+
+  .toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #2d3748; color: white; padding: 10px 20px; border-radius: 9999px; font-size: 13px; z-index: 100; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <h1>📅 シフト希望入力</h1>
+    <button class="logout-btn" onclick="logout()">ログアウト</button>
+  </div>
+  <div class="nurse-info" id="nurse-info">読み込み中...</div>
+</header>
+
+<div class="month-nav">
+  <button id="prev-btn" onclick="changeMonth(-1)">‹</button>
+  <h2 id="month-title"></h2>
+  <button id="next-btn" onclick="changeMonth(1)">›</button>
+</div>
+
+<div class="counters" id="counters"></div>
+
+<div class="calendar-wrap">
+  <div class="weekdays">
+    <div class="weekday sun">日</div><div class="weekday">月</div><div class="weekday">火</div>
+    <div class="weekday">水</div><div class="weekday">木</div><div class="weekday">金</div>
+    <div class="weekday sat">土</div>
+  </div>
+  <div class="calendar-grid" id="calendar"></div>
+</div>
+
+<div class="submit-bar">
+  <button class="submit-btn" id="submit-btn" onclick="submitPreferences()">提出する</button>
+</div>
+
+<!-- ホバーポップオーバー（デスクトップ） -->
+<div id="popover"></div>
+
+<!-- ボトムシート（タッチ端末） -->
+<div class="sheet-overlay" id="overlay" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-date" id="sheet-date"></div>
+  <div class="sheet-options" id="sheet-options"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const token    = localStorage.getItem('token');
+const userInfo = JSON.parse(localStorage.getItem('user') || 'null');
+if (!token || !userInfo) location.href = '/index.html';
+
+const api = (path, opts = {}) => fetch(path, {
+  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+  ...opts
+}).then(r => r.json());
+
+const OPTIONS_DEF = {
+  available:   { icon: '○', name: '勤務可',   desc: 'どのシフトにも対応できます',   cls: 'p-available',  ocls: 'o-available',  label: '可' },
+  no_late:     { icon: '夕', name: '遅出不可', desc: '日勤のみ対応できます',         cls: 'p-no-late',    ocls: 'o-no-late',    label: '遅×' },
+  no_night:    { icon: '🌙', name: '夜勤不可', desc: '日勤・遅出は対応できます',     cls: 'p-no-night',   ocls: 'o-no-night',   label: '夜×' },
+  night_wish:  { icon: '★', name: '夜勤希望', desc: 'この日の夜勤を希望します',     cls: 'p-night-wish', ocls: 'o-night-wish', label: '★夜' },
+  off_request: { icon: '🏖', name: '公休希望', desc: '公休を希望します（有休含む）', cls: 'p-off-req',    ocls: 'o-off-req',    label: '休' },
+};
+
+const WORK_TYPE_OPTIONS = {
+  day_only: ['available', 'off_request'],
+  day_late: ['available', 'no_late', 'off_request'],
+  full:     ['available', 'no_late', 'no_night', 'night_wish', 'off_request'],
+};
+
+// タッチ端末かどうかを判定
+const isTouch = window.matchMedia('(pointer: coarse)').matches;
+
+let nurse = null;
+let prefs = {};
+let submitted = false;
+let maxOffDays = null;
+let maxNightWish = 2;
+let targetYear, targetMonth;
+
+// ポップオーバー管理
+let popoverTimer = null;
+let popoverDate = null;
+
+const today = new Date();
+const defaultTarget = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+targetYear = defaultTarget.getFullYear();
+targetMonth = defaultTarget.getMonth() + 1;
+
+async function init() {
+  try {
+    nurse = await api('/api/me');
+    if (nurse.role === 'admin') { location.href = '/admin-master.html'; return; }
+    document.getElementById('nurse-info').textContent =
+      `${nurse.name}（${workTypeLabel(nurse.work_type)}・${skillLabel(nurse.skill_level)}）`;
+    await loadMonth();
+  } catch { showToast('読み込みエラー'); }
+}
+
+async function loadMonth() {
+  prefs = {};
+  submitted = false;
+  const [prefList, config] = await Promise.all([
+    api(`/api/preferences?year=${targetYear}&month=${targetMonth}`),
+    api(`/api/shift-config/${targetYear}/${targetMonth}`)
+  ]);
+  prefList.forEach(p => {
+    prefs[p.date] = p.preference;
+    if (p.is_submitted) submitted = true;
+  });
+  if (config?.max_off_days) maxOffDays = config.max_off_days;
+  else maxOffDays = null;
+  renderMonth();
+  renderCounters();
+  renderSubmitBtn();
+}
+
+function renderMonth() {
+  document.getElementById('month-title').textContent = `${targetYear}年${targetMonth}月`;
+  const minMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  const maxMonth = new Date(today.getFullYear(), today.getMonth() + 3, 1);
+  const cur = new Date(targetYear, targetMonth - 1, 1);
+  document.getElementById('prev-btn').disabled = cur <= minMonth;
+  document.getElementById('next-btn').disabled = cur >= maxMonth;
+
+  const grid = document.getElementById('calendar');
+  grid.innerHTML = '';
+
+  const firstDay = new Date(targetYear, targetMonth - 1, 1).getDay();
+  const daysInMonth = new Date(targetYear, targetMonth, 0).getDate();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  for (let i = 0; i < firstDay; i++) {
+    const e = document.createElement('div');
+    e.className = 'day-cell empty';
+    grid.appendChild(e);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${targetYear}-${String(targetMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dow  = new Date(targetYear, targetMonth - 1, d).getDay();
+    const pref = prefs[dateStr] || 'available';
+    const opt  = OPTIONS_DEF[pref];
+
+    const cell = document.createElement('div');
+    cell.className = 'day-cell' +
+      (dow === 0 ? ' sunday' : '') + (dow === 6 ? ' saturday' : '') +
+      (dateStr === todayStr ? ' today' : '') + (submitted ? ' submitted' : '');
+    cell.dataset.pref = pref;
+    cell.dataset.date = dateStr;
+    cell.dataset.dow  = dow;
+    cell.innerHTML = `<span class="day-num">${d}</span><span class="day-label">${opt.label}</span>`;
+
+    if (!submitted) {
+      if (isTouch) {
+        // タッチ端末：タップでボトムシート
+        cell.addEventListener('click', () => openSheet(dateStr, dow));
+      } else {
+        // デスクトップ：ホバーでポップオーバー
+        cell.addEventListener('mouseenter', (e) => showPopover(dateStr, cell));
+        cell.addEventListener('mouseleave', (e) => scheduleHidePopover(e));
+      }
+    }
+    grid.appendChild(cell);
+  }
+}
+
+// ─── ホバーポップオーバー ───
+function showPopover(dateStr, cell) {
+  clearTimeout(popoverTimer);
+  popoverDate = dateStr;
+  const pop = document.getElementById('popover');
+  const allowedPrefs = WORK_TYPE_OPTIONS[nurse.work_type] || ['available', 'off_request'];
+  const currentPref  = prefs[dateStr] || 'available';
+  const nightCount   = Object.values(prefs).filter(p => p === 'night_wish').length;
+
+  pop.innerHTML = allowedPrefs.map(key => {
+    const o = OPTIONS_DEF[key];
+    const isSelected = currentPref === key;
+    const isDisabled = key === 'night_wish' && nightCount >= maxNightWish && !isSelected;
+    return `<button
+      class="pop-btn ${o.cls}${isSelected ? ' selected' : ''}${isDisabled ? ' disabled' : ''}"
+      onclick="${isDisabled ? '' : `popSelect('${key}')`}"
+      onmouseenter="clearTimeout(popoverTimer)"
+      onmouseleave="scheduleHidePopover(event)">
+      <span class="pop-icon">${o.icon}</span>
+      <span>${o.name}</span>
+      ${isDisabled ? '<span class="pop-limit">上限</span>' : ''}
+      ${isSelected ? '<span style="margin-left:auto;font-size:14px">✓</span>' : ''}
+    </button>`;
+  }).join('');
+
+  // 表示位置計算
+  const rect = cell.getBoundingClientRect();
+  const popW = 172;
+  let left = rect.left + rect.width / 2 - popW / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - popW - 8));
+
+  const spaceAbove = rect.top;
+  const popH = allowedPrefs.length * 40 + 20;
+  const showBelow = spaceAbove < popH + 20;
+
+  pop.classList.toggle('below', showBelow);
+  pop.style.left  = left + 'px';
+  pop.style.width = popW + 'px';
+
+  if (showBelow) {
+    pop.style.top    = (rect.bottom + 8) + 'px';
+    pop.style.bottom = 'auto';
+  } else {
+    pop.style.top    = 'auto';
+    pop.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+  }
+
+  pop.classList.add('open');
+}
+
+function scheduleHidePopover(e) {
+  popoverTimer = setTimeout(() => {
+    document.getElementById('popover').classList.remove('open');
+    popoverDate = null;
+  }, 120);
+}
+
+async function popSelect(pref) {
+  if (!popoverDate) return;
+  const dateStr = popoverDate;
+  document.getElementById('popover').classList.remove('open');
+  await savePref(dateStr, pref);
+}
+
+// ─── ボトムシート（タッチ用） ───
+function openSheet(dateStr, dow) {
+  if (submitted) return;
+  const d = new Date(dateStr);
+  const dayNames = ['日','月','火','水','木','金','土'];
+  document.getElementById('sheet-date').textContent =
+    `${d.getMonth()+1}月${d.getDate()}日（${dayNames[dow]}）`;
+
+  const allowedPrefs = WORK_TYPE_OPTIONS[nurse.work_type] || ['available', 'off_request'];
+  const currentPref  = prefs[dateStr] || 'available';
+  const nightCount   = Object.values(prefs).filter(p => p === 'night_wish').length;
+
+  document.getElementById('sheet-options').innerHTML = allowedPrefs.map(key => {
+    const o = OPTIONS_DEF[key];
+    const isSelected = currentPref === key;
+    const isDisabled = key === 'night_wish' && nightCount >= maxNightWish && !isSelected;
+    return `<button class="option-btn ${o.ocls}${isSelected ? ' selected' : ''}${isDisabled ? ' disabled' : ''}"
+      onclick="${isDisabled ? '' : `sheetSelect('${dateStr}','${key}')`}">
+      <span class="opt-icon">${o.icon}</span>
+      <span class="opt-text">
+        <div class="opt-name">${o.name}${isDisabled ? '（上限到達）':''}</div>
+        <div class="opt-desc">${o.desc}</div>
+      </span>
+      ${isSelected ? '<span style="font-size:18px">✓</span>' : ''}
+    </button>`;
+  }).join('');
+
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('sheet').classList.add('open');
+}
+
+function closeSheet() {
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('sheet').classList.remove('open');
+}
+
+async function sheetSelect(dateStr, pref) {
+  closeSheet();
+  await savePref(dateStr, pref);
+}
+
+// ─── 共通保存処理 ───
+async function savePref(dateStr, pref) {
+  const prev = prefs[dateStr] || 'available';
+  if (prev === pref) return;
+
+  prefs[dateStr] = pref;
+  renderMonth();
+  renderCounters();
+
+  try {
+    const result = await api('/api/preferences', {
+      method: 'PUT',
+      body: JSON.stringify({ date: dateStr, preference: pref })
+    });
+    if (result.error) throw new Error(result.error);
+    showToast('保存しました');
+  } catch (err) {
+    prefs[dateStr] = prev;
+    renderMonth();
+    renderCounters();
+    showToast(err.message || '保存に失敗しました');
+  }
+}
+
+function renderCounters() {
+  const offCount   = Object.values(prefs).filter(p => p === 'off_request').length;
+  const nightCount = Object.values(prefs).filter(p => p === 'night_wish').length;
+  const chips = [];
+  if (submitted) chips.push(`<div class="counter-chip submitted">✅ 提出済み</div>`);
+  if (nurse?.work_type === 'full')
+    chips.push(`<div class="counter-chip night${nightCount > maxNightWish ? ' warn' : ''}">★ 夜勤希望 ${nightCount}/${maxNightWish}日</div>`);
+  chips.push(`<div class="counter-chip off${maxOffDays !== null && offCount > maxOffDays ? ' warn' : ''}">🏖 公休希望 ${offCount}${maxOffDays !== null ? '/'+maxOffDays : ''}日</div>`);
+  document.getElementById('counters').innerHTML = chips.join('');
+}
+
+function renderSubmitBtn() {
+  const btn = document.getElementById('submit-btn');
+  if (submitted) { btn.textContent = '提出済み'; btn.disabled = true; btn.classList.add('submitted'); }
+  else           { btn.textContent = '提出する'; btn.disabled = false; btn.classList.remove('submitted'); }
+}
+
+async function submitPreferences() {
+  const offCount = Object.values(prefs).filter(p => p === 'off_request').length;
+  if (maxOffDays !== null && offCount > maxOffDays) {
+    alert(`公休希望が上限（${maxOffDays}日）を超えています。調整してから提出してください。`); return;
+  }
+  if (!confirm('提出します。提出後は変更できません。よろしいですか？')) return;
+  try {
+    await api('/api/preferences/submit', { method: 'POST', body: JSON.stringify({ year: targetYear, month: targetMonth }) });
+    submitted = true;
+    renderMonth(); renderCounters(); renderSubmitBtn();
+    showToast('提出しました！');
+  } catch { showToast('提出に失敗しました'); }
+}
+
+function changeMonth(delta) {
+  hidePopover();
+  const d = new Date(targetYear, targetMonth - 1 + delta, 1);
+  targetYear = d.getFullYear(); targetMonth = d.getMonth() + 1;
+  loadMonth();
+}
+
+function hidePopover() { document.getElementById('popover').classList.remove('open'); popoverDate = null; }
+function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); }
+function logout() { localStorage.clear(); location.href = '/index.html'; }
+function workTypeLabel(v) { return { day_only:'日勤のみ', day_late:'日勤・遅出', full:'日勤・遅出・夜勤' }[v] || v; }
+function skillLabel(v)    { return { trainee:'みならい', half:'0.5人前', skilled:'1人前' }[v] || v; }
+
+init();
+</script>
+</body>
+</html>

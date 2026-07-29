@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スタッフマスタ管理</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4f8; min-height: 100vh; }
+
+  header { background: #1a365d; color: white; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }
+  header h1 { font-size: 18px; }
+  header .nav { display: flex; gap: 12px; align-items: center; }
+  header a { color: #bee3f8; text-decoration: none; font-size: 13px; }
+  header a:hover { color: white; }
+  .logout-btn { background: transparent; border: 1px solid #4299e1; color: #bee3f8; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .logout-btn:hover { background: #2b6cb0; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; }
+  .tab { padding: 10px 20px; cursor: pointer; border-radius: 8px 8px 0 0; font-size: 14px; font-weight: 500; color: #718096; background: transparent; border: none; transition: all 0.2s; }
+  .tab.active { color: #2b6cb0; background: white; border-bottom: 2px solid white; margin-bottom: -2px; }
+  .tab:hover { color: #2b6cb0; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 8px rgba(0,0,0,0.08); }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .card-header h2 { font-size: 16px; color: #2d3748; }
+
+  .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+  .btn-primary { background: #2b6cb0; color: white; }
+  .btn-primary:hover { background: #2c5282; }
+  .btn-danger { background: #fed7d7; color: #c53030; }
+  .btn-danger:hover { background: #feb2b2; }
+  .btn-secondary { background: #edf2f7; color: #4a5568; }
+  .btn-secondary:hover { background: #e2e8f0; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 10px 12px; font-size: 12px; color: #718096; font-weight: 600; border-bottom: 1px solid #e2e8f0; background: #f7fafc; }
+  td { padding: 12px; font-size: 14px; color: #2d3748; border-bottom: 1px solid #f0f4f8; }
+  tr:hover td { background: #f7fafc; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
+  .badge-blue { background: #bee3f8; color: #2b6cb0; }
+  .badge-green { background: #c6f6d5; color: #276749; }
+  .badge-orange { background: #feebc8; color: #c05621; }
+  .badge-red { background: #fed7d7; color: #c53030; }
+  .badge-gray { background: #e2e8f0; color: #4a5568; }
+
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: white; border-radius: 12px; padding: 28px; width: 440px; max-width: 95vw; }
+  .modal h3 { font-size: 16px; color: #2d3748; margin-bottom: 20px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; color: #4a5568; font-weight: 500; margin-bottom: 4px; }
+  .form-group input, .form-group select { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 9px 12px; font-size: 14px; outline: none; }
+  .form-group input:focus, .form-group select:focus { border-color: #4299e1; }
+  .form-group .hint { font-size: 11px; color: #a0aec0; margin-top: 3px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+  .empty-state { text-align: center; padding: 48px; color: #a0aec0; }
+  .empty-state p { margin-top: 8px; font-size: 14px; }
+
+  .alert { padding: 10px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+  .alert-error { background: #fed7d7; color: #c53030; }
+  .alert-success { background: #c6f6d5; color: #276749; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏥 手術室シフト管理</h1>
+  <div class="nav">
+    <a href="/admin-master.html">スタッフマスタ</a>
+    <button class="logout-btn" onclick="logout()">ログアウト</button>
+  </div>
+</header>
+
+<div class="container">
+  <div id="alert"></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('nurses')">👩‍⚕️ 看護師一覧</button>
+    <button class="tab" onclick="switchTab('pairs')">🚫 夜勤禁忌ペア</button>
+  </div>
+
+  <!-- 看護師一覧パネル -->
+  <div class="panel active" id="panel-nurses">
+    <div class="card">
+      <div class="card-header">
+        <h2>登録看護師一覧</h2>
+        <button class="btn btn-primary" onclick="openAddModal()">＋ 看護師を追加</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>氏名</th>
+            <th>職員ID</th>
+            <th>勤務区分</th>
+            <th>スキル</th>
+            <th>ログインID</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="nurses-table-body">
+          <tr><td colspan="6"><div class="empty-state">読み込み中...</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 禁忌ペアパネル -->
+  <div class="panel" id="panel-pairs">
+    <div class="card">
+      <div class="card-header">
+        <h2>夜勤禁忌ペア設定</h2>
+        <button class="btn btn-primary" onclick="openAddPairModal()">＋ 禁忌ペアを追加</button>
+      </div>
+      <p style="font-size:13px;color:#718096;margin-bottom:16px;">同じ夜勤に入れないペアを登録します。スキルや人間関係等の理由で設定してください。</p>
+      <table>
+        <thead>
+          <tr><th>看護師A</th><th>看護師B</th><th>理由</th><th>操作</th></tr>
+        </thead>
+        <tbody id="pairs-table-body">
+          <tr><td colspan="4"><div class="empty-state">読み込み中...</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 看護師追加・編集モーダル -->
+<div class="modal-overlay" id="nurse-modal">
+  <div class="modal">
+    <h3 id="modal-title">看護師を追加</h3>
+    <div id="modal-alert"></div>
+    <div class="form-group">
+      <label>氏名 *</label>
+      <input type="text" id="f-name" placeholder="例：山田 花子">
+    </div>
+    <div class="form-group">
+      <label>職員ID</label>
+      <input type="text" id="f-employee-id" placeholder="例：N001（任意）">
+    </div>
+    <div class="form-group">
+      <label>勤務区分 *</label>
+      <select id="f-work-type">
+        <option value="day_only">日勤のみ</option>
+        <option value="day_late">日勤・遅出</option>
+        <option value="full">日勤・遅出・夜勤</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>スキルレベル *</label>
+      <select id="f-skill-level">
+        <option value="trainee">みならい</option>
+        <option value="half">0.5人前</option>
+        <option value="skilled">1人前</option>
+      </select>
+    </div>
+    <div id="login-fields">
+      <div class="form-group">
+        <label>ログインID *</label>
+        <input type="text" id="f-username" placeholder="例：yamada_h">
+      </div>
+      <div class="form-group">
+        <label>初期パスワード *</label>
+        <input type="password" id="f-password" placeholder="6文字以上">
+        <div class="hint">看護師が初回ログイン後に変更できます</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('nurse-modal')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveNurse()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 禁忌ペア追加モーダル -->
+<div class="modal-overlay" id="pair-modal">
+  <div class="modal">
+    <h3>夜勤禁忌ペアを追加</h3>
+    <div id="pair-modal-alert"></div>
+    <div class="form-group">
+      <label>看護師A *</label>
+      <select id="f-nurse-a"></select>
+    </div>
+    <div class="form-group">
+      <label>看護師B *</label>
+      <select id="f-nurse-b"></select>
+    </div>
+    <div class="form-group">
+      <label>理由（任意）</label>
+      <input type="text" id="f-pair-reason" placeholder="例：スキルバランス不適">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('pair-modal')">キャンセル</button>
+      <button class="btn btn-primary" onclick="savePair()">登録</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const WORK_TYPE = { day_only: '日勤のみ', day_late: '日勤・遅出', full: '日勤・遅出・夜勤' };
+const SKILL = { trainee: 'みならい', half: '0.5人前', skilled: '1人前' };
+const SKILL_BADGE = { trainee: 'badge-orange', half: 'badge-blue', skilled: 'badge-green' };
+
+let editingId = null;
+let nurses = [];
+
+// 認証チェック
+const token = localStorage.getItem('token');
+const user = JSON.parse(localStorage.getItem('user') || 'null');
+if (!token || !user || user.role !== 'admin') location.href = '/index.html';
+
+function authHeaders() { return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }; }
+
+function logout() { localStorage.clear(); location.href = '/index.html'; }
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', ['nurses','pairs'][i] === tab));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${tab}`).classList.add('active');
+  if (tab === 'pairs') loadPairs();
+}
+
+function showAlert(msg, type = 'error') {
+  const el = document.getElementById('alert');
+  el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  setTimeout(() => el.innerHTML = '', 4000);
+}
+
+// === 看護師管理 ===
+async function loadNurses() {
+  try {
+    const res = await fetch('/api/nurses', { headers: authHeaders() });
+    nurses = await res.json();
+    renderNurses();
+  } catch { showAlert('看護師データの取得に失敗しました'); }
+}
+
+function renderNurses() {
+  const tbody = document.getElementById('nurses-table-body');
+  if (nurses.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>看護師が登録されていません。追加ボタンから登録してください。</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = nurses.map(n => `
+    <tr>
+      <td><strong>${n.name}</strong></td>
+      <td>${n.employee_id || '—'}</td>
+      <td>${WORK_TYPE[n.work_type]}</td>
+      <td><span class="badge ${SKILL_BADGE[n.skill_level]}">${SKILL[n.skill_level]}</span></td>
+      <td>${n.username || '—'}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="openEditModal(${n.id})">編集</button>
+        <button class="btn btn-secondary btn-sm" onclick="resetPassword(${n.id}, '${n.name}')">PW変更</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteNurse(${n.id}, '${n.name}')">削除</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = '看護師を追加';
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-employee-id').value = '';
+  document.getElementById('f-work-type').value = 'full';
+  document.getElementById('f-skill-level').value = 'skilled';
+  document.getElementById('f-username').value = '';
+  document.getElementById('f-password').value = '';
+  document.getElementById('login-fields').style.display = '';
+  document.getElementById('modal-alert').innerHTML = '';
+  document.getElementById('nurse-modal').classList.add('open');
+}
+
+function openEditModal(id) {
+  const n = nurses.find(x => x.id === id);
+  editingId = id;
+  document.getElementById('modal-title').textContent = '看護師情報を編集';
+  document.getElementById('f-name').value = n.name;
+  document.getElementById('f-employee-id').value = n.employee_id || '';
+  document.getElementById('f-work-type').value = n.work_type;
+  document.getElementById('f-skill-level').value = n.skill_level;
+  document.getElementById('login-fields').style.display = 'none';
+  document.getElementById('modal-alert').innerHTML = '';
+  document.getElementById('nurse-modal').classList.add('open');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+async function saveNurse() {
+  const body = {
+    name: document.getElementById('f-name').value.trim(),
+    employee_id: document.getElementById('f-employee-id').value.trim(),
+    work_type: document.getElementById('f-work-type').value,
+    skill_level: document.getElementById('f-skill-level').value,
+  };
+  if (!editingId) {
+    body.username = document.getElementById('f-username').value.trim();
+    body.password = document.getElementById('f-password').value;
+  }
+
+  const url = editingId ? `/api/nurses/${editingId}` : '/api/nurses';
+  const method = editingId ? 'PUT' : 'POST';
+
+  try {
+    const res = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) {
+      document.getElementById('modal-alert').innerHTML = `<div class="alert alert-error">${data.error}</div>`;
+      return;
+    }
+    closeModal('nurse-modal');
+    showAlert(editingId ? '更新しました' : '看護師を追加しました', 'success');
+    loadNurses();
+  } catch { document.getElementById('modal-alert').innerHTML = '<div class="alert alert-error">サーバーエラー</div>'; }
+}
+
+async function resetPassword(id, name) {
+  const pw = prompt(`${name} さんの新しいパスワードを入力してください:`);
+  if (!pw) return;
+  const res = await fetch(`/api/nurses/${id}/password`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ password: pw }) });
+  const data = await res.json();
+  showAlert(res.ok ? data.message : data.error, res.ok ? 'success' : 'error');
+}
+
+async function deleteNurse(id, name) {
+  if (!confirm(`${name} さんを削除しますか？\n（シフトデータは保持されます）`)) return;
+  const res = await fetch(`/api/nurses/${id}`, { method: 'DELETE', headers: authHeaders() });
+  const data = await res.json();
+  showAlert(res.ok ? data.message : data.error, res.ok ? 'success' : 'error');
+  if (res.ok) loadNurses();
+}
+
+// === 禁忌ペア管理 ===
+async function loadPairs() {
+  try {
+    const res = await fetch('/api/nurses/forbidden-pairs', { headers: authHeaders() });
+    const pairs = await res.json();
+    const tbody = document.getElementById('pairs-table-body');
+    if (pairs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><p>禁忌ペアは登録されていません</p></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = pairs.map(p => `
+      <tr>
+        <td>${p.nurse_a_name}</td>
+        <td>${p.nurse_b_name}</td>
+        <td>${p.reason || '—'}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deletePair(${p.id})">削除</button></td>
+      </tr>
+    `).join('');
+  } catch { showAlert('禁忌ペアデータの取得に失敗しました'); }
+}
+
+function openAddPairModal() {
+  const nightNurses = nurses.filter(n => n.work_type === 'full' && n.skill_level === 'skilled');
+  const options = nightNurses.map(n => `<option value="${n.id}">${n.name}</option>`).join('');
+  document.getElementById('f-nurse-a').innerHTML = options;
+  document.getElementById('f-nurse-b').innerHTML = options;
+  document.getElementById('f-pair-reason').value = '';
+  document.getElementById('pair-modal-alert').innerHTML = '';
+  document.getElementById('pair-modal').classList.add('open');
+}
+
+async function savePair() {
+  const body = {
+    nurse_a_id: parseInt(document.getElementById('f-nurse-a').value),
+    nurse_b_id: parseInt(document.getElementById('f-nurse-b').value),
+    reason: document.getElementById('f-pair-reason').value.trim()
+  };
+  try {
+    const res = await fetch('/api/nurses/forbidden-pairs', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) {
+      document.getElementById('pair-modal-alert').innerHTML = `<div class="alert alert-error">${data.error}</div>`;
+      return;
+    }
+    closeModal('pair-modal');
+    showAlert('禁忌ペアを登録しました', 'success');
+    loadPairs();
+  } catch { document.getElementById('pair-modal-alert').innerHTML = '<div class="alert alert-error">サーバーエラー</div>'; }
+}
+
+async function deletePair(id) {
+  if (!confirm('この禁忌ペアを削除しますか？')) return;
+  const res = await fetch(`/api/nurses/forbidden-pairs/${id}`, { method: 'DELETE', headers: authHeaders() });
+  const data = await res.json();
+  showAlert(res.ok ? data.message : data.error, res.ok ? 'success' : 'error');
+  if (res.ok) loadPairs();
+}
+
+// 初期ロード
+loadNurses();
+</script>
+</body>
+</html>

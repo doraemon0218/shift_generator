@@ -1,0 +1,30 @@
+{
+  "name": "shift_generator",
+  "version": "1.0.0",
+  "description": "看護師のシフト希望調査結果から、公平な2交代制の手術室シフト表を自動生成するWebアプリケーションです。",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/doraemon0218/shift_generator.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/doraemon0218/shift_generator/issues"
+  },
+  "homepage": "https://github.com/doraemon0218/shift_generator#readme",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.22.0"
+  }
+}
