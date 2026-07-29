@@ -106,19 +106,34 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 // 看護師自己登録（初回セットアップ、認証不要）
 router.post('/self-register', async (req, res) => {
   const { name, employee_id, work_type, username, password } = req.body;
-  if (!name) return res.status(400).json({ error: '氏名を入力してください' });
+  if (!name)        return res.status(400).json({ error: '氏名を入力してください' });
+  if (!employee_id) return res.status(400).json({ error: '社員番号を入力してください' });
   if (!work_type || !['day_only','day_late','full'].includes(work_type))
     return res.status(400).json({ error: '勤務区分を選択してください' });
   if (!username) return res.status(400).json({ error: 'ログインIDを入力してください' });
   if (!password || password.length < 6)
     return res.status(400).json({ error: 'パスワードは6文字以上にしてください' });
 
+  // 同姓同名チェック
+  const nameCheck = await pool.query(
+    `SELECT id FROM nurses WHERE name=$1 AND is_active=true`, [name]
+  );
+  if (nameCheck.rows.length > 0)
+    return res.status(400).json({ error: 'その氏名はすでに登録されています。同姓同名の場合は管理者にお問い合わせください。' });
+
+  // 社員番号重複チェック
+  const empCheck = await pool.query(
+    `SELECT id FROM nurses WHERE employee_id=$1`, [employee_id]
+  );
+  if (empCheck.rows.length > 0)
+    return res.status(400).json({ error: 'その社員番号はすでに登録されています。管理者にお問い合わせください。' });
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const nurseResult = await client.query(
       `INSERT INTO nurses (name, employee_id, work_type, skill_level) VALUES ($1, $2, $3, 'trainee') RETURNING *`,
-      [name, employee_id || null, work_type]
+      [name, employee_id, work_type]
     );
     const nurse = nurseResult.rows[0];
     const hash = await bcrypt.hash(password, 10);

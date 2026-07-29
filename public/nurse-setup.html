@@ -50,8 +50,9 @@
     <input type="text" id="f-name" placeholder="例：山田 花子">
   </div>
   <div class="form-group">
-    <label>職員ID</label>
-    <input type="text" id="f-employee-id" placeholder="例：N001（任意）">
+    <label>社員番号<span class="required">*</span></label>
+    <input type="text" id="f-employee-id" placeholder="例：N001">
+    <div class="hint">すでに登録済みの番号は使用できません</div>
   </div>
 
   <p class="section-title">勤務区分<span class="required"> *</span></p>
@@ -112,8 +113,9 @@ async function register() {
   const password   = document.getElementById('f-password').value;
   const password2  = document.getElementById('f-password2').value;
 
-  if (!name)     { showError('氏名を入力してください'); return; }
-  if (!username) { showError('ログインIDを入力してください'); return; }
+  if (!name)       { showError('氏名を入力してください'); return; }
+  if (!employeeId) { showError('社員番号を入力してください'); return; }
+  if (!username)   { showError('ログインIDを入力してください'); return; }
   if (!password) { showError('パスワードを入力してください'); return; }
   if (password.length < 6) { showError('パスワードは6文字以上にしてください'); return; }
   if (password !== password2) { showError('パスワードが一致しません'); return; }
