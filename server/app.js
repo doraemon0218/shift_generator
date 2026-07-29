@@ -85,14 +85,18 @@ async function initDemoNurses() {
         [n.name, n.employee_id, n.work_type, n.skill_level]
       );
       const nurseId = nurseRes.rows[0].id;
-      const hash = await bcrypt.hash(n.password, 10);
-      // ユーザーは重複なら無視（パスワード変更しない）
-      await client.query(
-        `INSERT INTO users (username, password_hash, role, nurse_id)
-         VALUES ($1, $2, 'nurse', $3)
-         ON CONFLICT (username) DO NOTHING`,
-        [n.username, hash, nurseId]
+      // ユーザーが存在しない場合のみ作成（bcryptは重いので不要な再ハッシュを省く）
+      const existingUser = await client.query(
+        `SELECT id FROM users WHERE username=$1`, [n.username]
       );
+      if (existingUser.rows.length === 0) {
+        const hash = await bcrypt.hash(n.password, 10);
+        await client.query(
+          `INSERT INTO users (username, password_hash, role, nurse_id)
+           VALUES ($1, $2, 'nurse', $3)`,
+          [n.username, hash, nurseId]
+        );
+      }
     }
     await client.query('COMMIT');
     console.log(`デモ看護師 ${DEMO_NURSES.length}名をシードしました`);

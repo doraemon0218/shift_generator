@@ -358,17 +358,25 @@ targetMonth = defaultTarget.getMonth() + 1;
 
 async function init() {
   try {
-    nurse = await api('/api/me');
+    // /api/me とカレンダーデータを並列取得
+    const [meData, prefList, config, settings] = await Promise.all([
+      api('/api/me'),
+      api(`/api/preferences?year=${targetYear}&month=${targetMonth}`),
+      api(`/api/shift-config/${targetYear}/${targetMonth}`),
+      api('/api/settings')
+    ]);
+
+    nurse = meData;
     if (nurse.role === 'admin') { location.href = '/admin-master.html'; return; }
 
-    const wtLabel = { day_only:'日勤のみ', day_late:'日勤・遅出', full:'日勤・遅出・夜勤' }[nurse.work_type] || '';
+    const wtLabel = { day_only:'日勤のみ', day_late:'遅出まで', full:'夜勤まで' }[nurse.work_type] || '';
     const skLabel = { trainee:'みならい', half:'0.5人前', skilled:'1人前' }[nurse.skill_level] || '';
     document.getElementById('nurse-info').innerHTML =
       `${nurse.name}<span class="nurse-badge">${wtLabel}</span><span class="nurse-badge">${skLabel}</span>`;
 
     renderLegend();
     loadNote();
-    await loadMonth();
+    applyMonthData(prefList, config, settings);
     loadMyStats();
   } catch (e) {
     showToast('読み込みエラー');
@@ -399,6 +407,14 @@ async function loadMonth() {
     api(`/api/shift-config/${targetYear}/${targetMonth}`),
     api(`/api/settings`)
   ]);
+
+  applyMonthData(prefList, config, settings);
+}
+
+function applyMonthData(prefList, config, settings) {
+  prefs = {};
+  submitted = false;
+  deadlineDate = null;
 
   prefList.forEach(p => {
     prefs[p.date] = p.preference;
