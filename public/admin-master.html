@@ -110,6 +110,15 @@
   .matrix-legend.ok       { background: #f7fafc; color: #48bb78; border: 1px solid #e2e8f0; }
   .matrix-legend.forbidden { background: #fed7d7; color: #e53e3e; border: 1px solid #feb2b2; }
   .matrix-legend.caution  { background: #fefcbf; color: #d69e2e; border: 1px solid #fef08a; }
+
+  /* 配置人数テーブル */
+  .count-input { width: 52px; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 4px; font-size: 15px; font-weight: 700; text-align: center; outline: none; color: #1e293b; }
+  .count-input:focus { border-color: #4299e1; }
+  #staffing-table th { text-align: center; }
+  #staffing-table td { text-align: center; padding: 10px 8px; }
+
+  /* ランキングテーブル */
+  #ranking-early-body td, #ranking-night-body td { padding: 12px; }
 </style>
 </head>
 <body>
@@ -128,6 +137,8 @@
     <button class="tab active" onclick="switchTab('nurses')">👩‍⚕️ 看護師一覧</button>
     <button class="tab" onclick="switchTab('pairs')">🚫 夜勤禁忌ペア</button>
     <button class="tab" onclick="switchTab('deadlines')">📅 締め切り設定</button>
+    <button class="tab" onclick="switchTab('ranking')">🏆 ランキング</button>
+    <button class="tab" onclick="switchTab('staffing')">👥 配置人数</button>
   </div>
 
   <!-- 看護師一覧パネル -->
@@ -204,6 +215,122 @@
   </div>
 </div>
 
+  <!-- ランキングパネル -->
+  <div class="panel" id="panel-ranking">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+      <div class="card">
+        <div class="card-header">
+          <h2>⏰ 早期提出ランキング</h2>
+        </div>
+        <p style="font-size:12px;color:#718096;margin-bottom:16px;">
+          締め切り前に提出した日数の累計。早い提出が文化をつくります！
+        </p>
+        <table>
+          <thead><tr>
+            <th style="width:32px">順位</th>
+            <th>氏名</th>
+            <th style="text-align:right">累計早期日数</th>
+            <th style="text-align:right">提出回数</th>
+          </tr></thead>
+          <tbody id="ranking-early-body">
+            <tr><td colspan="4"><div class="empty-state"><p>読み込み中...</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>🌙 夜勤おまかせランキング</h2>
+        </div>
+        <p style="font-size:12px;color:#718096;margin-bottom:16px;">
+          夜勤希望の少ない人ほど管理者に丸投げしてくれている優しい人！<br>少ない順に表示。
+        </p>
+        <table>
+          <thead><tr>
+            <th style="width:32px">順位</th>
+            <th>氏名</th>
+            <th style="text-align:right">累計夜勤希望数</th>
+          </tr></thead>
+          <tbody id="ranking-night-body">
+            <tr><td colspan="3"><div class="empty-state"><p>読み込み中...</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 配置人数設定パネル -->
+  <div class="panel" id="panel-staffing">
+    <div class="card">
+      <div class="card-header">
+        <h2>👥 曜日別配置人数設定</h2>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="staffing-year" style="border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:13px;"></select>
+          <select id="staffing-month" style="border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:13px;"></select>
+          <button class="btn btn-secondary btn-sm" onclick="loadStaffingConfig()">読み込み</button>
+        </div>
+      </div>
+      <p style="font-size:13px;color:#718096;margin-bottom:20px;">
+        各曜日・シフト種別ごとの必要人数を設定します。締め切り後にこの人数をもとにシフトを自動生成します。
+      </p>
+
+      <div style="overflow-x:auto;">
+        <table id="staffing-table">
+          <thead>
+            <tr>
+              <th style="min-width:80px">シフト</th>
+              <th style="text-align:center">日</th>
+              <th style="text-align:center">月</th>
+              <th style="text-align:center">火</th>
+              <th style="text-align:center">水</th>
+              <th style="text-align:center">木</th>
+              <th style="text-align:center">金</th>
+              <th style="text-align:center">土</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>日勤</strong><br><span style="font-size:11px;color:#94a3b8">日中の人数</span></td>
+              <td id="day-0"><input type="number" class="count-input" min="0" max="20" value="6"></td>
+              <td id="day-1"><input type="number" class="count-input" min="0" max="20" value="6"></td>
+              <td id="day-2"><input type="number" class="count-input" min="0" max="20" value="6"></td>
+              <td id="day-3"><input type="number" class="count-input" min="0" max="20" value="6"></td>
+              <td id="day-4"><input type="number" class="count-input" min="0" max="20" value="6"></td>
+              <td id="day-5"><input type="number" class="count-input" min="0" max="20" value="5"></td>
+              <td id="day-6"><input type="number" class="count-input" min="0" max="20" value="5"></td>
+            </tr>
+            <tr>
+              <td><strong>遅出</strong><br><span style="font-size:11px;color:#94a3b8">夕方〜夜の人数</span></td>
+              <td id="late-0"><input type="number" class="count-input" min="0" max="10" value="2"></td>
+              <td id="late-1"><input type="number" class="count-input" min="0" max="10" value="2"></td>
+              <td id="late-2"><input type="number" class="count-input" min="0" max="10" value="1"></td>
+              <td id="late-3"><input type="number" class="count-input" min="0" max="10" value="2"></td>
+              <td id="late-4"><input type="number" class="count-input" min="0" max="10" value="1"></td>
+              <td id="late-5"><input type="number" class="count-input" min="0" max="10" value="0"></td>
+              <td id="late-6"><input type="number" class="count-input" min="0" max="10" value="0"></td>
+            </tr>
+            <tr>
+              <td><strong>夜勤</strong><br><span style="font-size:11px;color:#94a3b8">深夜の人数（全曜日共通）</span></td>
+              <td colspan="7" style="vertical-align:middle;">
+                <div style="display:flex;align-items:center;gap:12px;padding:4px 0;">
+                  <input type="number" id="night-count" class="count-input" min="0" max="10" value="2">
+                  <span style="font-size:13px;color:#64748b">人（毎日共通）</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:20px;display:flex;gap:10px;align-items:center;">
+        <button class="btn btn-primary" onclick="saveStaffingConfig()">保存する</button>
+        <span id="staffing-saved" style="font-size:13px;color:#276749;"></span>
+      </div>
+    </div>
+  </div>
+
 <!-- 看護師追加・編集モーダル -->
 <div class="modal-overlay" id="nurse-modal">
   <div class="modal">
@@ -270,11 +397,47 @@ function authHeaders() { return { 'Content-Type': 'application/json', 'Authoriza
 function logout() { localStorage.clear(); location.href = '/index.html'; }
 
 function switchTab(tab) {
-  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', ['nurses','pairs','deadlines'][i] === tab));
+  const tabs = ['nurses','pairs','deadlines','ranking','staffing'];
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', tabs[i] === tab));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById(`panel-${tab}`).classList.add('active');
-  if (tab === 'pairs') loadPairs();
+  if (tab === 'pairs')     loadPairs();
   if (tab === 'deadlines') loadDeadlines();
+  if (tab === 'ranking')   loadRanking();
+  if (tab === 'staffing')  initStaffingTab();
+}
+
+async function loadRanking() {
+  try {
+    const res = await fetch('/api/rankings', { headers: authHeaders() });
+    const data = await res.json();
+    const medals = ['🥇','🥈','🥉'];
+
+    const earlyBody = document.getElementById('ranking-early-body');
+    if (!data.earlySubmission?.length) {
+      earlyBody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><p>まだ提出データがありません</p></div></td></tr>';
+    } else {
+      earlyBody.innerHTML = data.earlySubmission.map((r, i) => `
+        <tr>
+          <td style="text-align:center;font-size:16px">${medals[i] || (i+1)+'位'}</td>
+          <td><strong>${r.name}</strong></td>
+          <td style="text-align:right;font-weight:700;color:#1d4ed8">${parseFloat(r.total_days_early).toFixed(1)}日</td>
+          <td style="text-align:right;color:#64748b">${r.submission_count}回</td>
+        </tr>`).join('');
+    }
+
+    const nightBody = document.getElementById('ranking-night-body');
+    if (!data.nightWish?.length) {
+      nightBody.innerHTML = '<tr><td colspan="3"><div class="empty-state"><p>夜勤対応スタッフが登録されていません</p></div></td></tr>';
+    } else {
+      nightBody.innerHTML = data.nightWish.map((r, i) => `
+        <tr>
+          <td style="text-align:center;font-size:16px">${medals[i] || (i+1)+'位'}</td>
+          <td><strong>${r.name}</strong></td>
+          <td style="text-align:right;font-weight:700;color:${r.night_wish_count === 0 ? '#15803d' : '#1e293b'}">${r.night_wish_count}回</td>
+        </tr>`).join('');
+    }
+  } catch { showAlert('ランキングの取得に失敗しました'); }
 }
 
 function showAlert(msg, type = 'error') {
@@ -556,6 +719,66 @@ async function saveDeadlineDay() {
     document.getElementById('deadline-day-saved').textContent =
       `✅ 保存しました（毎月前月${day}日 23:59 締め切り）`;
     showAlert(`締め切りを「毎月前月${day}日」に設定しました`, 'success');
+  } catch { showAlert('保存に失敗しました'); }
+}
+
+// === 配置人数設定 ===
+function initStaffingTab() {
+  const yearSel  = document.getElementById('staffing-year');
+  const monthSel = document.getElementById('staffing-month');
+  if (yearSel.options.length > 0) { loadStaffingConfig(); return; }
+
+  const now = new Date();
+  for (let y = now.getFullYear(); y <= now.getFullYear() + 1; y++) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y + '年';
+    yearSel.appendChild(o);
+  }
+  for (let m = 1; m <= 12; m++) {
+    const o = document.createElement('option');
+    o.value = m; o.textContent = m + '月';
+    if (m === now.getMonth() + 2) o.selected = true;
+    monthSel.appendChild(o);
+  }
+  loadStaffingConfig();
+}
+
+async function loadStaffingConfig() {
+  const year  = document.getElementById('staffing-year').value;
+  const month = document.getElementById('staffing-month').value;
+  try {
+    const res = await fetch(`/api/shift-config/${year}/${month}`, { headers: authHeaders() });
+    const cfg = await res.json();
+    if (!cfg) return; // デフォルト値のまま
+
+    const dayCounts  = cfg.day_counts  || [6,6,6,6,6,5,5];
+    const lateCounts = cfg.late_counts || [2,2,1,2,1,0,0];
+    const nightCount = cfg.night_count ?? 2;
+
+    for (let d = 0; d < 7; d++) {
+      document.querySelector(`#day-${d} input`).value  = dayCounts[d];
+      document.querySelector(`#late-${d} input`).value = lateCounts[d];
+    }
+    document.getElementById('night-count').value = nightCount;
+  } catch { showAlert('配置設定の取得に失敗しました'); }
+}
+
+async function saveStaffingConfig() {
+  const year  = parseInt(document.getElementById('staffing-year').value);
+  const month = parseInt(document.getElementById('staffing-month').value);
+  const dayCounts  = Array.from({length:7}, (_, d) => parseInt(document.querySelector(`#day-${d} input`).value) || 0);
+  const lateCounts = Array.from({length:7}, (_, d) => parseInt(document.querySelector(`#late-${d} input`).value) || 0);
+  const nightCount = parseInt(document.getElementById('night-count').value) || 0;
+
+  try {
+    const res = await fetch(`/api/shift-config/${year}/${month}`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify({ day_counts: dayCounts, late_counts: lateCounts, night_count: nightCount })
+    });
+    if (!res.ok) throw new Error();
+    document.getElementById('staffing-saved').textContent = `✅ ${year}年${month}月の設定を保存しました`;
+    setTimeout(() => { document.getElementById('staffing-saved').textContent = ''; }, 3000);
   } catch { showAlert('保存に失敗しました'); }
 }
 

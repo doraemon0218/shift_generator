@@ -1,5 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const { requireAdmin } = require('../middleware/auth');
 
@@ -99,6 +100,51 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'サーバーエラー' });
+  }
+});
+
+// 看護師自己登録（初回セットアップ、認証不要）
+router.post('/self-register', async (req, res) => {
+  const { name, employee_id, work_type, username, password } = req.body;
+  if (!name) return res.status(400).json({ error: '氏名を入力してください' });
+  if (!work_type || !['day_only','day_late','full'].includes(work_type))
+    return res.status(400).json({ error: '勤務区分を選択してください' });
+  if (!username) return res.status(400).json({ error: 'ログインIDを入力してください' });
+  if (!password || password.length < 6)
+    return res.status(400).json({ error: 'パスワードは6文字以上にしてください' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const nurseResult = await client.query(
+      `INSERT INTO nurses (name, employee_id, work_type, skill_level) VALUES ($1, $2, $3, 'trainee') RETURNING *`,
+      [name, employee_id || null, work_type]
+    );
+    const nurse = nurseResult.rows[0];
+    const hash = await bcrypt.hash(password, 10);
+    const userResult = await client.query(
+      `INSERT INTO users (username, password_hash, role, nurse_id) VALUES ($1, $2, 'nurse', $3) RETURNING *`,
+      [username, hash, nurse.id]
+    );
+    const user = userResult.rows[0];
+    await client.query('COMMIT');
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: 'nurse', nurse_id: nurse.id },
+      process.env.JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+    res.status(201).json({
+      token,
+      user: { id: user.id, username: user.username, role: 'nurse', nurse_id: nurse.id, nurse_name: nurse.name }
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.code === '23505') return res.status(400).json({ error: 'そのログインIDはすでに使われています' });
+    console.error(err);
+    res.status(500).json({ error: 'サーバーエラー' });
+  } finally {
+    client.release();
   }
 });
 

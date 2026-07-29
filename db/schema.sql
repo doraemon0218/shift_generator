@@ -110,6 +110,31 @@ CREATE TABLE IF NOT EXISTS system_settings (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- preference の CHECK 制約を新値に更新（late_wish / paid_leave 追加）
+DO $$
+BEGIN
+  ALTER TABLE shift_preferences DROP CONSTRAINT IF EXISTS shift_preferences_preference_check;
+  ALTER TABLE shift_preferences ADD CONSTRAINT shift_preferences_preference_check
+    CHECK (preference IN (
+      'available', 'off_request', 'no_day', 'no_late', 'no_night',
+      'night_wish', 'late_wish', 'paid_leave'
+    ));
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'constraint update skipped: %', SQLERRM;
+END $$;
+
+-- 提出タイミング記録（早期提出ランキング用）
+CREATE TABLE IF NOT EXISTS preference_submissions (
+  id SERIAL PRIMARY KEY,
+  nurse_id INTEGER NOT NULL REFERENCES nurses(id) ON DELETE CASCADE,
+  year INTEGER NOT NULL,
+  month INTEGER NOT NULL,
+  submitted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  deadline_date TIMESTAMP,
+  days_early NUMERIC(7,2),
+  UNIQUE (nurse_id, year, month)
+);
+
 -- Phase 4用: 累積実績（月締め後に記録）
 CREATE TABLE IF NOT EXISTS nurse_monthly_stats (
   id SERIAL PRIMARY KEY,

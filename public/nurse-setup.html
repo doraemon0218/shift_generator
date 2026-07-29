@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>スタッフ初回登録</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', sans-serif; background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .card { background: white; border-radius: 16px; padding: 28px 24px; width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+  .logo { text-align: center; margin-bottom: 24px; }
+  .logo h1 { font-size: 18px; color: #1a365d; font-weight: 800; }
+  .logo p  { color: #718096; font-size: 13px; margin-top: 4px; }
+  .step-badge { display: inline-block; background: #ebf4ff; color: #2b6cb0; border-radius: 9999px; font-size: 12px; font-weight: 700; padding: 3px 12px; margin-bottom: 16px; }
+  .section-title { font-size: 13px; font-weight: 700; color: #94a3b8; letter-spacing: 0.05em; text-transform: uppercase; margin: 20px 0 12px; border-top: 1px solid #f1f5f9; padding-top: 16px; }
+  .section-title:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+  .form-group { margin-bottom: 14px; }
+  label { display: block; font-size: 13px; color: #4a5568; margin-bottom: 4px; font-weight: 600; }
+  .required { color: #e53e3e; margin-left: 3px; }
+  input, select { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; font-size: 15px; outline: none; transition: border-color 0.2s; color: #1e293b; background: white; }
+  input:focus, select:focus { border-color: #4299e1; }
+  .hint { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+  .submit-btn { width: 100%; padding: 14px; border-radius: 10px; border: none; background: #1d4ed8; color: white; font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 20px; transition: background 0.2s; }
+  .submit-btn:hover { background: #1e40af; }
+  .submit-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+  .back-link { display: block; text-align: center; margin-top: 14px; font-size: 13px; color: #64748b; cursor: pointer; }
+  .back-link:hover { color: #1d4ed8; }
+  .error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-top: 12px; display: none; }
+  .error.show { display: block; }
+  .work-type-cards { display: flex; flex-direction: column; gap: 8px; }
+  .work-card { padding: 12px 14px; border: 2px solid #e2e8f0; border-radius: 10px; cursor: pointer; transition: all 0.15s; }
+  .work-card:hover { border-color: #93c5fd; background: #f0f9ff; }
+  .work-card.selected { border-color: #2563eb; background: #eff6ff; }
+  .work-card .wt-name { font-size: 14px; font-weight: 700; color: #1e293b; }
+  .work-card .wt-desc { font-size: 12px; color: #64748b; margin-top: 2px; }
+  .work-card.selected .wt-name { color: #1d4ed8; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <h1>🏥 スタッフ初回登録</h1>
+    <p>はじめてご利用の方はこちらで登録してください</p>
+  </div>
+
+  <p class="section-title">基本情報</p>
+
+  <div class="form-group">
+    <label>氏名<span class="required">*</span></label>
+    <input type="text" id="f-name" placeholder="例：山田 花子">
+  </div>
+  <div class="form-group">
+    <label>職員ID</label>
+    <input type="text" id="f-employee-id" placeholder="例：N001（任意）">
+  </div>
+
+  <p class="section-title">勤務区分<span class="required"> *</span></p>
+  <div class="work-type-cards" id="work-type-cards">
+    <div class="work-card selected" data-value="day_only" onclick="selectWorkType('day_only')">
+      <div class="wt-name">日勤のみ</div>
+      <div class="wt-desc">平日の日勤のみ。土日は自動的に休みとなります。</div>
+    </div>
+    <div class="work-card" data-value="day_late" onclick="selectWorkType('day_late')">
+      <div class="wt-name">日勤・遅出</div>
+      <div class="wt-desc">日勤と遅出（夕方勤務）に対応します。夜勤はありません。</div>
+    </div>
+    <div class="work-card" data-value="full" onclick="selectWorkType('full')">
+      <div class="wt-name">日勤・遅出・夜勤</div>
+      <div class="wt-desc">すべてのシフトに対応します。</div>
+    </div>
+  </div>
+  <input type="hidden" id="f-work-type" value="day_only">
+
+  <p class="section-title">ログイン情報</p>
+
+  <div class="form-group">
+    <label>ログインID<span class="required">*</span></label>
+    <input type="text" id="f-username" placeholder="例：yamada_h" autocomplete="username">
+    <div class="hint">半角英数字・アンダーバーで設定してください</div>
+  </div>
+  <div class="form-group">
+    <label>パスワード<span class="required">*</span></label>
+    <input type="password" id="f-password" placeholder="6文字以上" autocomplete="new-password">
+  </div>
+  <div class="form-group">
+    <label>パスワード（確認）<span class="required">*</span></label>
+    <input type="password" id="f-password2" placeholder="もう一度入力" autocomplete="new-password">
+  </div>
+
+  <div class="error" id="error"></div>
+
+  <button class="submit-btn" id="submit-btn" onclick="register()">登録してログイン</button>
+  <span class="back-link" onclick="location.href='/index.html'">← ログイン画面に戻る</span>
+</div>
+
+<script>
+let selectedWorkType = 'day_only';
+
+function selectWorkType(value) {
+  selectedWorkType = value;
+  document.getElementById('f-work-type').value = value;
+  document.querySelectorAll('.work-card').forEach(card => {
+    card.classList.toggle('selected', card.dataset.value === value);
+  });
+}
+
+async function register() {
+  const name       = document.getElementById('f-name').value.trim();
+  const employeeId = document.getElementById('f-employee-id').value.trim();
+  const workType   = selectedWorkType;
+  const username   = document.getElementById('f-username').value.trim();
+  const password   = document.getElementById('f-password').value;
+  const password2  = document.getElementById('f-password2').value;
+
+  if (!name)     { showError('氏名を入力してください'); return; }
+  if (!username) { showError('ログインIDを入力してください'); return; }
+  if (!password) { showError('パスワードを入力してください'); return; }
+  if (password.length < 6) { showError('パスワードは6文字以上にしてください'); return; }
+  if (password !== password2) { showError('パスワードが一致しません'); return; }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = '登録中...';
+
+  try {
+    const res = await fetch('/api/nurses/self-register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, employee_id: employeeId, work_type: workType, username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) { showError(data.error || '登録に失敗しました'); return; }
+
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    location.href = '/nurse-input.html';
+  } catch {
+    showError('サーバーに接続できません');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '登録してログイン';
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('error');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Enter') register(); });
+</script>
+</body>
+</html>
