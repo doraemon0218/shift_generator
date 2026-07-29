@@ -30,18 +30,26 @@ function makeRng(seed) {
 
 // ─── スコア計算 ───
 
+// スコアが低い人ほど優先して割り当て
+// 優先順位（全戦略共通）:
+//   最優先: night_wish（夜勤希望） → 大幅マイナス
+//   準優先: available（制約なし）
+//   回避:   no_night（夜勤不可）  → 大ペナルティ（ただし人員不足なら割り当て可）
 function nightScore(n, prefs, date, stats, strategy, rng) {
   const pref = getPref(prefs, n.id, date);
-  let s = stats[n.id].nights * 10;           // 夜勤が少ない人を優先
+  let s = stats[n.id].nights * 10;
+
+  // no_night は除外ではなく高ペナルティ（最後の手段として残す）
+  if (pref === 'no_night') s += 300;
+
   if (strategy === 'preference') {
-    if (pref === 'night_wish') s -= 60;      // 夜勤希望を強く優先
+    if (pref === 'night_wish') s -= 120;     // 最高優先
     if (pref === 'available')  s -= 5;
   } else if (strategy === 'balance') {
-    // nights数だけで決める（均等）
-    if (pref === 'night_wish') s -= 5;       // 軽微な優先のみ
+    if (pref === 'night_wish') s -= 20;      // 均等重視でも希望は少し優先
   } else {                                   // random
     s += rng() * 40;
-    if (pref === 'night_wish') s -= 25;
+    if (pref === 'night_wish') s -= 60;
   }
   return s;
 }
@@ -49,13 +57,18 @@ function nightScore(n, prefs, date, stats, strategy, rng) {
 function lateScore(n, prefs, date, stats, strategy, rng) {
   const pref = getPref(prefs, n.id, date);
   let s = stats[n.id].lates * 8;
+
+  // no_late は高ペナルティ（ソフト制約）
+  if (pref === 'no_late') s += 200;
+
   if (strategy === 'preference') {
-    if (pref === 'late_wish') s -= 50;
+    if (pref === 'late_wish') s -= 80;       // 希望優先
+    if (pref === 'available') s -= 3;
   } else if (strategy === 'random') {
     s += rng() * 30;
-    if (pref === 'late_wish') s -= 20;
+    if (pref === 'late_wish') s -= 40;
   } else {
-    if (pref === 'late_wish') s -= 5;
+    if (pref === 'late_wish') s -= 8;
   }
   return s;
 }
@@ -136,11 +149,10 @@ function generate(nurses, prefs, config, pairMap, year, month, strategy, seed) {
       }
     }
 
-    // ④ 夜勤割り当て（制約最強: full限定 + 禁忌ペア）
+    // ④ 夜勤割り当て（full限定 + 禁忌ペア / no_nightはスコアで回避）
     let nightPool = nurses.filter(n =>
       !fixed.has(n.id) &&
-      n.work_type === 'full' &&
-      getPref(prefs, n.id, date) !== 'no_night'
+      n.work_type === 'full'
     );
 
     // ランダム戦略の場合はプールをシャッフル
@@ -156,6 +168,9 @@ function generate(nurses, prefs, config, pairMap, year, month, strategy, seed) {
       if (tonight.length >= reqNight) break;
       if (tonight.some(a => isForbidden(a.id, n.id, pairMap))) continue;
       tonight.push(n);
+      if (getPref(prefs, n.id, date) === 'no_night') {
+        warns.push(`${date}: ${n.name} — 夜勤不可希望がありましたが人員不足のため割り当て`);
+      }
       shifts[n.id][date] = 'night';
       stats[n.id].nights++;
       fixed.add(n.id);
@@ -165,11 +180,10 @@ function generate(nurses, prefs, config, pairMap, year, month, strategy, seed) {
     }
     prevNightIds = tonight.map(n => n.id);
 
-    // ⑤ 遅出割り当て
+    // ⑤ 遅出割り当て（no_latはスコアで回避）
     let latePool = nurses.filter(n =>
       !fixed.has(n.id) &&
-      n.work_type !== 'day_only' &&
-      getPref(prefs, n.id, date) !== 'no_late'
+      n.work_type !== 'day_only'
     );
     if (strategy === 'random') latePool = shuffleArr(latePool, rng);
 
@@ -181,6 +195,9 @@ function generate(nurses, prefs, config, pairMap, year, month, strategy, seed) {
     let lateCount = 0;
     for (const n of latePool) {
       if (lateCount >= reqLate) break;
+      if (getPref(prefs, n.id, date) === 'no_late') {
+        warns.push(`${date}: ${n.name} — 遅出不可希望がありましたが人員不足のため割り当て`);
+      }
       shifts[n.id][date] = 'late';
       stats[n.id].lates++;
       fixed.add(n.id);
