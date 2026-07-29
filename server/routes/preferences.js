@@ -173,6 +173,41 @@ router.post('/preferences/submit', requireAuth, async (req, res) => {
   }
 });
 
+// 提出取り消し（締め切り前のみ）
+router.post('/preferences/unsubmit', requireAuth, async (req, res) => {
+  const { year, month } = req.body;
+  if (!year || !month) return res.status(400).json({ error: 'year/monthが必要です' });
+
+  const nurseId = req.user.nurse_id;
+  if (!nurseId) return res.status(403).json({ error: '看護師アカウントでログインしてください' });
+
+  // 締め切りチェック
+  const settingsRes = await pool.query(`SELECT value FROM system_settings WHERE key='deadline_day'`);
+  const deadlineDay = parseInt(settingsRes.rows[0]?.value);
+  if (deadlineDay >= 1 && deadlineDay <= 31) {
+    const dl = new Date(parseInt(year), parseInt(month) - 2, deadlineDay, 23, 59, 59);
+    if (new Date() > dl) {
+      return res.status(403).json({ error: '締め切りを過ぎているため取り消しできません' });
+    }
+  }
+
+  try {
+    await pool.query(
+      `UPDATE shift_preferences SET is_submitted=false WHERE nurse_id=$1 AND year=$2 AND month=$3`,
+      [nurseId, year, month]
+    );
+    // ランキング記録も削除（再提出時に再計算）
+    await pool.query(
+      `DELETE FROM preference_submissions WHERE nurse_id=$1 AND year=$2 AND month=$3`,
+      [nurseId, year, month]
+    );
+    res.json({ message: '提出を取り消しました' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'サーバーエラー' });
+  }
+});
+
 // ランキング取得（管理者・看護師共通）
 router.get('/rankings', requireAuth, async (req, res) => {
   try {

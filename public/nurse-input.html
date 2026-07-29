@@ -132,9 +132,9 @@
   .score-unit { font-size: 11px; color: #94a3b8; margin-top: 2px; }
   .score-desc { font-size: 11px; color: #64748b; margin-top: 4px; font-weight: 600; }
 
-  .submit-bar { position: sticky; bottom: 0; padding: 12px 16px env(safe-area-inset-bottom, 12px); background: white; border-top: 1px solid #e2e8f0; }
+  .submit-bar { position: sticky; bottom: 0; padding: 12px 16px env(safe-area-inset-bottom, 12px); background: white; border-top: 1px solid #e2e8f0; display: flex; gap: 8px; }
   .submit-btn {
-    width: 100%; padding: 15px; border-radius: 12px; border: none;
+    flex: 1; padding: 15px; border-radius: 12px; border: none;
     font-size: 16px; font-weight: 800; cursor: pointer;
     background: #1d4ed8; color: white; transition: background 0.2s;
     letter-spacing: 0.03em;
@@ -142,6 +142,12 @@
   .submit-btn:disabled { background: #94a3b8; cursor: not-allowed; }
   .submit-btn.submitted { background: #15803d; }
   .submit-btn.expired   { background: #64748b; }
+  .unsubmit-btn {
+    flex: 0 0 auto; padding: 15px 18px; border-radius: 12px;
+    border: 2px solid #dc2626; background: white; color: #dc2626;
+    font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+  }
+  .unsubmit-btn:hover { background: #fef2f2; }
 
   .toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 10px 20px; border-radius: 9999px; font-size: 13px; z-index: 100; opacity: 0; transition: opacity 0.25s; pointer-events: none; white-space: nowrap; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
   .toast.show { opacity: 1; }
@@ -281,6 +287,7 @@
 
 <div class="submit-bar">
   <button class="submit-btn" id="submit-btn" onclick="openSubmitModal()">提出する</button>
+  <button class="unsubmit-btn" id="unsubmit-btn" onclick="openUnsubmitModal()" style="display:none">取り消す</button>
 </div>
 
 <div id="popover"></div>
@@ -300,6 +307,18 @@
     <div class="modal-actions">
       <button class="modal-cancel" onclick="closeSubmitModal()">戻る</button>
       <button class="modal-confirm" id="modal-confirm-btn" onclick="confirmSubmit()">提出する</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="unsubmit-modal">
+  <div class="modal">
+    <div class="modal-title">↩️ 提出を取り消す</div>
+    <p style="font-size:13px;color:#4a5568;margin-bottom:8px;">提出を取り消して再入力できるようになります。</p>
+    <p style="font-size:12px;color:#dc2626;margin-bottom:16px;">⚠️ 締め切り後は取り消しできません。</p>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeUnsubmitModal()">戻る</button>
+      <button class="modal-confirm" style="background:#dc2626" onclick="confirmUnsubmit()">取り消す</button>
     </div>
   </div>
 </div>
@@ -532,17 +551,47 @@ function renderCounters() {
 }
 
 function renderSubmitBtn() {
-  const btn = document.getElementById('submit-btn');
-  if (submitted) {
+  const btn  = document.getElementById('submit-btn');
+  const ubtn = document.getElementById('unsubmit-btn');
+  const canUnsubmit = submitted && !isDeadlinePassed();
+
+  if (submitted && isDeadlinePassed()) {
+    btn.textContent = '🔒 提出済み（変更不可）'; btn.disabled = true;
+    btn.className = 'submit-btn expired';
+    ubtn.style.display = 'none';
+  } else if (submitted) {
     btn.textContent = '✅ 提出済み'; btn.disabled = true;
     btn.className = 'submit-btn submitted';
+    ubtn.style.display = '';
   } else if (isDeadlinePassed()) {
     btn.textContent = '🔒 締め切り済み'; btn.disabled = true;
     btn.className = 'submit-btn expired';
+    ubtn.style.display = 'none';
   } else {
     btn.textContent = '提出する'; btn.disabled = false;
     btn.className = 'submit-btn';
+    ubtn.style.display = 'none';
   }
+}
+
+function openUnsubmitModal()  { document.getElementById('unsubmit-modal').classList.add('open'); }
+function closeUnsubmitModal() { document.getElementById('unsubmit-modal').classList.remove('open'); }
+
+async function confirmUnsubmit() {
+  closeUnsubmitModal();
+  try {
+    const result = await api('/api/preferences/unsubmit', {
+      method: 'POST',
+      body: JSON.stringify({ year: targetYear, month: targetMonth })
+    });
+    if (result.error) { showToast(result.error); return; }
+    submitted = false;
+    renderMonth();
+    renderCounters();
+    renderSubmitBtn();
+    loadMyStats();
+    showToast('提出を取り消しました');
+  } catch { showToast('取り消しに失敗しました'); }
 }
 
 function renderDeadlineBanner() {
