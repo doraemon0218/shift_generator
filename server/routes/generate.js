@@ -188,21 +188,34 @@ function generate(nurses, prefs, config, pairMap, year, month, strategy, seed) {
     }
 
     // ⑥ 日勤 or 公休 の割り当て
-    //   残り日数で4週8休を達成できるよう調整
     const remaining = nurses.filter(n => !fixed.has(n.id));
     const daysLeft  = daysInMonth - d; // 今日を除く残り日数
 
-    // ランダム戦略はシャッフル
-    let orderedRemaining = strategy === 'random' ? shuffleArr(remaining, rng) : remaining;
+    let dayCount = 0;
 
-    // 日勤優先度: offが少ない（まだ目標まで余裕ある）人 → 日勤
+    // day_only看護師は平日必ず日勤（4週8休は週末の公休で達成）
+    if (dow !== 0 && dow !== 6) {
+      for (const n of remaining) {
+        if (n.work_type === 'day_only') {
+          shifts[n.id][date] = 'day';
+          stats[n.id].days++;
+          dayCount++;
+          fixed.add(n.id);
+        }
+      }
+    }
+
+    // その他の看護師は4週8休に基づき日勤 or 公休を決定
+    let orderedRemaining = remaining.filter(n => !fixed.has(n.id));
+    if (strategy === 'random') orderedRemaining = shuffleArr(orderedRemaining, rng);
+
+    // offが少ない（目標まで余裕ある）人を先に日勤へ
     orderedRemaining = [...orderedRemaining].sort((a, b) => {
       const aOff = offTarget - stats[a.id].offs;
       const bOff = offTarget - stats[b.id].offs;
-      return aOff - bOff; // offが余っている人を先に日勤
+      return aOff - bOff;
     });
 
-    let dayCount = 0;
     for (const n of orderedRemaining) {
       const offStillNeeded = offTarget - stats[n.id].offs;
 
@@ -212,7 +225,6 @@ function generate(nurses, prefs, config, pairMap, year, month, strategy, seed) {
         stats[n.id].days++;
         dayCount++;
       } else {
-        // 公休（必要な休日を確保）
         shifts[n.id][date] = 'off';
         stats[n.id].offs++;
       }

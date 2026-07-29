@@ -251,19 +251,30 @@
 </div>
 
 <div class="score-section" id="score-section" style="display:none">
-  <div class="score-title">🏆 あなたのスコア（累計）</div>
-  <div class="score-grid">
+  <div class="score-title">📊 今月の入力状況 <span id="score-month-label" style="font-weight:400;font-size:12px;color:#64748b"></span></div>
+  <div class="score-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
     <div class="score-item">
-      <div class="score-val" id="score-early">—</div>
+      <div class="score-val" id="score-off">—</div>
       <div class="score-unit">日</div>
-      <div class="score-desc">早期提出の累計日数</div>
+      <div class="score-desc">公休希望</div>
+    </div>
+    <div class="score-item">
+      <div class="score-val" id="score-paid">—</div>
+      <div class="score-unit">日</div>
+      <div class="score-desc">有給希望</div>
+    </div>
+    <div class="score-item">
+      <div class="score-val" id="score-late">—</div>
+      <div class="score-unit">回</div>
+      <div class="score-desc">遅出希望</div>
     </div>
     <div class="score-item">
       <div class="score-val" id="score-night">—</div>
       <div class="score-unit">回</div>
-      <div class="score-desc">夜勤希望の累計回数</div>
+      <div class="score-desc">夜勤希望</div>
     </div>
   </div>
+  <div id="score-submit-status" style="margin-top:8px;font-size:12px;color:#64748b;text-align:center;"></div>
 </div>
 
 <div class="submit-bar">
@@ -721,11 +732,23 @@ async function confirmSubmit() {
 // ─── 自分のスコア ───
 async function loadMyStats() {
   try {
-    const stats = await api('/api/my-stats');
+    const stats = await api(`/api/my-stats?year=${targetYear}&month=${targetMonth}`);
     const el = document.getElementById('score-section');
     if (!stats || stats.error) return;
-    document.getElementById('score-early').textContent = parseFloat(stats.total_days_early || 0).toFixed(1);
-    document.getElementById('score-night').textContent = stats.night_wish_count || 0;
+    document.getElementById('score-month-label').textContent = `${targetYear}年${targetMonth}月`;
+    document.getElementById('score-off').textContent   = stats.off_request_count  ?? 0;
+    document.getElementById('score-paid').textContent  = stats.paid_leave_count   ?? 0;
+    document.getElementById('score-late').textContent  = stats.late_wish_count    ?? 0;
+    document.getElementById('score-night').textContent = stats.night_wish_count   ?? 0;
+    const statusEl = document.getElementById('score-submit-status');
+    if (stats.is_submitted && stats.submitted_at) {
+      const d = new Date(stats.submitted_at);
+      statusEl.textContent = `✅ 提出済み（${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}）`;
+      statusEl.style.color = '#276749';
+    } else {
+      statusEl.textContent = '未提出';
+      statusEl.style.color = '#94a3b8';
+    }
     el.style.display = '';
   } catch {}
 }

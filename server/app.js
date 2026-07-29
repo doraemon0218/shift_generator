@@ -47,7 +47,7 @@ const DEMO_NURSES = [
   { name: '井上 さつき',  employee_id: 'N009', work_type: 'full', skill_level: 'skilled',  username: 'inoue_s',     password: 'demo1234' },
   { name: '中島 由紀',    employee_id: 'N010', work_type: 'full', skill_level: 'skilled',  username: 'nakajima_y',  password: 'demo1234' },
   { name: '林 奈美',      employee_id: 'N011', work_type: 'full', skill_level: 'half',     username: 'hayashi_n',   password: 'demo1234' },
-  { name: '清水 美香',    employee_id: 'N012', work_type: 'full', skill_level: 'skilled',  username: 'shimizu_m',   password: 'demo1234' },
+  { name: '清水 美鈴',    employee_id: 'N012', work_type: 'full', skill_level: 'skilled',  username: 'shimizu_m',   password: 'demo1234' },
   { name: '池田 理恵',    employee_id: 'N013', work_type: 'full', skill_level: 'skilled',  username: 'ikeda_r',     password: 'demo1234' },
   { name: '橋本 みき',    employee_id: 'N014', work_type: 'full', skill_level: 'half',     username: 'hashimoto_m', password: 'demo1234' },
   { name: '石田 なつき',  employee_id: 'N015', work_type: 'full', skill_level: 'trainee',  username: 'ishida_n',    password: 'demo1234' },
@@ -64,7 +64,7 @@ const DEMO_NURSES = [
   { name: '宮田 あい',    employee_id: 'N025', work_type: 'day_only', skill_level: 'skilled',  username: 'miyata_a',   password: 'demo1234' },
   { name: '小川 ちはる',  employee_id: 'N026', work_type: 'day_only', skill_level: 'half',     username: 'ogawa_c',    password: 'demo1234' },
   { name: '長谷川 理沙',  employee_id: 'N027', work_type: 'day_only', skill_level: 'skilled',  username: 'hasegawa_r', password: 'demo1234' },
-  { name: '野口 みか',    employee_id: 'N028', work_type: 'day_only', skill_level: 'skilled',  username: 'noguchi_m',  password: 'demo1234' },
+  { name: '野口 ひとみ',  employee_id: 'N028', work_type: 'day_only', skill_level: 'skilled',  username: 'noguchi_m',  password: 'demo1234' },
   { name: '福田 えり',    employee_id: 'N029', work_type: 'day_only', skill_level: 'half',     username: 'fukuda_e',   password: 'demo1234' },
   { name: '斎藤 なな',    employee_id: 'N030', work_type: 'day_only', skill_level: 'skilled',  username: 'saito_n',    password: 'demo1234' },
 ];

@@ -207,18 +207,26 @@ router.get('/rankings', requireAuth, async (req, res) => {
 router.get('/my-stats', requireAuth, async (req, res) => {
   const nurseId = req.user.nurse_id;
   if (!nurseId) return res.status(403).json({ error: '看護師アカウントが必要です' });
+  const { year, month } = req.query;
+  if (!year || !month) return res.status(400).json({ error: 'year/monthが必要です' });
   try {
-    const earlyRes = await pool.query(`
-      SELECT COALESCE(SUM(GREATEST(days_early, 0)), 0)::NUMERIC(7,1) AS total_days_early,
-             COUNT(*) FILTER (WHERE days_early > 0) AS early_count,
-             COUNT(*) AS submission_count
-      FROM preference_submissions WHERE nurse_id=$1`, [nurseId]);
-    const nightRes = await pool.query(`
-      SELECT COUNT(*)::INTEGER AS night_wish_count
-      FROM shift_preferences WHERE nurse_id=$1 AND preference='night_wish'`, [nurseId]);
+    const prefRes = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE preference='off_request')::INTEGER AS off_request_count,
+        COUNT(*) FILTER (WHERE preference='paid_leave')::INTEGER  AS paid_leave_count,
+        COUNT(*) FILTER (WHERE preference='night_wish')::INTEGER  AS night_wish_count,
+        COUNT(*) FILTER (WHERE preference='late_wish')::INTEGER   AS late_wish_count
+      FROM shift_preferences
+      WHERE nurse_id=$1 AND year=$2 AND month=$3`, [nurseId, year, month]);
+    const subRes = await pool.query(`
+      SELECT submitted_at, days_early
+      FROM preference_submissions
+      WHERE nurse_id=$1 AND year=$2 AND month=$3`, [nurseId, year, month]);
     res.json({
-      ...earlyRes.rows[0],
-      night_wish_count: nightRes.rows[0].night_wish_count
+      ...prefRes.rows[0],
+      is_submitted:  subRes.rows.length > 0,
+      submitted_at:  subRes.rows[0]?.submitted_at || null,
+      days_early:    subRes.rows[0]?.days_early    || null
     });
   } catch (err) {
     console.error(err);
