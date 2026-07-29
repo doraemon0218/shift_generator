@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>シフト自動生成</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4f8; min-height: 100vh; }
+
+  header { background: #1a365d; color: white; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }
+  header h1 { font-size: 18px; }
+  header .nav { display: flex; gap: 12px; align-items: center; }
+  header a { color: #bee3f8; text-decoration: none; font-size: 13px; }
+  .logout-btn { background: transparent; border: 1px solid #4299e1; color: #bee3f8; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
+  .card { background: white; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 8px rgba(0,0,0,0.08); margin-bottom: 16px; }
+
+  /* コントロールバー */
+  .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .controls select { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 15px; outline: none; }
+  .btn { padding: 9px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; }
+  .btn-primary { background: #2b6cb0; color: white; }
+  .btn-primary:hover { background: #2c5282; }
+  .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+  .btn-success { background: #276749; color: white; padding: 10px 24px; }
+  .btn-success:hover { background: #1c4532; }
+  .btn-secondary { background: #edf2f7; color: #4a5568; }
+
+  .alert { padding: 10px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+  .alert-error   { background: #fed7d7; color: #c53030; }
+  .alert-success { background: #c6f6d5; color: #276749; }
+  .alert-warning { background: #fefcbf; color: #744210; }
+
+  /* 候補タブ */
+  .candidate-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+  .c-tab { padding: 10px 20px; border-radius: 8px 8px 0 0; font-size: 14px; font-weight: 600; cursor: pointer; border: 2px solid #e2e8f0; background: #f8fafc; color: #64748b; transition: all 0.15s; border-bottom: none; }
+  .c-tab.active { background: white; color: #1d4ed8; border-color: #bfdbfe; border-bottom-color: white; }
+  .c-tab:hover:not(.active) { background: #f1f5f9; }
+
+  .candidate-panel { display: none; }
+  .candidate-panel.active { display: block; }
+
+  /* 候補ヘッダー */
+  .cand-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+  .cand-desc { font-size: 13px; color: #64748b; margin-top: 4px; }
+  .cand-warns { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #92400e; margin-bottom: 12px; }
+  .cand-warns ul { margin-left: 16px; }
+  .cand-warns li { margin-top: 3px; }
+
+  /* シフト表 */
+  .shift-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.shift-table { border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+  table.shift-table th { position: sticky; top: 0; background: #f7fafc; z-index: 2; padding: 6px 4px; text-align: center; border: 1px solid #e2e8f0; font-size: 11px; }
+  table.shift-table th.nurse-col { left: 0; z-index: 3; min-width: 72px; text-align: left; padding: 6px 8px; }
+  table.shift-table td { border: 1px solid #e8edf2; padding: 0; text-align: center; }
+  table.shift-table td.nurse-name { position: sticky; left: 0; background: white; z-index: 1; padding: 5px 8px; font-size: 12px; font-weight: 600; color: #1e293b; text-align: left; border-right: 2px solid #e2e8f0; min-width: 72px; }
+  table.shift-table td.nurse-name .wt { font-size: 10px; color: #94a3b8; font-weight: 400; display: block; }
+
+  .shift-cell {
+    width: 30px; height: 34px; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; cursor: default;
+  }
+  .shift-cell.s-day   { background: #f8fafc; color: #475569; }
+  .shift-cell.s-late  { background: #fff7ed; color: #c2410c; }
+  .shift-cell.s-night { background: #dbeafe; color: #1d4ed8; }
+  .shift-cell.s-off   { background: #f0fdf4; color: #15803d; }
+  .shift-cell.s-holiday { background: #ccfbf1; color: #0f766e; }
+  .shift-cell.s-after_night { background: #f1f5f9; color: #64748b; }
+  .shift-cell.s-sun { background: #fef9f9; }
+  .shift-cell.s-sat { background: #f8fbff; }
+
+  /* 統計テーブル */
+  table.stats-table { border-collapse: collapse; font-size: 13px; width: 100%; margin-top: 16px; }
+  table.stats-table th { background: #f7fafc; padding: 8px 10px; border: 1px solid #e2e8f0; font-size: 12px; color: #718096; }
+  table.stats-table td { padding: 8px 10px; border: 1px solid #e2e8f0; text-align: center; }
+  table.stats-table tr:hover td { background: #f7fafc; }
+  .stat-warn { color: #b91c1c; font-weight: 700; }
+
+  /* 凡例 */
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+  .legend-box { width: 22px; height: 18px; border-radius: 3px; display: inline-block; }
+  .legend-box.s-day   { background: #f8fafc; border: 1px solid #e2e8f0; }
+  .legend-box.s-late  { background: #fff7ed; }
+  .legend-box.s-night { background: #dbeafe; }
+  .legend-box.s-off   { background: #f0fdf4; }
+  .legend-box.s-holiday { background: #ccfbf1; }
+  .legend-box.s-after_night { background: #f1f5f9; }
+
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 6px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #loading { text-align: center; padding: 48px; color: #94a3b8; display: none; }
+
+  .empty-msg { text-align: center; padding: 48px; color: #94a3b8; }
+
+  .save-bar { display: flex; align-items: center; gap: 12px; padding-top: 16px; border-top: 1px solid #e2e8f0; margin-top: 16px; }
+  .save-note { font-size: 13px; color: #64748b; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🗓 シフト自動生成</h1>
+  <div class="nav">
+    <a href="/admin-master.html">← 管理画面</a>
+    <button class="logout-btn" onclick="logout()">ログアウト</button>
+  </div>
+</header>
+
+<div class="container">
+  <div id="alert"></div>
+
+  <!-- コントロール -->
+  <div class="card">
+    <div class="controls">
+      <select id="sel-year"></select>
+      <select id="sel-month"></select>
+      <button class="btn btn-primary" id="gen-btn" onclick="runGenerate()">
+        ✨ シフト案を3つ生成する
+      </button>
+      <button class="btn btn-secondary" onclick="location.href='/admin-master.html?tab=staffing'">
+        👥 配置人数設定
+      </button>
+    </div>
+    <p style="font-size:12px;color:#94a3b8;margin-top:10px;">
+      ※ 4週8休・夜勤翌日明け・明け翌日公休・禁忌ペア・勤務希望を考慮して生成します
+    </p>
+  </div>
+
+  <div id="loading"><span class="spinner" style="border-color:rgba(0,0,0,0.2);border-top-color:#2b6cb0;width:24px;height:24px;"></span> 生成中...</div>
+
+  <!-- 候補パネル -->
+  <div id="candidates-wrap" style="display:none">
+    <div class="candidate-tabs" id="ctabs"></div>
+
+    <div id="cpanels"></div>
+  </div>
+
+  <div class="empty-msg" id="empty-msg">月を選択して「シフト案を3つ生成する」ボタンを押してください</div>
+</div>
+
+<script>
+const token = localStorage.getItem('token');
+const user  = JSON.parse(localStorage.getItem('user') || 'null');
+if (!token || !user || user.role !== 'admin') location.href = '/index.html';
+
+function logout() { localStorage.clear(); location.href = '/index.html'; }
+function authHeaders() { return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }; }
+
+const SHIFT_LABEL = {
+  day:         { text: '日', cls: 's-day' },
+  late:        { text: '遅', cls: 's-late' },
+  night:       { text: '夜', cls: 's-night' },
+  off:         { text: '休', cls: 's-off' },
+  holiday:     { text: '有', cls: 's-holiday' },
+  after_night: { text: '明', cls: 's-after_night' },
+};
+const DAY_NAMES = ['日','月','火','水','木','金','土'];
+const WT_LABEL = { day_only:'日勤', day_late:'日遅', full:'夜勤' };
+
+// セレクタ初期化
+(function initSelectors() {
+  const now = new Date();
+  const yearSel = document.getElementById('sel-year');
+  const monthSel = document.getElementById('sel-month');
+
+  for (let y = now.getFullYear(); y <= now.getFullYear() + 1; y++) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y + '年';
+    yearSel.appendChild(o);
+  }
+  for (let m = 1; m <= 12; m++) {
+    const o = document.createElement('option');
+    o.value = m; o.textContent = m + '月';
+    if (m === now.getMonth() + 2) o.selected = true;
+    monthSel.appendChild(o);
+  }
+})();
+
+let generatedData = null;
+let activeCandIdx = 0;
+
+async function runGenerate() {
+  const year  = document.getElementById('sel-year').value;
+  const month = document.getElementById('sel-month').value;
+
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 生成中...';
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('candidates-wrap').style.display = 'none';
+  document.getElementById('empty-msg').style.display = 'none';
+  document.getElementById('alert').innerHTML = '';
+
+  try {
+    const res = await fetch(`/api/generate/${year}/${month}`, {
+      method: 'POST',
+      headers: authHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '生成に失敗しました');
+
+    generatedData = data;
+    renderCandidates(data);
+    document.getElementById('candidates-wrap').style.display = 'block';
+  } catch (err) {
+    showAlert(err.message, 'error');
+    document.getElementById('empty-msg').style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✨ シフト案を3つ生成する';
+    document.getElementById('loading').style.display = 'none';
+  }
+}
+
+function renderCandidates(data) {
+  const { nurses, candidates, year, month } = data;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  // タブ
+  const ctabs = document.getElementById('ctabs');
+  ctabs.innerHTML = candidates.map((c, i) =>
+    `<div class="c-tab${i === 0 ? ' active' : ''}" onclick="switchCand(${i})">${i+1}. ${c.name}</div>`
+  ).join('');
+
+  // パネル
+  const cpanels = document.getElementById('cpanels');
+  cpanels.innerHTML = candidates.map((c, ci) => {
+    const panel = buildCandidatePanel(c, nurses, days, year, month, ci);
+    return `<div class="candidate-panel card${ci === 0 ? ' active' : ''}" id="cpanel-${ci}">${panel}</div>`;
+  }).join('');
+
+  activeCandIdx = 0;
+}
+
+function buildCandidatePanel(cand, nurses, days, year, month, ci) {
+  const daysInMonth = days.length;
+  const offTarget = Math.round(daysInMonth * 8 / 28);
+
+  // 警告
+  let warnHtml = '';
+  if (cand.warnings?.length > 0) {
+    warnHtml = `<div class="cand-warns">⚠️ <strong>注意事項</strong>
+      <ul>${cand.warnings.slice(0, 10).map(w => `<li>${w}</li>`).join('')}</ul>
+      ${cand.warnings.length > 10 ? `<p style="margin-top:4px">... 他${cand.warnings.length-10}件</p>` : ''}
+    </div>`;
+  }
+
+  // 凡例
+  const legendHtml = `<div class="legend">
+    ${Object.entries(SHIFT_LABEL).map(([k,v]) =>
+      `<div class="legend-item"><span class="legend-box ${v.cls}"></span>${v.text} = ${
+        k==='day'?'日勤':k==='late'?'遅出':k==='night'?'夜勤':k==='off'?'公休':k==='holiday'?'有給':'明け'}</div>`
+    ).join('')}
+  </div>`;
+
+  // シフトグリッド
+  const headerCells = days.map(d => {
+    const dow = new Date(year, month - 1, d).getDay();
+    const cls = dow === 0 ? 'style="color:#ef4444"' : dow === 6 ? 'style="color:#3b82f6"' : '';
+    return `<th ${cls}>${d}<br><span style="font-size:9px">${DAY_NAMES[dow]}</span></th>`;
+  }).join('');
+
+  const bodyRows = nurses.map(n => {
+    const cells = days.map(d => {
+      const date = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dow  = new Date(year, month - 1, d).getDay();
+      const st   = cand.shifts[n.id]?.[date] || 'off';
+      const info = SHIFT_LABEL[st] || { text: '?', cls: '' };
+      const satSun = dow === 0 ? ' s-sun' : dow === 6 ? ' s-sat' : '';
+      return `<td><div class="shift-cell ${info.cls}${satSun}">${info.text}</div></td>`;
+    }).join('');
+
+    return `<tr>
+      <td class="nurse-name">${n.name}<span class="wt">${WT_LABEL[n.work_type]||''}</span></td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  // 統計
+  const statsRows = nurses.map(n => {
+    const s = cand.stats[n.id] || {};
+    const offWarn = s.offs < offTarget - 1;
+    return `<tr>
+      <td style="text-align:left">${n.name}</td>
+      <td>${WT_LABEL[n.work_type]||''}</td>
+      <td>${s.days || 0}</td>
+      <td>${s.lates || 0}</td>
+      <td>${s.nights || 0}</td>
+      <td>${s.afterNights || 0}</td>
+      <td class="${offWarn ? 'stat-warn' : ''}">${s.offs || 0}${offWarn ? ` ⚠️(目標${offTarget})` : ''}</td>
+      <td>${s.paid || 0}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <div class="cand-header">
+      <div>
+        <h3 style="font-size:16px;color:#1e293b">案 ${ci+1}: ${cand.name}</h3>
+        <p class="cand-desc">${cand.desc}</p>
+      </div>
+      <button class="btn btn-success" onclick="saveCandidate(${ci})">
+        ✅ この案を採用して保存する
+      </button>
+    </div>
+    ${warnHtml}
+    ${legendHtml}
+    <div class="shift-table-wrap">
+      <table class="shift-table">
+        <thead><tr>
+          <th class="nurse-col">看護師</th>
+          ${headerCells}
+        </tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+
+    <h4 style="font-size:14px;color:#1e293b;margin-top:20px;margin-bottom:4px">📊 個人別統計</h4>
+    <p style="font-size:12px;color:#94a3b8;margin-bottom:8px">4週8休目標: ${offTarget}日 ／ 明けは公休カウント外</p>
+    <div style="overflow-x:auto">
+      <table class="stats-table">
+        <thead><tr>
+          <th style="text-align:left">氏名</th>
+          <th>区分</th>
+          <th>日勤</th>
+          <th>遅出</th>
+          <th>夜勤</th>
+          <th>明け</th>
+          <th>公休</th>
+          <th>有給</th>
+        </tr></thead>
+        <tbody>${statsRows}</tbody>
+      </table>
+    </div>
+
+    <div class="save-bar">
+      <button class="btn btn-success" onclick="saveCandidate(${ci})">✅ この案を採用して保存する</button>
+      <span class="save-note">保存すると既存の自動生成シフトは上書きされます</span>
+    </div>
+  `;
+}
+
+function switchCand(idx) {
+  document.querySelectorAll('.c-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+  document.querySelectorAll('.candidate-panel').forEach((p, i) => p.classList.toggle('active', i === idx));
+  activeCandIdx = idx;
+}
+
+async function saveCandidate(ci) {
+  if (!generatedData) return;
+  const cand = generatedData.candidates[ci];
+  const { year, month } = generatedData;
+
+  if (!confirm(`「${cand.name}」案を採用して保存しますか？\n既存の自動生成シフト（${year}年${month}月）は上書きされます。`)) return;
+
+  try {
+    const res = await fetch(`/api/generate/${year}/${month}/save`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ shifts: cand.shifts })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showAlert(`✅ ${year}年${month}月のシフトを保存しました（案${ci+1}: ${cand.name}）`, 'success');
+  } catch (err) {
+    showAlert(err.message, 'error');
+  }
+}
+
+function showAlert(msg, type) {
+  const el = document.getElementById('alert');
+  el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  if (type === 'success') setTimeout(() => el.innerHTML = '', 5000);
+}
+</script>
+</body>
+</html>

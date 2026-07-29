@@ -16,6 +16,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/nurses', require('./routes/nurses'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api', require('./routes/preferences'));
+app.use('/api', require('./routes/generate'));
 
 // ─── 初期化（サーバーレス対応：コールドスタート時に1回だけ実行） ───
 let initPromise = null;

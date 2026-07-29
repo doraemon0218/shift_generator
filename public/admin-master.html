@@ -126,6 +126,7 @@
   <h1>🏥 手術室シフト管理</h1>
   <div class="nav">
     <a href="/admin-master.html">スタッフマスタ</a>
+    <a href="/shift-generate.html" style="background:#2563eb;color:white;padding:6px 14px;border-radius:6px;font-weight:700;">✨ シフト自動生成</a>
     <button class="logout-btn" onclick="logout()">ログアウト</button>
   </div>
 </header>
@@ -139,6 +140,7 @@
     <button class="tab" onclick="switchTab('deadlines')">📅 締め切り設定</button>
     <button class="tab" onclick="switchTab('ranking')">🏆 ランキング</button>
     <button class="tab" onclick="switchTab('staffing')">👥 配置人数</button>
+    <button class="tab" onclick="switchTab('submission')">📋 提出状況</button>
   </div>
 
   <!-- 看護師一覧パネル -->
@@ -331,6 +333,38 @@
     </div>
   </div>
 
+  <!-- 提出状況パネル -->
+  <div class="panel" id="panel-submission">
+    <div class="card">
+      <div class="card-header">
+        <h2>📋 シフト希望 提出状況</h2>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="sub-year" style="border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:13px;"></select>
+          <select id="sub-month" style="border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:13px;"></select>
+          <button class="btn btn-secondary btn-sm" onclick="loadSubmissionStatus()">更新</button>
+        </div>
+      </div>
+      <div id="submission-summary" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>氏名</th>
+            <th>勤務区分</th>
+            <th>提出状況</th>
+            <th>公休希望</th>
+            <th>有給希望</th>
+            <th>遅出希望</th>
+            <th>夜勤希望</th>
+            <th>提出日時</th>
+          </tr>
+        </thead>
+        <tbody id="submission-table-body">
+          <tr><td colspan="8"><div class="empty-state">月を選択してください</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 <!-- 看護師追加・編集モーダル -->
 <div class="modal-overlay" id="nurse-modal">
   <div class="modal">
@@ -397,14 +431,15 @@ function authHeaders() { return { 'Content-Type': 'application/json', 'Authoriza
 function logout() { localStorage.clear(); location.href = '/index.html'; }
 
 function switchTab(tab) {
-  const tabs = ['nurses','pairs','deadlines','ranking','staffing'];
+  const tabs = ['nurses','pairs','deadlines','ranking','staffing','submission'];
   document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', tabs[i] === tab));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById(`panel-${tab}`).classList.add('active');
-  if (tab === 'pairs')     loadPairs();
-  if (tab === 'deadlines') loadDeadlines();
-  if (tab === 'ranking')   loadRanking();
-  if (tab === 'staffing')  initStaffingTab();
+  if (tab === 'pairs')      loadPairs();
+  if (tab === 'deadlines')  loadDeadlines();
+  if (tab === 'ranking')    loadRanking();
+  if (tab === 'staffing')   initStaffingTab();
+  if (tab === 'submission') initSubmissionTab();
 }
 
 async function loadRanking() {
@@ -780,6 +815,102 @@ async function saveStaffingConfig() {
     document.getElementById('staffing-saved').textContent = `✅ ${year}年${month}月の設定を保存しました`;
     setTimeout(() => { document.getElementById('staffing-saved').textContent = ''; }, 3000);
   } catch { showAlert('保存に失敗しました'); }
+}
+
+// === 提出状況 ===
+function initSubmissionTab() {
+  const yearSel  = document.getElementById('sub-year');
+  const monthSel = document.getElementById('sub-month');
+  if (yearSel.options.length > 0) { loadSubmissionStatus(); return; }
+
+  const now = new Date();
+  for (let y = now.getFullYear(); y <= now.getFullYear() + 1; y++) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y + '年';
+    yearSel.appendChild(o);
+  }
+  for (let m = 1; m <= 12; m++) {
+    const o = document.createElement('option');
+    o.value = m; o.textContent = m + '月';
+    if (m === now.getMonth() + 2) o.selected = true;
+    monthSel.appendChild(o);
+  }
+  loadSubmissionStatus();
+}
+
+async function loadSubmissionStatus() {
+  const year  = document.getElementById('sub-year').value;
+  const month = document.getElementById('sub-month').value;
+
+  try {
+    // 全看護師とその月の希望状況を取得
+    const [nursesRes, prefRes] = await Promise.all([
+      fetch('/api/nurses', { headers: authHeaders() }).then(r => r.json()),
+      fetch(`/api/preferences?year=${year}&month=${month}`, { headers: authHeaders() }).then(r => r.json())
+    ]);
+
+    // prefRes: 全看護師の希望一覧（管理者は全員取得可能）
+    // 看護師ごとに集計
+    const prefByNurse = {};
+    const submittedAt = {};
+    for (const p of prefRes) {
+      if (!prefByNurse[p.nurse_id]) {
+        prefByNurse[p.nurse_id] = { off: 0, paid: 0, late_wish: 0, night_wish: 0, submitted: false };
+      }
+      if (p.preference === 'off_request') prefByNurse[p.nurse_id].off++;
+      if (p.preference === 'paid_leave')  prefByNurse[p.nurse_id].paid++;
+      if (p.preference === 'late_wish')   prefByNurse[p.nurse_id].late_wish++;
+      if (p.preference === 'night_wish')  prefByNurse[p.nurse_id].night_wish++;
+      if (p.is_submitted) {
+        prefByNurse[p.nurse_id].submitted = true;
+        if (!submittedAt[p.nurse_id] && p.updated_at) submittedAt[p.nurse_id] = p.updated_at;
+      }
+    }
+
+    const WT = { day_only: '日勤のみ', day_late: '日勤・遅出', full: '日勤・遅出・夜勤' };
+    const submitted = nursesRes.filter(n => prefByNurse[n.id]?.submitted).length;
+    const pending   = nursesRes.length - submitted;
+
+    // サマリー
+    document.getElementById('submission-summary').innerHTML = `
+      <span class="badge badge-green" style="font-size:13px;padding:6px 14px;">✅ 提出済み ${submitted}名</span>
+      <span class="badge badge-red"   style="font-size:13px;padding:6px 14px;">⏳ 未提出 ${pending}名</span>
+      <span class="badge badge-gray"  style="font-size:13px;padding:6px 14px;">合計 ${nursesRes.length}名</span>
+    `;
+
+    const tbody = document.getElementById('submission-table-body');
+    // 未提出者を先に表示
+    const sorted = [...nursesRes].sort((a, b) => {
+      const aS = prefByNurse[a.id]?.submitted ? 1 : 0;
+      const bS = prefByNurse[b.id]?.submitted ? 1 : 0;
+      return aS - bS;
+    });
+
+    tbody.innerHTML = sorted.map(n => {
+      const p = prefByNurse[n.id] || {};
+      const isSubmitted = p.submitted;
+      const submDt = submittedAt[n.id]
+        ? new Date(submittedAt[n.id]).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })
+        : '—';
+
+      return `<tr style="${isSubmitted ? '' : 'background:#fff7f7;'}">
+        <td><strong>${n.name}</strong></td>
+        <td>${WT[n.work_type] || ''}</td>
+        <td>
+          ${isSubmitted
+            ? '<span class="badge badge-green">✅ 提出済み</span>'
+            : '<span class="badge badge-red">⏳ 未提出</span>'}
+        </td>
+        <td>${p.off || 0}日</td>
+        <td>${p.paid || 0}日</td>
+        <td>${n.work_type !== 'day_only' ? (p.late_wish || 0)+'日' : '—'}</td>
+        <td>${n.work_type === 'full' ? (p.night_wish || 0)+'日' : '—'}</td>
+        <td style="color:#64748b;font-size:12px">${submDt}</td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    showAlert('提出状況の取得に失敗しました: ' + err.message);
+  }
 }
 
 // 初期ロード

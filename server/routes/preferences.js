@@ -57,16 +57,27 @@ router.get('/shift-config/:year/:month', requireAuth, async (req, res) => {
   }
 });
 
-// 希望一覧取得（自分の月分）
+// 希望一覧取得（自分の月分 / 管理者は全員分または指定看護師）
 router.get('/preferences', requireAuth, async (req, res) => {
   const { year, month, nurse_id } = req.query;
   if (!year || !month) return res.status(400).json({ error: 'year/monthが必要です' });
 
-  // 管理者は nurse_id 指定で取得可能、看護師は自分のみ
-  const targetId = (req.user.role === 'admin' && nurse_id) ? parseInt(nurse_id) : req.user.nurse_id;
-  if (!targetId) return res.status(400).json({ error: '対象看護師が特定できません' });
-
   try {
+    if (req.user.role === 'admin') {
+      // 管理者: nurse_id 指定があればその1名、なければ全員分
+      const cond   = nurse_id ? `AND nurse_id=$3` : '';
+      const params = nurse_id ? [year, month, parseInt(nurse_id)] : [year, month];
+      const result = await pool.query(
+        `SELECT id, nurse_id, year, month, date::text, preference, note, is_submitted, created_at, updated_at
+         FROM shift_preferences WHERE year=$1 AND month=$2 ${cond} ORDER BY nurse_id, date`,
+        params
+      );
+      return res.json(result.rows);
+    }
+
+    // 看護師は自分のみ
+    const targetId = req.user.nurse_id;
+    if (!targetId) return res.status(400).json({ error: '対象看護師が特定できません' });
     const result = await pool.query(
       `SELECT id, nurse_id, year, month, date::text, preference, note, is_submitted, created_at, updated_at
        FROM shift_preferences WHERE nurse_id=$1 AND year=$2 AND month=$3 ORDER BY date`,
