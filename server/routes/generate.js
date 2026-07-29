@@ -272,8 +272,8 @@ router.post('/generate/:year/:month', requireAdmin, async (req, res) => {
       `SELECT * FROM shift_configs WHERE year=$1 AND month=$2`, [year, month]
     );
     const config = cfgRes.rows[0] || {
-      day_counts:  [6,6,6,6,6,5,5],
-      late_counts: [2,2,1,2,1,0,0],
+      day_counts:  [2,22,22,22,22,22,2],  // 日: 日曜=2, 月〜金=22, 土=2
+      late_counts: [2, 2, 2, 2, 2, 2,2],  // 遅出: 全曜日2
       night_count: 2
     };
 
