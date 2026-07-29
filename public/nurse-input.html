@@ -138,6 +138,17 @@
 
   .toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #2d3748; color: white; padding: 10px 20px; border-radius: 9999px; font-size: 13px; z-index: 100; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; }
   .toast.show { opacity: 1; }
+
+  .deadline-banner {
+    margin: 0; padding: 10px 16px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; font-weight: 600;
+  }
+  .deadline-banner.safe    { background: #ebf8ff; color: #2b6cb0; }
+  .deadline-banner.warning { background: #fffbeb; color: #b7791f; }
+  .deadline-banner.urgent  { background: #fff5f5; color: #c53030; }
+  .deadline-banner.expired { background: #f7fafc; color: #718096; }
+  .deadline-countdown { margin-left: auto; font-size: 12px; opacity: 0.85; }
 </style>
 </head>
 <body>
@@ -149,6 +160,8 @@
   </div>
   <div class="nurse-info" id="nurse-info">読み込み中...</div>
 </header>
+
+<div id="deadline-banner" style="display:none"></div>
 
 <div class="month-nav">
   <button id="prev-btn" onclick="changeMonth(-1)">‹</button>
@@ -217,6 +230,8 @@ let submitted = false;
 let maxOffDays = null;
 let maxNightWish = 2;
 let targetYear, targetMonth;
+let deadlineDate = null;  // Date object or null
+let deadlineTimer = null;
 
 // ポップオーバー管理
 let popoverTimer = null;
@@ -240,9 +255,11 @@ async function init() {
 async function loadMonth() {
   prefs = {};
   submitted = false;
-  const [prefList, config] = await Promise.all([
+  deadlineDate = null;
+  const [prefList, config, settings] = await Promise.all([
     api(`/api/preferences?year=${targetYear}&month=${targetMonth}`),
-    api(`/api/shift-config/${targetYear}/${targetMonth}`)
+    api(`/api/shift-config/${targetYear}/${targetMonth}`),
+    api(`/api/settings`)
   ]);
   prefList.forEach(p => {
     prefs[p.date] = p.preference;
@@ -250,9 +267,19 @@ async function loadMonth() {
   });
   if (config?.max_off_days) maxOffDays = config.max_off_days;
   else maxOffDays = null;
+
+  // 毎月「前月 deadline_day 日 23:59」が締め切り
+  const deadlineDay = parseInt(settings?.deadline_day);
+  if (deadlineDay >= 1 && deadlineDay <= 31) {
+    // targetMonth の前月 = targetMonth - 2 (0-indexed)
+    deadlineDate = new Date(targetYear, targetMonth - 2, deadlineDay, 23, 59, 59);
+  }
+
   renderMonth();
   renderCounters();
   renderSubmitBtn();
+  renderDeadlineBanner();
+  startDeadlineTimer();
 }
 
 function renderMonth() {
@@ -291,7 +318,7 @@ function renderMonth() {
     cell.dataset.dow  = dow;
     cell.innerHTML = `<span class="day-num">${d}</span><span class="day-label">${opt.label}</span>`;
 
-    if (!submitted) {
+    if (!submitted && !isDeadlinePassed()) {
       if (isTouch) {
         // タッチ端末：タップでボトムシート
         cell.addEventListener('click', () => openSheet(dateStr, dow));
@@ -447,11 +474,19 @@ function renderCounters() {
 
 function renderSubmitBtn() {
   const btn = document.getElementById('submit-btn');
-  if (submitted) { btn.textContent = '提出済み'; btn.disabled = true; btn.classList.add('submitted'); }
-  else           { btn.textContent = '提出する'; btn.disabled = false; btn.classList.remove('submitted'); }
+  if (submitted) {
+    btn.textContent = '✅ 提出済み'; btn.disabled = true; btn.classList.add('submitted');
+  } else if (isDeadlinePassed()) {
+    btn.textContent = '🔒 締め切り済み'; btn.disabled = true; btn.classList.remove('submitted');
+    btn.style.background = '#a0aec0';
+  } else {
+    btn.textContent = '提出する'; btn.disabled = false; btn.classList.remove('submitted');
+    btn.style.background = '';
+  }
 }
 
 async function submitPreferences() {
+  if (isDeadlinePassed()) { showToast('締め切りを過ぎているため提出できません'); return; }
   const offCount = Object.values(prefs).filter(p => p === 'off_request').length;
   if (maxOffDays !== null && offCount > maxOffDays) {
     alert(`公休希望が上限（${maxOffDays}日）を超えています。調整してから提出してください。`); return;
@@ -465,8 +500,61 @@ async function submitPreferences() {
   } catch { showToast('提出に失敗しました'); }
 }
 
+// ─── 締め切りバナー ───
+function renderDeadlineBanner() {
+  const banner = document.getElementById('deadline-banner');
+  if (!deadlineDate) { banner.style.display = 'none'; return; }
+
+  const now = new Date();
+  const diffMs = deadlineDate - now;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const diffMins  = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+  const deadlineStr = deadlineDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' });
+
+  let cls, icon, mainText;
+  if (diffMs <= 0) {
+    cls = 'expired'; icon = '🔒';
+    mainText = `締め切り済み（${deadlineStr} 23:59）`;
+  } else if (diffDays < 1) {
+    cls = 'urgent'; icon = '🚨';
+    mainText = `締切まで あと ${diffHours}時間${diffMins}分！（${deadlineStr} 23:59）`;
+  } else if (diffDays <= 3) {
+    cls = 'warning'; icon = '⚠️';
+    mainText = `締切まで あと ${diffDays}日！（${deadlineStr} 23:59）`;
+  } else {
+    cls = 'safe'; icon = '📅';
+    mainText = `締切まで あと ${diffDays}日（${deadlineStr} 23:59）`;
+  }
+
+  banner.style.display = '';
+  banner.className = `deadline-banner ${cls}`;
+  banner.innerHTML = `<span>${icon}</span><span>${mainText}</span>`;
+}
+
+function startDeadlineTimer() {
+  if (deadlineTimer) clearInterval(deadlineTimer);
+  if (!deadlineDate) return;
+  deadlineTimer = setInterval(() => {
+    renderDeadlineBanner();
+    // 期限を過ぎたらボタンとカレンダーを再レンダリングして即ロック
+    if (deadlineDate && new Date() > deadlineDate) {
+      clearInterval(deadlineTimer);
+      deadlineTimer = null;
+      renderMonth();
+      renderSubmitBtn();
+    }
+  }, 30000);
+}
+
+function isDeadlinePassed() {
+  return deadlineDate ? new Date() > deadlineDate : false;
+}
+
 function changeMonth(delta) {
   hidePopover();
+  if (deadlineTimer) { clearInterval(deadlineTimer); deadlineTimer = null; }
   const d = new Date(targetYear, targetMonth - 1 + delta, 1);
   targetYear = d.getFullYear(); targetMonth = d.getMonth() + 1;
   loadMonth();

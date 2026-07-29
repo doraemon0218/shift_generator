@@ -102,6 +102,60 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   }
 });
 
+// ─── ペア設定（○/×/△マトリクス） ───
+
+// ペア設定一覧
+router.get('/pair-settings', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT ps.*, na.name AS nurse_a_name, nb.name AS nurse_b_name
+       FROM nurse_pair_settings ps
+       JOIN nurses na ON ps.nurse_a_id = na.id
+       JOIN nurses nb ON ps.nurse_b_id = nb.id
+       ORDER BY ps.nurse_a_id, ps.nurse_b_id`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'サーバーエラー' });
+  }
+});
+
+// ペア設定を upsert（status='ok' の場合は削除してデフォルトに戻す）
+router.post('/pair-settings', requireAdmin, async (req, res) => {
+  const { nurse_a_id, nurse_b_id, status, reason } = req.body;
+  if (!nurse_a_id || !nurse_b_id || !status) {
+    return res.status(400).json({ error: '必須項目が不足しています' });
+  }
+  if (nurse_a_id === nurse_b_id) return res.status(400).json({ error: '同一人物は指定できません' });
+
+  const aId = Math.min(nurse_a_id, nurse_b_id);
+  const bId = Math.max(nurse_a_id, nurse_b_id);
+
+  try {
+    if (status === 'ok') {
+      await pool.query(
+        `DELETE FROM nurse_pair_settings WHERE nurse_a_id=$1 AND nurse_b_id=$2`, [aId, bId]
+      );
+      return res.json({ status: 'ok', deleted: true });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO nurse_pair_settings (nurse_a_id, nurse_b_id, status, reason)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (nurse_a_id, nurse_b_id)
+       DO UPDATE SET status=$3, reason=$4, updated_at=NOW()
+       RETURNING *`,
+      [aId, bId, status, reason || null]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'サーバーエラー' });
+  }
+});
+
+// ─── 旧: 禁忌ペア一覧 ───
 // 禁忌ペア一覧
 router.get('/forbidden-pairs', requireAdmin, async (req, res) => {
   try {

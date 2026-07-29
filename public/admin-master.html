@@ -67,6 +67,49 @@
   .alert { padding: 10px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
   .alert-error { background: #fed7d7; color: #c53030; }
   .alert-success { background: #c6f6d5; color: #276749; }
+
+  /* ─── ペアマトリクス ─── */
+  .matrix-table { border-collapse: collapse; table-layout: fixed; }
+  .matrix-table th, .matrix-table td { border: 1px solid #e2e8f0; }
+  .matrix-corner { width: 80px; min-width: 80px; background: #f7fafc; }
+  .matrix-col-header {
+    width: 56px; min-width: 56px; max-width: 56px;
+    padding: 6px 4px; font-size: 11px; font-weight: 600; color: #4a5568;
+    text-align: center; vertical-align: bottom; background: #f7fafc;
+    word-break: break-all; line-height: 1.3;
+  }
+  .matrix-row-header {
+    padding: 4px 8px; font-size: 11px; font-weight: 600; color: #4a5568;
+    white-space: nowrap; background: #f7fafc; max-width: 80px;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .matrix-cell {
+    width: 56px; min-width: 56px; height: 52px;
+    text-align: center; vertical-align: middle;
+    cursor: pointer; transition: filter 0.1s;
+    user-select: none; position: relative;
+  }
+  .matrix-cell:hover { filter: brightness(0.9); }
+  .matrix-cell:active { filter: brightness(0.8); transform: scale(0.95); }
+  .matrix-cell.ok       { background: #f7fafc; }
+  .matrix-cell.forbidden { background: #fed7d7; }
+  .matrix-cell.caution  { background: #fefcbf; }
+  .matrix-cell.mirror   { cursor: default; opacity: 0.55; }
+  .matrix-cell.mirror:hover { filter: none; }
+  .matrix-diagonal { background: #edf2f7; width: 56px; height: 52px; text-align: center; vertical-align: middle; color: #cbd5e0; font-size: 18px; }
+  .cell-symbol { display: block; font-size: 20px; font-weight: 800; line-height: 1; }
+  .cell-date   { display: block; font-size: 9px; color: #a0aec0; margin-top: 2px; line-height: 1; }
+  .cell-symbol.ok       { color: #48bb78; }
+  .cell-symbol.forbidden { color: #e53e3e; }
+  .cell-symbol.caution  { color: #d69e2e; }
+
+  .matrix-legend {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600;
+  }
+  .matrix-legend.ok       { background: #f7fafc; color: #48bb78; border: 1px solid #e2e8f0; }
+  .matrix-legend.forbidden { background: #fed7d7; color: #e53e3e; border: 1px solid #feb2b2; }
+  .matrix-legend.caution  { background: #fefcbf; color: #d69e2e; border: 1px solid #fef08a; }
 </style>
 </head>
 <body>
@@ -84,6 +127,7 @@
   <div class="tabs">
     <button class="tab active" onclick="switchTab('nurses')">👩‍⚕️ 看護師一覧</button>
     <button class="tab" onclick="switchTab('pairs')">🚫 夜勤禁忌ペア</button>
+    <button class="tab" onclick="switchTab('deadlines')">📅 締め切り設定</button>
   </div>
 
   <!-- 看護師一覧パネル -->
@@ -111,22 +155,51 @@
     </div>
   </div>
 
-  <!-- 禁忌ペアパネル -->
+  <!-- 夜勤ペア設定パネル（マトリクス） -->
   <div class="panel" id="panel-pairs">
     <div class="card">
       <div class="card-header">
-        <h2>夜勤禁忌ペア設定</h2>
-        <button class="btn btn-primary" onclick="openAddPairModal()">＋ 禁忌ペアを追加</button>
+        <h2>夜勤ペア設定</h2>
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="display:flex;gap:10px;font-size:13px;align-items:center;">
+            <span class="matrix-legend ok">○ 制限なし</span>
+            <span class="matrix-legend forbidden">× 禁忌</span>
+            <span class="matrix-legend caution">△ 要注意</span>
+          </div>
+        </div>
       </div>
-      <p style="font-size:13px;color:#718096;margin-bottom:16px;">同じ夜勤に入れないペアを登録します。スキルや人間関係等の理由で設定してください。</p>
-      <table>
-        <thead>
-          <tr><th>看護師A</th><th>看護師B</th><th>理由</th><th>操作</th></tr>
-        </thead>
-        <tbody id="pairs-table-body">
-          <tr><td colspan="4"><div class="empty-state">読み込み中...</div></td></tr>
-        </tbody>
-      </table>
+      <p style="font-size:13px;color:#718096;margin-bottom:4px;">
+        セルをクリックすると ○ → × → △ → ○ と切り替わります。設定は翌月以降のシフト生成にも反映されます。
+      </p>
+      <p id="pair-matrix-updated" style="font-size:12px;color:#a0aec0;margin-bottom:16px;"></p>
+      <div id="pair-matrix-container" style="overflow-x:auto;">
+        <div class="empty-state"><p>読み込み中...</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- 締め切り設定パネル -->
+  <div class="panel" id="panel-deadlines">
+    <div class="card">
+      <div class="card-header">
+        <h2>シフト希望締め切り設定</h2>
+      </div>
+      <p style="font-size:13px;color:#718096;margin-bottom:24px;">
+        毎月、前月の指定した日の 23:59 が締め切りになります。看護師の希望入力画面に自動でカウントダウンが表示されます。
+      </p>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-size:15px;font-weight:600;color:#2d3748;">毎月前月</span>
+        <input type="number" id="f-deadline-day" min="1" max="31"
+          style="width:72px;border:2px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:20px;font-weight:700;text-align:center;outline:none;"
+          placeholder="25"
+          onfocus="this.style.borderColor='#4299e1'"
+          onblur="this.style.borderColor='#e2e8f0'">
+        <span style="font-size:15px;font-weight:600;color:#2d3748;">日 23:59 に締め切り</span>
+        <button class="btn btn-primary" onclick="saveDeadlineDay()">保存</button>
+      </div>
+      <p id="deadline-day-example" style="font-size:13px;color:#a0aec0;margin-top:16px;"></p>
+      <p id="deadline-day-saved"   style="font-size:13px;color:#276749;margin-top:4px;"></p>
     </div>
   </div>
 </div>
@@ -178,29 +251,6 @@
   </div>
 </div>
 
-<!-- 禁忌ペア追加モーダル -->
-<div class="modal-overlay" id="pair-modal">
-  <div class="modal">
-    <h3>夜勤禁忌ペアを追加</h3>
-    <div id="pair-modal-alert"></div>
-    <div class="form-group">
-      <label>看護師A *</label>
-      <select id="f-nurse-a"></select>
-    </div>
-    <div class="form-group">
-      <label>看護師B *</label>
-      <select id="f-nurse-b"></select>
-    </div>
-    <div class="form-group">
-      <label>理由（任意）</label>
-      <input type="text" id="f-pair-reason" placeholder="例：スキルバランス不適">
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal('pair-modal')">キャンセル</button>
-      <button class="btn btn-primary" onclick="savePair()">登録</button>
-    </div>
-  </div>
-</div>
 
 <script>
 const WORK_TYPE = { day_only: '日勤のみ', day_late: '日勤・遅出', full: '日勤・遅出・夜勤' };
@@ -220,10 +270,11 @@ function authHeaders() { return { 'Content-Type': 'application/json', 'Authoriza
 function logout() { localStorage.clear(); location.href = '/index.html'; }
 
 function switchTab(tab) {
-  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', ['nurses','pairs'][i] === tab));
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', ['nurses','pairs','deadlines'][i] === tab));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById(`panel-${tab}`).classList.add('active');
   if (tab === 'pairs') loadPairs();
+  if (tab === 'deadlines') loadDeadlines();
 }
 
 function showAlert(msg, type = 'error') {
@@ -238,6 +289,10 @@ async function loadNurses() {
     const res = await fetch('/api/nurses', { headers: authHeaders() });
     nurses = await res.json();
     renderNurses();
+    // ペアタブが開いていれば再描画
+    if (document.getElementById('panel-pairs').classList.contains('active')) {
+      loadPairs();
+    }
   } catch { showAlert('看護師データの取得に失敗しました'); }
 }
 
@@ -336,62 +391,172 @@ async function deleteNurse(id, name) {
   if (res.ok) loadNurses();
 }
 
-// === 禁忌ペア管理 ===
+// === ペア設定マトリクス ===
+let pairSettings = {};  // key: "minId-maxId" → {status, updated_at, reason}
+let latestPairUpdate = null;
+
+function pairKey(aId, bId) {
+  return `${Math.min(aId, bId)}-${Math.max(aId, bId)}`;
+}
+
+function statusSymbol(s) {
+  return s === 'forbidden' ? '×' : s === 'caution' ? '△' : '○';
+}
+
+function nextStatus(s) {
+  return s === 'ok' ? 'forbidden' : s === 'forbidden' ? 'caution' : 'ok';
+}
+
 async function loadPairs() {
   try {
-    const res = await fetch('/api/nurses/forbidden-pairs', { headers: authHeaders() });
-    const pairs = await res.json();
-    const tbody = document.getElementById('pairs-table-body');
-    if (pairs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><p>禁忌ペアは登録されていません</p></div></td></tr>';
-      return;
-    }
-    tbody.innerHTML = pairs.map(p => `
-      <tr>
-        <td>${p.nurse_a_name}</td>
-        <td>${p.nurse_b_name}</td>
-        <td>${p.reason || '—'}</td>
-        <td><button class="btn btn-danger btn-sm" onclick="deletePair(${p.id})">削除</button></td>
-      </tr>
-    `).join('');
-  } catch { showAlert('禁忌ペアデータの取得に失敗しました'); }
+    const res = await fetch('/api/nurses/pair-settings', { headers: authHeaders() });
+    const settings = await res.json();
+    pairSettings = {};
+    latestPairUpdate = null;
+    settings.forEach(s => {
+      pairSettings[pairKey(s.nurse_a_id, s.nurse_b_id)] = s;
+      const t = new Date(s.updated_at);
+      if (!latestPairUpdate || t > latestPairUpdate) latestPairUpdate = t;
+    });
+    renderPairMatrix();
+  } catch { showAlert('ペア設定の取得に失敗しました'); }
 }
 
-function openAddPairModal() {
-  const nightNurses = nurses.filter(n => n.work_type === 'full' && n.skill_level === 'skilled');
-  const options = nightNurses.map(n => `<option value="${n.id}">${n.name}</option>`).join('');
-  document.getElementById('f-nurse-a').innerHTML = options;
-  document.getElementById('f-nurse-b').innerHTML = options;
-  document.getElementById('f-pair-reason').value = '';
-  document.getElementById('pair-modal-alert').innerHTML = '';
-  document.getElementById('pair-modal').classList.add('open');
+function renderPairMatrix() {
+  const container = document.getElementById('pair-matrix-container');
+  const updatedEl = document.getElementById('pair-matrix-updated');
+  const nightNurses = nurses.filter(n => n.work_type === 'full' && n.is_active !== false);
+
+  if (latestPairUpdate) {
+    updatedEl.textContent = `最終更新: ${latestPairUpdate.toLocaleString('ja-JP')}`;
+  } else {
+    updatedEl.textContent = '設定なし（すべて ○ 制限なし）';
+  }
+
+  if (nightNurses.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>夜勤対応（フル勤務）の看護師が登録されていません</p></div>';
+    return;
+  }
+
+  // ヘッダー行
+  let html = '<table class="matrix-table"><thead><tr><th class="matrix-corner"></th>';
+  nightNurses.forEach(n => {
+    html += `<th class="matrix-col-header">${n.name}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  nightNurses.forEach((rowNurse, i) => {
+    html += `<tr><td class="matrix-row-header" title="${rowNurse.name}">${rowNurse.name}</td>`;
+    nightNurses.forEach((colNurse, j) => {
+      if (i === j) {
+        // 対角線
+        html += '<td class="matrix-diagonal">—</td>';
+      } else {
+        const key = pairKey(rowNurse.id, colNurse.id);
+        const setting = pairSettings[key];
+        const status = setting?.status || 'ok';
+        const isMirror = j < i;  // 下三角 = ミラー（視覚的に表示するが薄く）
+        const dateStr = setting?.updated_at
+          ? new Date(setting.updated_at).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })
+          : null;
+        const titleAttr = setting?.updated_at
+          ? `最終更新: ${new Date(setting.updated_at).toLocaleString('ja-JP')}${setting.reason ? ' / ' + setting.reason : ''}`
+          : '未設定（制限なし）';
+
+        html += `<td
+          class="matrix-cell ${status}${isMirror ? ' mirror' : ''}"
+          title="${titleAttr}"
+          ${!isMirror ? `onclick="togglePair(${rowNurse.id}, ${colNurse.id})"` : ''}
+        >
+          <span class="cell-symbol ${status}">${statusSymbol(status)}</span>
+          ${!isMirror && dateStr ? `<span class="cell-date">${dateStr}</span>` : ''}
+        </td>`;
+      }
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
 }
 
-async function savePair() {
-  const body = {
-    nurse_a_id: parseInt(document.getElementById('f-nurse-a').value),
-    nurse_b_id: parseInt(document.getElementById('f-nurse-b').value),
-    reason: document.getElementById('f-pair-reason').value.trim()
-  };
+async function togglePair(aId, bId) {
+  const key = pairKey(aId, bId);
+  const current = pairSettings[key]?.status || 'ok';
+  const next = nextStatus(current);
+
+  // 楽観的UI更新
+  if (next === 'ok') {
+    delete pairSettings[key];
+  } else {
+    pairSettings[key] = { ...(pairSettings[key] || {}), status: next, updated_at: new Date().toISOString() };
+  }
+  latestPairUpdate = new Date();
+  renderPairMatrix();
+
   try {
-    const res = await fetch('/api/nurses/forbidden-pairs', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+    const res = await fetch('/api/nurses/pair-settings', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ nurse_a_id: aId, nurse_b_id: bId, status: next })
+    });
+    if (!res.ok) throw new Error();
     const data = await res.json();
-    if (!res.ok) {
-      document.getElementById('pair-modal-alert').innerHTML = `<div class="alert alert-error">${data.error}</div>`;
-      return;
+    // サーバーの updated_at で更新
+    if (next !== 'ok') {
+      pairSettings[key] = data;
+      latestPairUpdate = new Date(data.updated_at);
+      renderPairMatrix();
     }
-    closeModal('pair-modal');
-    showAlert('禁忌ペアを登録しました', 'success');
-    loadPairs();
-  } catch { document.getElementById('pair-modal-alert').innerHTML = '<div class="alert alert-error">サーバーエラー</div>'; }
+  } catch {
+    showAlert('保存に失敗しました。ページを再読み込みしてください。');
+    loadPairs();  // サーバー状態に戻す
+  }
 }
 
-async function deletePair(id) {
-  if (!confirm('この禁忌ペアを削除しますか？')) return;
-  const res = await fetch(`/api/nurses/forbidden-pairs/${id}`, { method: 'DELETE', headers: authHeaders() });
-  const data = await res.json();
-  showAlert(res.ok ? data.message : data.error, res.ok ? 'success' : 'error');
-  if (res.ok) loadPairs();
+// === 締め切り設定（グローバル: 毎月前月○日） ===
+async function loadDeadlines() {
+  try {
+    const res = await fetch('/api/settings', { headers: authHeaders() });
+    const settings = await res.json();
+    const day = settings.deadline_day || '';
+    document.getElementById('f-deadline-day').value = day;
+    updateDeadlineExample(day);
+  } catch { showAlert('設定の取得に失敗しました'); }
+}
+
+function updateDeadlineExample(day) {
+  const el = document.getElementById('deadline-day-example');
+  if (!day || day < 1 || day > 31) { el.textContent = ''; return; }
+  const now = new Date();
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  el.textContent =
+    `例: ${nextMonth.getFullYear()}年${nextMonth.getMonth() + 1}月分のシフト希望は` +
+    ` ${nextMonth.getFullYear()}年${nextMonth.getMonth()}月${day}日 23:59 まで入力できます`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('f-deadline-day');
+  if (input) input.addEventListener('input', () => updateDeadlineExample(input.value));
+});
+
+async function saveDeadlineDay() {
+  const day = parseInt(document.getElementById('f-deadline-day').value);
+  if (!day || day < 1 || day > 31) {
+    showAlert('1〜31の日付を入力してください');
+    return;
+  }
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ key: 'deadline_day', value: day })
+    });
+    if (!res.ok) throw new Error();
+    document.getElementById('deadline-day-saved').textContent =
+      `✅ 保存しました（毎月前月${day}日 23:59 締め切り）`;
+    showAlert(`締め切りを「毎月前月${day}日」に設定しました`, 'success');
+  } catch { showAlert('保存に失敗しました'); }
 }
 
 // 初期ロード

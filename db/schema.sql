@@ -84,6 +84,32 @@ CREATE TABLE IF NOT EXISTS generated_shifts (
   UNIQUE (nurse_id, date)
 );
 
+-- 夜勤ペア設定（○=制限なし / ×=禁忌 / △=要注意、永続保存）
+CREATE TABLE IF NOT EXISTS nurse_pair_settings (
+  id SERIAL PRIMARY KEY,
+  nurse_a_id INTEGER NOT NULL REFERENCES nurses(id) ON DELETE CASCADE,
+  nurse_b_id INTEGER NOT NULL REFERENCES nurses(id) ON DELETE CASCADE,
+  status VARCHAR(10) NOT NULL DEFAULT 'ok' CHECK (status IN ('ok', 'forbidden', 'caution')),
+  reason TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (nurse_a_id, nurse_b_id),
+  CHECK (nurse_a_id <> nurse_b_id),
+  CHECK (nurse_a_id < nurse_b_id)
+);
+
+DROP TRIGGER IF EXISTS nurse_pair_settings_updated_at ON nurse_pair_settings;
+CREATE TRIGGER nurse_pair_settings_updated_at
+  BEFORE UPDATE ON nurse_pair_settings
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- システム設定（key-value、deadline_day など）
+CREATE TABLE IF NOT EXISTS system_settings (
+  key VARCHAR(100) PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Phase 4用: 累積実績（月締め後に記録）
 CREATE TABLE IF NOT EXISTS nurse_monthly_stats (
   id SERIAL PRIMARY KEY,
