@@ -199,6 +199,8 @@
   .pop-btn.p-late-wish  { background:var(--late-wish);  color:var(--col-late-wish); }
   .pop-btn.p-paid-leave { background:var(--paid-leave); color:var(--col-paid-leave); }
   .pop-limit { font-size:10px; opacity:0.65; margin-left:auto; }
+  .pop-btn.not-applicable   { background:#f1f5f9 !important; color:#b0bec5 !important; opacity:0.55; cursor:not-allowed; }
+  .option-btn.not-applicable { background:#f1f5f9 !important; color:#b0bec5 !important; opacity:0.45; cursor:not-allowed; }
 
   .modal-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:60; align-items:flex-end; justify-content:center; }
   .modal-overlay.open { display:flex; }
@@ -331,6 +333,8 @@ const WORK_TYPE_OPTIONS = {
   day_late: ['available', 'no_late', 'late_wish', 'paid_leave', 'off_request'],
   full:     ['available', 'no_late', 'no_night', 'late_wish', 'night_wish', 'paid_leave', 'off_request'],
 };
+// ポップオーバーに全選択肢を表示する順序（勤務区分外はグレーアウト）
+const ALL_OPTIONS = ['available', 'no_late', 'no_night', 'late_wish', 'night_wish', 'paid_leave', 'off_request'];
 
 const MAX_NIGHT_WISH = 4;
 const MAX_LATE_WISH  = 4;
@@ -578,28 +582,30 @@ function showPopover(dateStr, cell) {
   const nightCount = Object.values(prefs).filter(p => p === 'night_wish').length;
   const lateCount  = Object.values(prefs).filter(p => p === 'late_wish').length;
 
-  pop.innerHTML = allowed.map(key => {
+  pop.innerHTML = ALL_OPTIONS.map(key => {
     const o = OPTIONS_DEF[key];
     const sel = current === key;
+    const na       = !allowed.includes(key);
     const disNight = key === 'night_wish' && nightCount >= MAX_NIGHT_WISH && !sel;
     const disLate  = key === 'late_wish'  && lateCount  >= MAX_LATE_WISH  && !sel;
-    const dis = disNight || disLate;
-    return `<button class="pop-btn ${o.cls}${sel?' selected':''}${dis?' disabled':''}"
+    const dis = na || disNight || disLate;
+    const badge = na ? '対象外' : (disNight || disLate) ? '上限' : '';
+    return `<button class="pop-btn ${o.cls}${sel?' selected':''}${dis?' disabled':''}${na?' not-applicable':''}"
       onclick="${dis ? '' : `popSelect('${key}')`}"
       onmouseenter="clearTimeout(popoverTimer)"
       onmouseleave="scheduleHidePopover()">
       <span class="pop-icon">${o.icon}</span><span>${o.name}</span>
-      ${dis ? '<span class="pop-limit">上限</span>' : ''}
+      ${badge ? `<span class="pop-limit">${badge}</span>` : ''}
       ${sel ? '<span style="margin-left:auto">✓</span>' : ''}
     </button>`;
   }).join('');
 
   const rect = cell.getBoundingClientRect();
-  const popW = 172;
+  const popW = 180;
   let left = rect.left + rect.width / 2 - popW / 2;
   left = Math.max(8, Math.min(left, window.innerWidth - popW - 8));
 
-  const popH = allowed.length * 38 + 16;
+  const popH = ALL_OPTIONS.length * 38 + 16;
   const showBelow = rect.top < popH + 20;
   pop.classList.toggle('below', showBelow);
   pop.style.left  = left + 'px';
@@ -634,17 +640,20 @@ function openSheet(dateStr, dow) {
   const nightCount = Object.values(prefs).filter(p => p === 'night_wish').length;
   const lateCount  = Object.values(prefs).filter(p => p === 'late_wish').length;
 
-  document.getElementById('sheet-options').innerHTML = allowed.map(key => {
+  document.getElementById('sheet-options').innerHTML = ALL_OPTIONS.map(key => {
     const o   = OPTIONS_DEF[key];
     const sel = current === key;
+    const na       = !allowed.includes(key);
     const disNight = key === 'night_wish' && nightCount >= MAX_NIGHT_WISH && !sel;
     const disLate  = key === 'late_wish'  && lateCount  >= MAX_LATE_WISH  && !sel;
-    const dis = disNight || disLate;
-    const limitLabel = disNight ? `（上限 ${MAX_NIGHT_WISH}回）` : disLate ? `（上限 ${MAX_LATE_WISH}回）` : '';
-    return `<button class="option-btn ${o.ocls}${sel?' selected':''}${dis?' disabled':''}"
+    const dis = na || disNight || disLate;
+    const subLabel = na ? '（あなたの勤務区分では対象外）'
+      : disNight ? `（上限 ${MAX_NIGHT_WISH}回）`
+      : disLate  ? `（上限 ${MAX_LATE_WISH}回）` : '';
+    return `<button class="option-btn ${o.ocls}${sel?' selected':''}${dis?' disabled':''}${na?' not-applicable':''}"
       onclick="${dis ? '' : `sheetSelect('${dateStr}','${key}')`}">
       <span class="opt-icon">${o.icon}</span>
-      <span><div class="opt-name">${o.name}${limitLabel}</div><div class="opt-desc">${o.desc}</div></span>
+      <span><div class="opt-name">${o.name}</div><div class="opt-desc">${na ? subLabel : o.desc + subLabel}</div></span>
       ${sel ? '<span class="opt-check">✓</span>' : ''}
     </button>`;
   }).join('');
